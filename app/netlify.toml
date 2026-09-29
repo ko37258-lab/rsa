@@ -1,0 +1,8 @@
+# Netlify 빌드 설정(비밀값 없음). 환경변수는 Netlify 사이트 설정에 있다.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
