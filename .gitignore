@@ -10,3 +10,4 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+lecture64/*.wav
