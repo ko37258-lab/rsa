@@ -6,3 +6,7 @@
 [build.environment]
   NODE_VERSION = "22"
   NEXT_TELEMETRY_DISABLED = "1"
+
+# Next.js 서버 기능(API·미들웨어·SSR)을 Netlify 함수로 변환하는 공식 런타임.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
