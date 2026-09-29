@@ -67,6 +67,9 @@ export default async function globalSetup() {
   const db = new pg.Client({ connectionString: process.env.LOCAL_DB_URL })
   await db.connect()
   await db.query('INSERT INTO public.report_admins(user_id) VALUES ($1)', [adminId])
+  // 수집 토큰은 원문이 아니라 SHA-256 해시만 DB에 등록한다.
+  if (process.env.REPORT_INGEST_TOKEN)
+    await db.query(`INSERT INTO public.blog_ingest_tokens(blog_id, token_sha256) VALUES ('ko372', encode(sha256(convert_to($1, 'UTF8')), 'hex'))`, [process.env.REPORT_INGEST_TOKEN])
   await db.end()
 
   const viewerCookies = await sessionCookies(url, anon, viewer.email, viewer.password)

@@ -3,7 +3,6 @@ import 'server-only'
 export interface ServerEnv {
   supabaseUrl: string
   supabaseAnonKey: string
-  serviceRoleKey: string
   ingestToken: string | null
   appOrigin: string
   allowedBlogId: 'ko372'
@@ -24,7 +23,6 @@ export function readEnv(): EnvStatus {
   }
   const supabaseUrl = get('NEXT_PUBLIC_SUPABASE_URL')
   const supabaseAnonKey = get('NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  const serviceRoleKey = get('SUPABASE_SERVICE_ROLE_KEY')
   const appOrigin = get('APP_ORIGIN')
   const blog = process.env.ALLOWED_BLOG_ID?.trim() || 'ko372'
   const token = process.env.REPORT_INGEST_TOKEN?.trim() || null
@@ -49,12 +47,11 @@ export function readEnv(): EnvStatus {
       problems.push('NEXT_PUBLIC_SUPABASE_URL 형식이 올바르지 않습니다.')
     }
   }
-  if (serviceRoleKey && serviceRoleKey === supabaseAnonKey) problems.push('서비스 역할 키와 anon 키가 같습니다.')
 
   if (missing.length || problems.length) return { ok: false, missing, problems }
   return {
     ok: true,
-    env: { supabaseUrl, supabaseAnonKey, serviceRoleKey, ingestToken: token, appOrigin, allowedBlogId: 'ko372' },
+    env: { supabaseUrl, supabaseAnonKey, ingestToken: token, appOrigin, allowedBlogId: 'ko372' },
   }
 }
 

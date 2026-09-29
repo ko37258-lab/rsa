@@ -4,7 +4,6 @@ import { HttpError } from '../http'
 import { decideWrite } from './decide'
 import { contentHash, etagFor } from './hash'
 import type { BaselineReport, Channel, Metric, Report, RevisionMeta, StoredReport, StoredReportMeta, WeeklyReport } from './types'
-import { reportKeys } from './validate'
 
 const META_COLUMNS = 'report_id, report_type, observed_on, period_start, period_end, content_hash, save_source, created_at, updated_at'
 
@@ -195,28 +194,24 @@ export function reportPath(r: { reportId: string; reportType: string }) {
 }
 
 /**
- * 검증을 통과한 보고서를 저장한다(서비스 역할 클라이언트 사용).
+ * 검증을 통과한 보고서를 저장한다. DB 함수(blog_*)가 관리자 세션 또는 수집 토큰을 다시 확인한다.
  * - 동일 해시: unchanged, 리비전 추가 없음
  * - 신규: If-None-Match: * 필요
  * - 교체: If-Match(최신 ETag) + 이전 해시 조건의 원자적 UPDATE. 경쟁 쓰기 중 한 건만 성공.
  * 리비전은 DB 트리거가 기록한다.
  */
 export async function saveReport(
-  service: SupabaseClient,
+  db: SupabaseClient,
   report: Report,
-  opts: { ifMatch: string | null; ifMatchRaw: string | null; ifNoneMatchStar: boolean; machine: boolean; correction: boolean; userId: string | null },
+  opts: { ifMatch: string | null; ifMatchRaw: string | null; ifNoneMatchStar: boolean; machine: boolean; correction: boolean; token: string | null },
 ): Promise<SaveOutcome> {
   const hash = contentHash(report)
-  const keys = reportKeys(report)
-  const source = opts.machine ? 'ingest_api' : 'admin_upload'
   const path = reportPath(report)
+  const token = opts.machine ? opts.token : null
 
-  const { data: existing, error } = await service
-    .from('blog_reports')
-    .select('content_hash, updated_at, report_type')
-    .eq('report_id', report.reportId)
-    .maybeSingle()
-  if (error) dbFail()
+  const { data: stateRows, error } = await db.rpc('blog_report_state', { p_report_id: report.reportId, p_token: token })
+  if (error) rpcFail(error)
+  const existing = (stateRows as { content_hash: string; updated_at: string }[] | null)?.[0] ?? null
 
   const decision = decideWrite({
     existingHash: existing?.content_hash ?? null,
@@ -242,36 +237,32 @@ export async function saveReport(
     case 'unchanged':
       return ok(200, 'unchanged', existing!.updated_at)
     case 'insert': {
-      const { data, error: insErr } = await service
-        .from('blog_reports')
-        .insert({ ...keys, payload: report, content_hash: hash, saved_by: opts.userId, save_source: source })
-        .select('updated_at')
-        .single()
+      const { data, error: insErr } = await db.rpc('blog_insert_report', { p_payload: report, p_hash: hash, p_token: token })
       if (insErr) {
         if (insErr.code === '23505') {
           // 동시에 같은 ID가 먼저 저장됨: 같은 내용이면 unchanged, 아니면 충돌
-          const { data: now } = await service.from('blog_reports').select('content_hash, updated_at').eq('report_id', report.reportId).maybeSingle()
-          if (now?.content_hash === hash) return ok(200, 'unchanged', now.updated_at)
+          const { data: now } = await db.rpc('blog_report_state', { p_report_id: report.reportId, p_token: token })
+          const row = (now as { content_hash: string; updated_at: string }[] | null)?.[0]
+          if (row?.content_hash === hash) return ok(200, 'unchanged', row.updated_at)
           throw new HttpError(412, 'already_exists', '같은 ID의 다른 보고서가 방금 저장되었습니다. 다시 확인하세요.')
         }
-        if (insErr.code === '23514') throw new HttpError(422, 'db_constraint', '데이터베이스 제약조건 검증에 실패했습니다.')
-        dbFail()
+        rpcFail(insErr)
       }
-      return ok(201, 'created', data!.updated_at)
+      return ok(201, 'created', data as string)
     }
     case 'update': {
-      const { data, error: upErr } = await service
-        .from('blog_reports')
-        .update({ payload: report, content_hash: hash, observed_on: keys.observed_on, saved_by: opts.userId, save_source: source })
-        .eq('report_id', report.reportId)
-        .eq('content_hash', decision.expectedHash)
-        .select('updated_at')
-      if (upErr) {
-        if (upErr.code === '23514') throw new HttpError(422, 'db_constraint', '데이터베이스 제약조건 검증에 실패했습니다.')
-        dbFail()
-      }
-      if (!data || data.length !== 1) throw new HttpError(412, 'etag_mismatch', '그 사이 보고서가 변경되었습니다. 최신 내용을 다시 불러와 확인하세요.')
-      return ok(200, 'updated', data[0].updated_at, { previousHash: decision.expectedHash })
+      const { data, error: upErr } = await db.rpc('blog_update_report', { p_payload: report, p_hash: hash, p_expected_hash: decision.expectedHash, p_token: token })
+      if (upErr) rpcFail(upErr)
+      if (!data) throw new HttpError(412, 'etag_mismatch', '그 사이 보고서가 변경되었습니다. 최신 내용을 다시 불러와 확인하세요.')
+      return ok(200, 'updated', data as string, { previousHash: decision.expectedHash })
     }
   }
+}
+
+/** DB 함수 오류를 HTTP 오류로 변환(세부 내용은 노출하지 않음). */
+export function rpcFail(err: { code?: string }): never {
+  if (err.code === '42501') throw new HttpError(403, 'forbidden', '권한이 없습니다.')
+  if (err.code === '23514' || err.code === '22P02' || err.code === '22007' || err.code === '22008')
+    throw new HttpError(422, 'db_constraint', '데이터베이스 제약조건 검증에 실패했습니다.')
+  throw new HttpError(500, 'storage_error', '데이터베이스 처리에 실패했습니다.')
 }

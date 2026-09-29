@@ -2,7 +2,8 @@ import { inclusiveDays, isRealIsoDate, weekdayMon0 } from '@/lib/dates'
 import { authenticate, handle, HttpError, json, readJsonBody } from '@/lib/http'
 import { ERROR_CODE, listRuns, sanitizeSafeMessage } from '@/lib/ops'
 import { consumeRateLimit } from '@/lib/ratelimit'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAnonClient } from '@/lib/supabase/server'
+import { rpcFail } from '@/lib/report/store'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,20 +30,15 @@ export async function POST(req: Request) {
     if (!['running', 'needs_login', 'failed'].includes(status)) throw new HttpError(422, 'invalid_status', 'status는 running, needs_login, failed 중 하나여야 합니다.')
     if (errorCode !== undefined && errorCode !== null && !ERROR_CODE.test(String(errorCode)))
       throw new HttpError(422, 'invalid_error_code', 'errorCode는 영문 소문자·숫자·밑줄 64자 이하입니다.')
-    const { data, error } = await createServiceClient()
-      .from('collection_runs')
-      .insert({
-        blog_id: 'ko372',
-        expected_period_start: s,
-        expected_period_end: e,
-        status,
-        error_code: errorCode ?? null,
-        safe_message: sanitizeSafeMessage(body.safeMessage),
-        finished_at: status === 'running' ? null : new Date().toISOString(),
-      })
-      .select('run_id, status, started_at')
-      .single()
-    if (error) throw new HttpError(500, 'storage_error', '수집 이력 저장에 실패했습니다.')
+    const { data, error } = await createAnonClient().rpc('blog_create_run', {
+      p_token: actor.token,
+      p_start: s,
+      p_end: e,
+      p_status: status,
+      p_error_code: errorCode ?? null,
+      p_message: sanitizeSafeMessage(body.safeMessage),
+    })
+    if (error) rpcFail(error)
     return json({ ok: true, runId: data.run_id, status: data.status, startedAt: data.started_at }, 201)
   })
 }

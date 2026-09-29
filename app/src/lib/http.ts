@@ -106,7 +106,7 @@ export function ingestEnabled(): boolean {
 
 export type Actor =
   | { kind: 'admin'; user: User; supabase: SupabaseClient }
-  | { kind: 'machine' }
+  | { kind: 'machine'; token: string }
 
 /**
  * 관리자 세션 또는(허용된 경우) 수집 토큰으로 요청자를 확인한다.
@@ -117,7 +117,7 @@ export async function authenticate(req: Request, opts: { allowMachine: boolean }
     if (!opts.allowMachine) throw new HttpError(401, 'unauthorized', '인증이 필요합니다.')
     if (!ingestEnabled()) throw new HttpError(503, 'ingest_disabled', '수집 API가 설정되지 않았습니다.')
     if (!verifyIngestToken(req)) throw new HttpError(401, 'unauthorized', '인증이 필요합니다.')
-    return { kind: 'machine' }
+    return { kind: 'machine', token: (req.headers.get('authorization') ?? '').slice(7) }
   }
   const ctx = await getAdminContext()
   if (ctx.kind === 'config') throw new HttpError(503, 'not_configured', '서버 설정이 완료되지 않았습니다.')

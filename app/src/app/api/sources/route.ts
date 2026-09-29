@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { assertSameOrigin, authenticate, handle, HttpError, json, readBodyLimited } from '@/lib/http'
 import { listSourceFiles } from '@/lib/ops'
 import { consumeRateLimit } from '@/lib/ratelimit'
-import { createServiceClient } from '@/lib/supabase/server'
+import { rpcFail } from '@/lib/report/store'
 import { sniffSourceType } from '@/lib/sources'
 
 export const dynamic = 'force-dynamic'
@@ -34,15 +34,14 @@ export async function POST(req: Request) {
     const mediaType = sniffSourceType(name, bytes)
     if (!mediaType) throw new HttpError(415, 'unsupported_file', 'XLSX 또는 UTF-8 CSV 파일만 등록할 수 있습니다.')
     const sha256 = createHash('sha256').update(bytes).digest('hex')
-    const db = createServiceClient()
-    const { data: dup } = await db.from('source_files').select('source_id').eq('sha256', sha256).maybeSingle()
-    if (dup) return json({ ok: true, result: 'unchanged', sourceId: dup.source_id })
-    const { data, error } = await db
-      .from('source_files')
-      .insert({ file_name: name, media_type: mediaType, byte_size: bytes.length, sha256, content: `\\x${Buffer.from(bytes).toString('hex')}`, uploaded_by: actor.user.id })
-      .select('source_id')
-      .single()
-    if (error) throw new HttpError(500, 'storage_error', '원자료 저장에 실패했습니다.')
-    return json({ ok: true, result: 'created', sourceId: data.source_id }, 201)
+    const { data, error } = await actor.supabase.rpc('blog_add_source', {
+      p_file_name: name,
+      p_media_type: mediaType,
+      p_sha256: sha256,
+      p_content_b64: Buffer.from(bytes).toString('base64'),
+    })
+    if (error) rpcFail(error)
+    const out = data as { result: 'created' | 'unchanged'; source_id: string }
+    return json({ ok: true, result: out.result, sourceId: out.source_id }, out.result === 'created' ? 201 : 200)
   })
 }

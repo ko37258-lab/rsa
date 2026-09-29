@@ -1,10 +1,11 @@
 import { assertSameOrigin, authenticate, handle, HttpError, json, problem } from '@/lib/http'
 import { consumeRateLimit } from '@/lib/ratelimit'
 import { etagFor, parseIfMatch } from '@/lib/report/hash'
-import { getReport, REPORT_ID_PATTERN, saveReport } from '@/lib/report/store'
+import { getReport, REPORT_ID_PATTERN, rpcFail, saveReport } from '@/lib/report/store'
 import { validateReport } from '@/lib/report/validate'
 import { readJsonBody } from '@/lib/http'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAnonClient } from '@/lib/supabase/server'
+import type { Report } from '@/lib/report/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,8 +17,27 @@ export async function GET(req: Request, ctx: Ctx) {
     const { reportId } = await ctx.params
     const actor = await authenticate(req, { allowMachine: true })
     if (!REPORT_ID_PATTERN.test(reportId)) throw new HttpError(404, 'not_found', '보고서를 찾을 수 없습니다.')
-    const db = actor.kind === 'admin' ? actor.supabase : createServiceClient()
-    const stored = await getReport(db, reportId)
+    let stored: Awaited<ReturnType<typeof getReport>>
+    if (actor.kind === 'admin') stored = await getReport(actor.supabase, reportId)
+    else {
+      const { data, error } = await createAnonClient().rpc('blog_get_report', { p_report_id: reportId, p_token: actor.token })
+      if (error) rpcFail(error)
+      const r = data as Record<string, string> | null
+      stored = r
+        ? {
+            reportId: r.report_id,
+            reportType: r.report_type as 'weekly' | 'baseline',
+            observedOn: r.observed_on,
+            periodStart: r.period_start ?? null,
+            periodEnd: r.period_end ?? null,
+            contentHash: r.content_hash,
+            saveSource: r.save_source as 'admin_upload' | 'ingest_api',
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+            payload: (r as unknown as { payload: Report }).payload,
+          }
+        : null
+    }
     if (!stored) throw new HttpError(404, 'not_found', '보고서를 찾을 수 없습니다.')
     const { payload, ...meta } = stored
     return json({ ok: true, report: meta, payload }, 200, { ETag: etagFor(stored.contentHash) })
@@ -41,13 +61,13 @@ export async function PUT(req: Request, ctx: Ctx) {
 
     const ifMatchRaw = req.headers.get('if-match')
     try {
-      const out = await saveReport(createServiceClient(), result.report, {
+      const out = await saveReport(actor.kind === 'admin' ? actor.supabase : createAnonClient(), result.report, {
         ifMatch: parseIfMatch(ifMatchRaw),
         ifMatchRaw,
         ifNoneMatchStar: req.headers.get('if-none-match')?.trim() === '*',
         machine: actor.kind === 'machine',
         correction: req.headers.get('x-report-correction') === 'true',
-        userId: actor.kind === 'admin' ? actor.user.id : null,
+        token: actor.kind === 'machine' ? actor.token : null,
       })
       return json({ ...out.body, warnings: result.warnings }, out.status, { ETag: out.etag, Location: `/api/reports/${encodeURIComponent(reportId)}` })
     } catch (e) {

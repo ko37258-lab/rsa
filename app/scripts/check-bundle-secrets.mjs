@@ -4,9 +4,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
-const envFile = path.join(root, '.env.local')
 const env = { ...process.env }
-if (fs.existsSync(envFile)) {
+for (const envFile of ['.env.local', '.env.e2e'].map((f) => path.join(root, f))) {
+  if (!fs.existsSync(envFile)) continue
   for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
     const m = /^([A-Z_]+)=(.*)$/.exec(line.trim())
     if (m && env[m[1]] === undefined) env[m[1]] = m[2]

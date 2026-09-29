@@ -22,18 +22,18 @@ export async function createSessionClient(): Promise<SupabaseClient> {
   })
 }
 
-let admin: SupabaseClient | null = null
+let anon: SupabaseClient | null = null
 
 /**
- * 서비스 역할 클라이언트. RLS를 우회하므로 반드시 서버에서 관리자 확인 또는
- * 수집 토큰 확인을 마친 뒤에만 사용한다. 이 모듈은 브라우저 번들에 포함될 수 없다(server-only).
+ * 세션 없는 anon 클라이언트. 로그인 전 요청 제한과 수집 토큰 경로에서만 쓴다.
+ * 서비스 역할 키는 사용하지 않으며, 모든 쓰기는 DB 함수가 관리자/토큰을 다시 확인한다.
  */
-export function createServiceClient(): SupabaseClient {
-  if (admin) return admin
+export function createAnonClient(): SupabaseClient {
+  if (anon) return anon
   const env = requireEnv()
-  admin = createClient(env.supabaseUrl, env.serviceRoleKey, {
+  anon = createClient(env.supabaseUrl, env.supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { headers: { 'X-Client-Info': 'mrk-blog-insights-server' } },
   })
-  return admin
+  return anon
 }

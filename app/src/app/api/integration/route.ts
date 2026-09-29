@@ -1,7 +1,7 @@
 import { isRealIsoDate } from '@/lib/dates'
 import { assertSameOrigin, authenticate, handle, HttpError, json, readJsonBody } from '@/lib/http'
 import { getIntegrationSettings } from '@/lib/ops'
-import { createServiceClient } from '@/lib/supabase/server'
+import { rpcFail } from '@/lib/report/store'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,18 +28,8 @@ export async function PUT(req: Request) {
     const note = typeof body?.note === 'string' ? body.note.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200) || null : null
     if (connected && (!firstRunOn || !isRealIsoDate(firstRunOn)))
       throw new HttpError(422, 'invalid_first_run', '연결 등록에는 Aside에서 확정한 첫 실행일이 필요합니다.')
-    const { error } = await createServiceClient()
-      .from('integration_settings')
-      .upsert({
-        blog_id: 'ko372',
-        aside_connected: connected,
-        first_run_on: connected ? firstRunOn : null,
-        connected_at: connected ? new Date().toISOString() : null,
-        note,
-        updated_by: actor.user.id,
-        updated_at: new Date().toISOString(),
-      })
-    if (error) throw new HttpError(500, 'storage_error', '연결 설정 저장에 실패했습니다.')
+    const { error } = await actor.supabase.rpc('blog_set_integration', { p_connected: connected, p_first_run: connected ? firstRunOn : null, p_note: note })
+    if (error) rpcFail(error)
     return json({ ok: true, settings: await getIntegrationSettings(actor.supabase) })
   })
 }

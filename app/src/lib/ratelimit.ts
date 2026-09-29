@@ -1,7 +1,7 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { HttpError } from './http'
-import { createServiceClient } from './supabase/server'
+import { createAnonClient } from './supabase/server'
 
 /**
  * DB(Postgres) 카운터 기반 고정 창 요청 제한. 여러 서버 인스턴스가 같은 DB를 공유하므로
@@ -10,7 +10,7 @@ import { createServiceClient } from './supabase/server'
  */
 export async function consumeRateLimit(scope: 'login_ip' | 'login_email' | 'ingest' | 'upload', key: string, limit: number, windowSeconds: number) {
   const bucket = `${scope}:${createHash('sha256').update(key.toLowerCase(), 'utf8').digest('hex')}`
-  const { data, error } = await createServiceClient().rpc('consume_rate_limit', {
+  const { data, error } = await createAnonClient().rpc('consume_rate_limit', {
     p_bucket: bucket,
     p_limit: limit,
     p_window_seconds: windowSeconds,

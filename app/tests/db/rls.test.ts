@@ -185,18 +185,75 @@ describe.skipIf(!enabled)('Supabase 마이그레이션 RLS·권한', () => {
     for (const sql of cases) await tx(async (c) => expect(c.query(sql)).rejects.toThrow(/check constraint/))
   })
 
-  it('요청 제한 함수: 서비스 역할만 실행 가능, 한도 초과 시 false', async () => {
+  it('요청 제한 함수: 한도 초과 시 false, 식별자 형식이 아니면 거부', async () => {
     await tx(async (c) => {
-      await asRole(c, 'authenticated', randomUUID())
-      await expect(c.query(`SELECT public.consume_rate_limit('login_ip:${'c'.repeat(64)}', 1, 60)`)).rejects.toThrow(/permission denied/)
+      await asRole(c, 'anon')
+      const b = `login_ip:${'d'.repeat(64)}`
+      const r = []
+      for (let i = 0; i < 3; i++) r.push((await c.query('SELECT public.consume_rate_limit($1, 2, 60) AS ok', [b])).rows[0].ok)
+      expect(r).toEqual([true, true, false])
     })
     await tx(async (c) => {
-      await asRole(c, 'service_role')
-      const b = `login_ip:${'d'.repeat(64)}`
-      const r1 = await c.query('SELECT public.consume_rate_limit($1, 2, 60) AS ok', [b])
-      const r2 = await c.query('SELECT public.consume_rate_limit($1, 2, 60) AS ok', [b])
-      const r3 = await c.query('SELECT public.consume_rate_limit($1, 2, 60) AS ok', [b])
-      expect([r1.rows[0].ok, r2.rows[0].ok, r3.rows[0].ok]).toEqual([true, true, false])
+      await asRole(c, 'anon')
+      await expect(c.query(`SELECT public.consume_rate_limit('아무값', 1, 60)`)).rejects.toThrow(/check constraint/)
+    })
+    await tx(async (c) => {
+      await asRole(c, 'anon')
+      await expect(c.query('SELECT * FROM public.rate_limit_hits')).rejects.toThrow(/permission denied/)
+    })
+  })
+
+  it('쓰기 함수: anon·비관리자·틀린 토큰은 거부, 관리자와 올바른 토큰만 저장', async () => {
+    const TOKEN = 'x'.repeat(40)
+    const call = (c: pg.PoolClient, p: object, hash: string, token: string | null) =>
+      c.query('SELECT public.blog_insert_report($1::jsonb, $2, $3) AS at', [p, hash, token])
+    // anon(토큰 없음)
+    await tx(async (c) => {
+      const { p, hash } = weeklyRow()
+      await asRole(c, 'anon')
+      await expect(call(c, p, hash, null)).rejects.toThrow(/forbidden/)
+    })
+    // 비관리자 로그인 사용자
+    const { p: vp, hash: vh } = weeklyRow()
+    for (const sql of [
+      (c: pg.PoolClient) => call(c, vp, vh, null),
+      (c: pg.PoolClient) => c.query('SELECT public.blog_set_integration(true, current_date, null)'),
+      (c: pg.PoolClient) => c.query(`SELECT public.blog_get_source('00000000-0000-4000-8000-000000000000')`),
+    ]) {
+      await tx(async (c) => {
+        const u = await makeUser(c, `v-${randomUUID()}@example.test`)
+        await asRole(c, 'authenticated', u)
+        await expect(sql(c)).rejects.toThrow(/forbidden/)
+      })
+    }
+    // 틀린 토큰
+    await tx(async (c) => {
+      const { p, hash } = weeklyRow()
+      await c.query(`INSERT INTO public.blog_ingest_tokens VALUES ('ko372', encode(sha256(convert_to($1,'UTF8')),'hex'))`, [TOKEN])
+      await asRole(c, 'anon')
+      await expect(call(c, p, hash, 'y'.repeat(40))).rejects.toThrow(/unauthorized/)
+    })
+    // 올바른 토큰 → ingest_api로 저장, 다른 해시 조건 교체는 NULL
+    await tx(async (c) => {
+      const { p, hash } = weeklyRow()
+      await c.query(`INSERT INTO public.blog_ingest_tokens VALUES ('ko372', encode(sha256(convert_to($1,'UTF8')),'hex'))`, [TOKEN])
+      await asRole(c, 'anon')
+      await call(c, p, hash, TOKEN)
+      const miss = await c.query('SELECT public.blog_update_report($1::jsonb, $2, $3, $4) AS at', [{ ...p, limitations: ['x'] }, 'e'.repeat(64), 'f'.repeat(64), TOKEN])
+      expect(miss.rows[0].at).toBeNull()
+      await c.query('RESET ROLE')
+      const row = (await c.query('SELECT save_source, saved_by FROM public.blog_reports WHERE report_id = $1', [p.reportId])).rows[0]
+      expect(row).toEqual({ save_source: 'ingest_api', saved_by: null })
+    })
+    // 관리자 → admin_upload, saved_by 기록
+    await tx(async (c) => {
+      const { p, hash } = weeklyRow()
+      const admin = await makeUser(c, `a-${randomUUID()}@example.test`)
+      await c.query('INSERT INTO public.report_admins(user_id) VALUES ($1)', [admin])
+      await asRole(c, 'authenticated', admin)
+      await call(c, p, hash, null)
+      const row = (await c.query('SELECT save_source, saved_by FROM public.blog_reports WHERE report_id = $1', [p.reportId])).rows[0]
+      expect(row).toEqual({ save_source: 'admin_upload', saved_by: admin })
     })
   })
 
