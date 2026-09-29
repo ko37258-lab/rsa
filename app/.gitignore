@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+next-env.d.ts
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+# 비공개 분석 자료는 이 폴더에 두지 않는다(MRK_DATA_DIR로 저장소 밖 경로를 지정).
+private-data/

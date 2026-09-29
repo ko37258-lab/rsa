@@ -1,0 +1,801 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MR.K report import contract",
+  "description": "Proposed v1 contract. Validate formats and additional cross-field period/ID/math rules on the server. complete denotes a stored historical report, not current freshness.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "reportType": {
+          "const": "weekly"
+        },
+        "reportId": {
+          "type": "string",
+          "pattern": "^ko372_[A-Za-z0-9_-]+$"
+        },
+        "blogId": {
+          "const": "ko372"
+        },
+        "blogName": {
+          "type": "string"
+        },
+        "timezone": {
+          "const": "Asia/Seoul"
+        },
+        "observedOn": {
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "const": "complete"
+        },
+        "period": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date"
+            },
+            "end": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "additionalProperties": false
+        },
+        "comparisonPeriod": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date"
+            },
+            "end": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "additionalProperties": false
+        },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "enum": [
+                  "pageViews",
+                  "uniqueVisitors",
+                  "visits",
+                  "retentionRate",
+                  "averageDuration",
+                  "neighborAdditions"
+                ]
+              },
+              "label": {
+                "type": "string"
+              },
+              "unit": {
+                "enum": [
+                  "count",
+                  "people",
+                  "percent",
+                  "seconds"
+                ]
+              },
+              "current": {
+                "type": "number",
+                "minimum": 0
+              },
+              "previous": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "change": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "changePercent": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "notes": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "unit",
+              "current",
+              "previous",
+              "change",
+              "changePercent",
+              "notes"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "daily": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "pageViews": {
+                "type": "number",
+                "minimum": 0
+              },
+              "uniqueVisitors": {
+                "type": "number",
+                "minimum": 0
+              },
+              "visits": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "date",
+              "pageViews",
+              "uniqueVisitors",
+              "visits"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "traffic": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            },
+            "coverage": {
+              "type": "string"
+            },
+            "denominator": {
+              "type": "string"
+            },
+            "channels": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "sharePercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "name",
+                  "sharePercent",
+                  "count"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "keywords": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "keyword": {
+                    "type": "string"
+                  },
+                  "sharePercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "keyword",
+                  "sharePercent"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "keywordCoverage": {
+              "type": "string"
+            },
+            "comparisonChannels": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "sharePercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "name",
+                  "sharePercent",
+                  "count"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "comparisonUnavailableReason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "period",
+            "coverage",
+            "denominator",
+            "channels",
+            "keywords",
+            "keywordCoverage",
+            "comparisonChannels",
+            "comparisonUnavailableReason"
+          ],
+          "additionalProperties": false
+        },
+        "content": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            },
+            "coverage": {
+              "type": "string"
+            },
+            "rankedViews": {
+              "type": "number",
+              "minimum": 0
+            },
+            "blogPageViews": {
+              "type": "number",
+              "minimum": 0
+            },
+            "unreconciledViews": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "posts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "rank": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "pageViews": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "publishedOn": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date"
+                  },
+                  "postUrl": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "rank",
+                  "title",
+                  "pageViews",
+                  "publishedOn",
+                  "postUrl"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "topics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "pageViews": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "rankedPostCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "name",
+                  "pageViews",
+                  "rankedPostCount"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "topicMethod": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "period",
+            "coverage",
+            "rankedViews",
+            "blogPageViews",
+            "unreconciledViews",
+            "posts",
+            "topics",
+            "topicMethod"
+          ],
+          "additionalProperties": false
+        },
+        "audience": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            },
+            "deviceBasis": {
+              "type": "string"
+            },
+            "devices": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "device": {
+                    "type": "string"
+                  },
+                  "pageViews": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "device",
+                  "pageViews",
+                  "sharePercent"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "demographicBasis": {
+              "type": "string"
+            },
+            "demographicSampleViews": {
+              "type": "number",
+              "minimum": 0
+            },
+            "genders": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "gender": {
+                    "type": "string"
+                  },
+                  "pageViews": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "sharePercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "gender",
+                  "pageViews",
+                  "sharePercent"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "ages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ageBand": {
+                    "type": "string"
+                  },
+                  "maleViews": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "femaleViews": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "ageBand",
+                  "maleViews",
+                  "femaleViews"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "period",
+            "deviceBasis",
+            "devices",
+            "demographicBasis",
+            "demographicSampleViews",
+            "genders",
+            "ages"
+          ],
+          "additionalProperties": false
+        },
+        "insights": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "observation",
+                  "recommendation"
+                ]
+              },
+              "text": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "text",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "label",
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "reportType",
+        "reportId",
+        "blogId",
+        "blogName",
+        "timezone",
+        "observedOn",
+        "status",
+        "period",
+        "comparisonPeriod",
+        "metrics",
+        "daily",
+        "traffic",
+        "content",
+        "audience",
+        "insights",
+        "limitations",
+        "sources"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "reportType": {
+          "const": "baseline"
+        },
+        "reportId": {
+          "type": "string",
+          "pattern": "^ko372_[A-Za-z0-9_-]+$"
+        },
+        "blogId": {
+          "const": "ko372"
+        },
+        "blogName": {
+          "type": "string"
+        },
+        "timezone": {
+          "const": "Asia/Seoul"
+        },
+        "observedOn": {
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "const": "complete"
+        },
+        "periods": {
+          "type": "object",
+          "properties": {
+            "current30Days": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            },
+            "previous30Days": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            },
+            "weekly": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            },
+            "previousWeek": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            },
+            "monthlyTraffic": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "current30Days",
+            "previous30Days",
+            "weekly",
+            "previousWeek",
+            "monthlyTraffic"
+          ],
+          "additionalProperties": false
+        },
+        "publicProfile": {
+          "type": "object"
+        },
+        "intradaySnapshot": {
+          "type": "object"
+        },
+        "analysisData": {
+          "type": "object",
+          "required": [
+            "metrics",
+            "refs",
+            "week",
+            "rank",
+            "demo",
+            "device",
+            "topics"
+          ],
+          "additionalProperties": true
+        },
+        "sourceFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "reportType",
+        "reportId",
+        "blogId",
+        "blogName",
+        "timezone",
+        "observedOn",
+        "status",
+        "periods",
+        "publicProfile",
+        "intradaySnapshot",
+        "analysisData",
+        "sourceFiles",
+        "limitations"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}
