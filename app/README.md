@@ -2,6 +2,8 @@
 
 네이버 블로그 `ko372`의 주간 보고서를 PostgreSQL(Supabase)에 누적 저장하고, 등록된 관리자만 열람하는 사이트입니다.
 
+> 현재 연결: Supabase `mrk-realestate` 프로젝트(테이블·함수 적용, 관리자 1명 등록), Netlify 사이트 `mrk-blog-insights`(환경변수 설정 완료, 첫 배포 대기).
+
 > ⚠️ 이 저장소는 **공개(public)** 저장소입니다. 실제 보고서 JSON·원자료 XLSX·기존 대시보드 HTML·수치가 담긴 지시문은
 > 저장소에 넣지 않습니다. 실제 데이터는 로그인한 관리자가 업로드 화면으로 DB에 저장합니다.
 > 테스트에서 실제 원자료가 필요하면 저장소 **밖** 폴더를 `MRK_DATA_DIR` 환경변수로 지정합니다.
@@ -98,9 +100,10 @@ npm run check:bundle                    # 번들·서버 로그에 비밀값/보
 4. **관리자 계정 생성**: Authentication → Users → *Add user*로 형님 계정을 만들고(자동 확인), 사용자 UUID를 복사.
 5. **관리자 등록**: SQL Editor에서 `INSERT INTO public.report_admins(user_id) VALUES ('<복사한 UUID>');`
 6. **환경변수 입력**(배포 환경 또는 `.env.local`):
-   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(또는 publishable 키), `SUPABASE_SERVICE_ROLE_KEY`(서버 전용),
-   `APP_ORIGIN`(실제 사이트 주소, 예: `https://report.example.com`), `ALLOWED_BLOG_ID=ko372`.
-   API 자동 저장을 쓸 때만 `REPORT_INGEST_TOKEN`(32자 이상 무작위, 예: `openssl rand -base64 48`).
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(또는 publishable 키),
+   `APP_ORIGIN`(실제 사이트 주소, 예: `https://report.example.com`), `ALLOWED_BLOG_ID=ko372`. 서비스 역할 키는 필요 없습니다.
+   API 자동 저장을 쓸 때만 `REPORT_INGEST_TOKEN`(32자 이상 무작위)을 넣고, 같은 값의 SHA-256 해시를
+   `INSERT INTO public.blog_ingest_tokens(blog_id, token_sha256) VALUES ('ko372', encode(sha256(convert_to('<토큰>','UTF8')),'hex'));`로 등록합니다.
 7. **배포 위치 결정**: 서버 실행이 되는 곳(Vercel·자체 서버 등)이어야 합니다. 정적 호스팅·GitHub Pages 불가.
    리버스 프록시 뒤라면 `X-Forwarded-For`를 프록시가 덮어쓰도록 설정하세요(로그인 IP 제한에 사용).
 8. **첫 데이터 저장**: 로그인 → `/admin/import`에서 실제 `reports/` JSON 2개 업로드 → ‘저장 완료 · DB 재조회 확인됨’ 확인.
@@ -119,7 +122,7 @@ npm run check:bundle                    # 번들·서버 로그에 비밀값/보
 ## 보안 설계 요약
 
 - 관리자 판정: 모든 서버 페이지/API에서 `auth.getUser()` + `report_admins` 소속 확인(프록시만 믿지 않음). 비관리자 로그인은 즉시 로그아웃.
-- 읽기는 사용자 세션(RLS) 클라이언트, 쓰기는 권한 확인 후 서버 전용 서비스 역할 클라이언트. `server-only`로 브라우저 번들 포함 차단.
+- 서비스 역할 키를 쓰지 않습니다. 읽기는 사용자 세션(RLS), 쓰기는 `blog_*` DB 함수(SECURITY DEFINER)가 관리자 소속 또는 수집 토큰 해시를 DB 안에서 다시 확인한 뒤 수행합니다.
 - RLS: anon 권한 없음, 비관리자 0행, 관리자 읽기만. 인증 클라이언트의 직접 쓰기·자가 관리자 등록 불가. 리비전은 추가 전용.
 - CSRF: 세션 쓰기 요청은 `Origin == APP_ORIGIN`(없으면 `Sec-Fetch-Site: same-origin`) 필수.
 - 요청 제한: 로그인(IP 20회/10분, 이메일 8회/15분), 수집 API(60회/시간)를 **DB 카운터**로 처리해 여러 서버 인스턴스에서도 공유됩니다. 제한 저장소 장애 시 거부(fail-closed). Supabase Auth 자체 제한도 함께 적용됩니다.
