@@ -83,8 +83,9 @@ npm run build && npm run test:e2e       # 종단 테스트: 로컬 DB를 초기�
 npm run check:bundle                    # 번들·서버 로그에 비밀값/보고서 문자열이 없는지 점검
 ```
 
-`.env.local`(커밋 금지) 예시 키: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-`REPORT_INGEST_TOKEN`, `APP_ORIGIN=http://127.0.0.1:3000`, `ALLOWED_BLOG_ID=ko372`, 테스트용 `LOCAL_DB_URL`, `MRK_DATA_DIR`.
+`.env.local`(앱 설정, 커밋 금지): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `REPORT_INGEST_TOKEN`,
+`APP_ORIGIN=http://127.0.0.1:3000`, `ALLOWED_BLOG_ID=ko372`, `MRK_DATA_DIR`.
+`.env.e2e`(테스트 준비 전용, 앱은 읽지 않음, 커밋 금지): 로컬 `SUPABASE_SERVICE_ROLE_KEY`(테스트 계정 생성용), `LOCAL_DB_URL`.
 `MRK_DATA_DIR`이 없으면 실제 데이터 테스트는 건너뛰고 합성 픽스처 테스트만 실행됩니다.
 종단 테스트는 **로컬 DB를 초기화**하므로 운영 DB 주소로는 실행되지 않게 막아 두었습니다.
 
