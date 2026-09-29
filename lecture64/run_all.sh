@@ -11,7 +11,7 @@ cat=""; for ((i=0;i<n;i++)); do cat+="[a$i]"; done
 ffmpeg -loglevel error -y "${args[@]}" -filter_complex "${fl}${cat}concat=n=$n:v=0:a=1,silenceremove=start_periods=1:start_threshold=-45dB,adelay=600[o]" -map "[o]" -ac 1 -ar 48000 voice.wav
 ffmpeg -loglevel error -y -i voice.wav -ac 1 -ar 16000 -f f32le $SP/lec.f32
 # 2) transcribe + align
-cp stt.mjs $STT/stt.mjs && (cd $STT && node stt.mjs word $SP/lec.f32 /home/user/rsa/lecture64/tr_word.json 2>&1 | grep -v -i warn | tail -1)
+cp stt.mjs $STT/stt.mjs && (cd $STT && STT=$STT node stt.mjs word $SP/lec.f32 /home/user/rsa/lecture64/tr_word.json 2>&1 | grep -v -i warn | tail -1)
 python3 align.py
 # 3) data + audio
 python3 gen.py
