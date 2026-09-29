@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { MRK_HOME_URL } from '@/lib/links'
 
 const LINKS = [
   { href: '/dashboard', label: '주간 대시보드' },
@@ -44,6 +45,7 @@ export function Sidebar({ email }: { email: string }) {
           </span>
         </div>
         <nav className="nav">
+          <a href={MRK_HOME_URL}>← MR.K 홈으로</a>
           {LINKS.map((l) => (
             <Link key={l.href} href={l.href} aria-current={current(l.href)}>
               {l.label}

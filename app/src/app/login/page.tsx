@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getAdminContext } from '@/lib/auth'
+import { MRK_HOME_URL } from '@/lib/links'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: '로그인' }
@@ -62,6 +63,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </button>
           </form>
         )}
+        <p className="note" style={{ marginTop: 16, textAlign: 'center' }}>
+          <a href={MRK_HOME_URL}>← MR.K 홈으로 돌아가기</a>
+        </p>
       </div>
     </main>
   )
