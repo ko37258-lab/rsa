@@ -1,0 +1,160 @@
+<title>듀얼 모션 비디오 설치 안내</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column; numbered steps on a left rail because the order matters */
+:root{
+  --bg:#f6f5f1; --surface:#ffffff; --fg:#17202e; --muted:#5b6474; --line:#dcd8cc;
+  --accent:#a57c2a; --accent-soft:#f3ead3; --navy:#13213d; --code-bg:#eef0f4; --ok:#2f7d4f; --warn:#a2461f;
+  --f-body:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  --f-mono:'JetBrains Mono',Consolas,'Courier New',monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1524; --surface:#162038; --fg:#e8ebf2; --muted:#a3abbd; --line:#2a3550;
+  --accent:#e2bc62; --accent-soft:#2a2615; --navy:#e8ebf2; --code-bg:#0b1020; --ok:#6fcf97; --warn:#f2a07b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1524; --surface:#162038; --fg:#e8ebf2; --muted:#a3abbd; --line:#2a3550;
+  --accent:#e2bc62; --accent-soft:#2a2615; --navy:#e8ebf2; --code-bg:#0b1020; --ok:#6fcf97; --warn:#f2a07b; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.7;padding-inline:16px;padding-block:40px 64px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+header{display:flex;flex-direction:column;gap:10px;border-bottom:2px solid var(--accent);padding-bottom:22px}
+.eyebrow{font-size:13px;letter-spacing:.14em;color:var(--accent);font-weight:700}
+h1{font-size:clamp(28px,5vw,38px);line-height:1.25;margin:0;color:var(--navy);text-wrap:balance}
+.lede{color:var(--muted);margin:0;max-width:62ch}
+.outputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.out{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;gap:14px;align-items:center}
+.frame{flex:none;border:2px solid var(--accent);border-radius:4px;background:var(--accent-soft)}
+.f169{width:48px;height:27px}.f916{width:20px;height:36px}
+.out b{display:block}.out span{color:var(--muted);font-size:14px}
+h2{font-size:22px;margin:0 0 4px;color:var(--navy)}
+section>p.sub{margin:0 0 16px;color:var(--muted)}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;counter-reset:s}
+ol.steps>li{counter-increment:s;position:relative;padding:0 0 22px 52px;min-width:0}
+ol.steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--navy);color:var(--bg);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+ol.steps>li::after{content:"";position:absolute;left:16px;top:38px;bottom:4px;width:2px;background:var(--line)}
+ol.steps>li:last-child::after{display:none}
+li h3{font-size:17px;margin:4px 0 6px}
+li p{margin:0 0 8px}
+.cmd{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--code-bg);margin:8px 0 4px}
+.cmd code{flex:1;min-width:0;font-family:var(--f-mono);font-size:14px;padding:10px 12px;white-space:pre-wrap;word-break:break-all}
+.cmd button{flex:none;border:0;border-left:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 13px var(--f-body);padding:0 14px;cursor:pointer}
+.cmd button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.path{font-family:var(--f-mono);font-size:14px;background:var(--code-bg);padding:1px 6px;border-radius:4px;word-break:break-all}
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin:8px 0}
+.warn{border-left-color:var(--warn)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{font:600 14px var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 14px;border-radius:999px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--navy);color:var(--bg);border-color:var(--navy)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+.tbl{overflow-x:auto}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:13px;letter-spacing:.06em;color:var(--muted);font-weight:600}
+td.k{font-weight:700;white-space:nowrap}
+.same{color:var(--ok);font-weight:700}.diff{color:var(--warn);font-weight:700}
+details{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:12px 16px}
+details+details{margin-top:8px}
+summary{cursor:pointer;font-weight:600}
+details p{margin:8px 0 0}
+footer{color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:16px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">미스터홈즈 · 부동산 AI 실습</div>
+  <h1>듀얼 모션 비디오 스킬 설치 안내</h1>
+  <p class="lede">영상 파일 하나를 넣으면 Claude가 모션그래픽, 자막, 효과음을 넣어 유튜브 본편과 쇼츠를 한 번에 만듭니다. 처음 한 번만 설치하면 그다음부터는 한 문장으로 실행됩니다.</p>
+  <div class="outputs">
+    <div class="out"><div class="frame f169"></div><div><b>16:9 본편</b><span>인트로 · 챕터 · 정보카드 · 상담 CTA</span></div></div>
+    <div class="out"><div class="frame f916"></div><div><b>9:16 쇼츠</b><span>핵심 구간 1분 · 큰 자막 · 카드</span></div></div>
+  </div>
+</header>
+
+<section>
+  <h2>준비물</h2>
+  <p class="sub">설치 전에 세 가지를 확인하세요.</p>
+  <ol class="steps">
+    <li><h3>Claude 유료 요금제 (Pro 이상)</h3><p>스킬은 Claude 데스크톱 앱의 <b>Code</b> 탭에서 실행합니다. Code 탭은 Pro 요금제부터 쓸 수 있습니다.</p></li>
+    <li><h3>Claude 데스크톱 앱</h3><p><a href="https://claude.ai/download">claude.ai/download</a>에서 Windows 또는 Mac용 앱을 설치하고 로그인합니다.</p></li>
+    <li><h3>Python</h3><p><a href="https://www.python.org/downloads/">python.org/downloads</a>에서 설치합니다. Windows는 설치 첫 화면 아래쪽의 <b>"Add python.exe to PATH"</b>에 꼭 체크하세요.</p>
+      <div class="note">Python을 직접 설치하기 어렵다면 3번 설치 단계에서 Claude에게 "Python도 설치해줘"라고 덧붙이면 안내해 줍니다.</div></li>
+  </ol>
+</section>
+
+<section>
+  <h2>스킬 설치 (처음 한 번)</h2>
+  <p class="sub">교수님이 공유한 <span class="path">dual-motion-video.zip</span> 파일을 내려받은 뒤 아래 방법 중 하나를 고르세요.</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-easy" aria-selected="true" aria-controls="p-easy">쉬운 방법 (Claude가 설치)</button>
+    <button role="tab" id="tab-hand" aria-selected="false" aria-controls="p-hand">직접 설치</button>
+  </div>
+  <div id="p-easy" role="tabpanel" aria-labelledby="tab-easy">
+    <ol class="steps">
+      <li><h3>Code 탭 열기</h3><p>Claude 데스크톱 앱 왼쪽 위에서 <b>Code</b>를 누르고, 폴더는 <b>다운로드</b> 폴더를 고릅니다.</p></li>
+      <li><h3>아래 문장을 그대로 붙여넣기</h3>
+        <div class="cmd"><code id="c1">다운로드 폴더에 있는 dual-motion-video.zip을 내 사용자 스킬 폴더(~/.claude/skills/dual-motion-video)에 압축을 풀어 설치하고, 그 안의 scripts/setup_check.py --install 을 실행해서 필요한 프로그램까지 준비해줘.</code><button data-copy="c1">복사</button></div>
+        <p>Claude가 명령 실행을 물어보면 <b>허용</b>을 누르세요. 처음에는 5~10분 걸립니다.</p></li>
+      <li><h3>"준비 완료!" 확인</h3><p>마지막에 <b>준비 완료!</b>가 보이면 설치가 끝난 것입니다. 앱을 한 번 껐다 켜면 스킬이 인식됩니다.</p></li>
+    </ol>
+  </div>
+  <div id="p-hand" role="tabpanel" aria-labelledby="tab-hand" hidden>
+    <ol class="steps">
+      <li><h3>압축 풀기</h3><p>zip 파일을 마우스 오른쪽 버튼으로 누르고 <b>압축 풀기</b>를 선택합니다. 그러면 <span class="path">dual-motion-video</span> 폴더가 생깁니다.</p></li>
+      <li><h3>스킬 폴더 열기</h3><p>Windows는 파일 탐색기 주소창에 아래를 붙여넣고 Enter를 누릅니다. 폴더가 없다는 메시지가 나오면 <span class="path">.claude</span> 안에 <span class="path">skills</span> 폴더를 새로 만드세요.</p>
+        <div class="cmd"><code id="c2">%USERPROFILE%\.claude\skills</code><button data-copy="c2">복사</button></div>
+        <p>Mac은 Finder에서 <b>Cmd+Shift+G</b>를 누르고 <span class="path">~/.claude/skills</span>를 입력합니다.</p></li>
+      <li><h3>폴더 넣기</h3><p><span class="path">dual-motion-video</span> 폴더를 통째로 옮깁니다. 최종 위치는 <span class="path">…\.claude\skills\dual-motion-video\SKILL.md</span>여야 합니다. 폴더가 두 겹(dual-motion-video 안에 또 dual-motion-video)이 되지 않게 주의하세요.</p></li>
+      <li><h3>필요한 프로그램 설치</h3><p>Code 탭에서 "dual-motion-video 스킬 준비해줘"라고 입력하면 Claude가 설치 점검을 실행합니다.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2>영상 만들기 (매번)</h2>
+  <p class="sub">설치 후에는 영상만 바꿔서 이 순서대로 하면 됩니다.</p>
+  <ol class="steps">
+    <li><h3>영상이 있는 폴더로 Code 탭 열기</h3><p>새 세션을 시작할 때 영상 파일이 들어 있는 폴더를 고릅니다.</p></li>
+    <li><h3>한 문장으로 요청</h3>
+      <div class="cmd"><code id="c3">이 폴더의 매물영상.mp4로 모션그래픽 넣은 16:9 본편이랑 9:16 쇼츠 만들어줘. 유튜브 제목이랑 설명도 정리해줘.</code><button data-copy="c3">복사</button></div>
+      <p>파일 이름은 본인 영상 이름으로 바꾸세요. 입력창에 <span class="path">/dual-motion-video</span>를 쳐서 스킬을 직접 불러도 됩니다.</p></li>
+    <li><h3>미리보기 확인</h3><p>Claude가 미리보기 그림을 먼저 보여 줍니다. 고칠 곳이 있으면 "전화번호 카드를 오른쪽으로", "쇼츠 첫 장면을 거실 장면으로"처럼 말로 요청하세요.</p></li>
+    <li><h3>완성 파일 받기</h3><p>5분짜리 영상 기준으로 15~40분 걸립니다. 노트북은 전원을 연결해 두세요. 완성 파일은 영상 폴더 안 <span class="path">output</span> 폴더에 생깁니다.</p></li>
+  </ol>
+  <div class="note warn">다른 사람의 영상, 사진, 음악은 사용 허락을 받은 것만 쓰세요. 스킬은 영상에서 말하거나 화면에 나온 정보만 넣고, 근거 없는 숫자는 넣지 않도록 만들어져 있습니다.</div>
+</section>
+
+<section>
+  <h2>어떤 모델로 실행할까요?</h2>
+  <p class="sub">입력창에 <span class="path">/model</span>을 치면 모델을 바꿀 수 있습니다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>항목</th><th>Sonnet 5.5</th><th>Opus 5.5</th></tr></thead>
+    <tbody>
+      <tr><td class="k">영상 화질 · 효과 · 음량</td><td class="same">똑같음</td><td class="same">똑같음</td></tr>
+      <tr><td class="k">하이라이트 고르기 · 카드 문구</td><td>충분히 좋음</td><td class="diff">조금 더 섬세함</td></tr>
+      <tr><td class="k">오타 · 사실관계 잡아내기</td><td>대부분 잡음</td><td class="diff">놓치는 것이 더 적음</td></tr>
+      <tr><td class="k">속도 · 사용량</td><td class="diff">빠르고 사용량을 덜 씀</td><td>느리고 사용량을 더 씀</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note"><b>추천:</b> 실습은 <b>Sonnet 5.5</b>로 충분합니다. 광고나 중요한 매물처럼 실수가 없어야 하는 영상만 <b>Opus 5.5</b>로 돌리세요.</div>
+</section>
+
+<section>
+  <h2>자주 묻는 질문</h2>
+  <details><summary>"python을 찾을 수 없습니다"라고 나와요</summary><p>Python 설치 때 PATH 체크를 안 한 경우입니다. Python을 다시 설치하면서 "Add python.exe to PATH"에 체크하세요.</p></details>
+  <details><summary>너무 오래 걸리거나 컴퓨터가 멈춰요</summary><p>"작업 수를 1로 줄여서 다시 렌더링해줘"라고 요청하세요. 느려지지만 메모리를 덜 씁니다.</p></details>
+  <details><summary>회사 PC라 설치가 막혀요</summary><p>보안 정책으로 브라우저 엔진 다운로드가 막히는 경우가 있습니다. "설치된 크롬을 써서 실행해줘"라고 요청하면 됩니다.</p></details>
+  <details><summary>claude.ai 웹 채팅에서도 되나요?</summary><p>스킬 zip을 웹 설정에 올릴 수는 있지만, 영상 파일 크기 제한과 프로그램 설치 제한 때문에 영상 제작은 내 컴퓨터에서 돌아가는 Code 탭을 권장합니다.</p></details>
+</section>
+
+<footer>고상철 교수 · 서울사이버대학교 부동산AI학과 · ㈜미스터홈즈 FC</footer>
+</div>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',()=>{
+  const el=document.getElementById(b.dataset.copy);const done=()=>{b.textContent='복사됨';setTimeout(()=>b.textContent='복사',1500)};
+  try{navigator.clipboard.writeText(el.textContent).then(done,()=>sel(el))}catch(e){sel(el)}
+  function sel(n){const r=document.createRange();r.selectNodeContents(n);const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='선택됨 · Ctrl+C'}
+}));
+const tabs=[...document.querySelectorAll('[role=tab]')];
+tabs.forEach(t=>t.addEventListener('click',()=>{tabs.forEach(x=>{const on=x===t;x.setAttribute('aria-selected',on);document.getElementById(x.getAttribute('aria-controls')).hidden=!on})}));
+</script>
