@@ -1,0 +1,102 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:P;font-weight:900;src:url(Pretendard-Black.otf)}
+@font-face{font-family:P;font-weight:800;src:url(Pretendard-ExtraBold.otf)}
+@font-face{font-family:P;font-weight:700;src:url(Pretendard-Bold.otf)}
+:root{--gold:#E2BC62;--gold2:#FFEDB0;--goldD:#A57C2A;--navy:#0B1630;--red:#E8384F}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:transparent;font-family:P,'Noto Color Emoji',sans-serif;color:#fff}
+.a{position:absolute;left:0;top:0;white-space:nowrap;display:none;will-change:transform,opacity}
+.gold{background:linear-gradient(100deg,var(--goldD) 0%,var(--gold) 25%,var(--gold2) 45%,var(--gold) 60%,var(--goldD) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+.glass{background:rgba(9,18,40,.78);border:2px solid rgba(226,188,98,.75);border-radius:22px;padding:18px 30px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(6px)}
+.chip{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1d1504;font-weight:900;font-size:40px;padding:12px 30px;border-radius:999px;box-shadow:0 10px 26px rgba(0,0,0,.35)}
+.stamp{font-weight:900;font-size:72px;color:#fff;background:linear-gradient(135deg,#ff5468,#c8102e);padding:10px 34px;border-radius:16px;border:5px solid #ffd2d8;box-shadow:0 14px 34px rgba(200,16,46,.5)}
+.row{display:flex;align-items:center;gap:16px;font-weight:800;font-size:38px}
+.ic{width:62px;height:62px;border-radius:16px;background:linear-gradient(135deg,var(--gold2),var(--gold));display:flex;align-items:center;justify-content:center;font-size:36px}
+.ttl{font-weight:900;font-size:30px;color:var(--gold);letter-spacing:.12em;margin-bottom:12px}
+#dim{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(8,16,36,.55),rgba(5,10,24,.92));opacity:0}
+#sweep{position:absolute;top:-10%;height:120%;width:260px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-20deg);opacity:0}
+#flash{position:absolute;inset:0;background:#fff3cc;opacity:0;mix-blend-mode:screen}
+</style></head><body>
+<div id="dim"></div>
+<div id="L"></div>
+<div id="sweep"></div><div id="flash"></div>
+<script>
+const $=id=>document.getElementById(id),cl=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)),P=(t,a,b)=>cl((t-a)/(b-a)),Lr=(a,b,x)=>a+(b-a)*x;
+const oE=x=>x>=1?1:1-Math.pow(2,-10*x),oC=x=>1-Math.pow(1-x,3),ioC=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const oB=x=>{const c1=1.9,c3=c1+1;return x<=0?0:1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+const IT=[];
+// anim: pop | slide(R/L) | slam | rise | stamp
+function A(t,tout,x,y,html,anim='pop',extra={}){const d=document.createElement('div');d.className='a';d.innerHTML=html;$('L').appendChild(d);IT.push({t,tout,x,y,el:d,anim,...extra});return d}
+const row=(ic,txt)=>`<div class="row"><div class="ic">${ic}</div><span>${txt}</span></div>`;
+// ===== INTRO 0~15.8 =====
+A(.2,15.4,960,250,'<div style="font-weight:800;font-size:34px;letter-spacing:.5em;color:#e9dcb8">PREMIUM PENTHOUSE</div>','rise');
+A(.6,15.4,960,380,'<div class="gold" style="font-weight:900;font-size:150px;letter-spacing:-.03em" id="gt">더샵 일산 엘로이</div>','slam');
+A(2.0,15.4,960,530,'<div style="font-weight:900;font-size:84px">75평 <span style="color:var(--gold2)">펜트하우스</span></div>','rise');
+A(3.6,8.8,560,680,'<div class="chip">단 8세대</div>','pop');
+A(4.0,8.8,960,680,'<div class="chip">36~42층 최상층</div>','pop');
+A(4.4,8.8,1360,680,'<div class="chip">더블역세권</div>','pop');
+A(6.2,8.8,960,820,'<div class="stamp">역대급 가격 혜택 🔥</div>','stamp');
+A(9.2,12.6,960,720,'<div class="glass" style="text-align:center;padding:22px 60px"><div style="font-size:36px;font-weight:800;color:#d8deee">총 1,976세대 중</div><div style="font-weight:900;font-size:110px;line-height:1.05"><span class="gold" id="cnt">1,976</span><span style="font-size:60px">세대</span></div></div>','pop');
+A(12.8,15.4,960,760,'<div class="glass" style="display:flex;align-items:center;gap:26px;padding:22px 48px"><div style="font-size:64px">☎</div><div><div style="font-size:32px;font-weight:800;color:#d8deee">상담 문의 · 삼송아트부동산</div><div class="gold" style="font-size:76px;font-weight:900">02-371-2454</div></div></div>','pop');
+// ===== PRESENTER 16~42 =====
+A(30.9,40.6,330,430,'<div class="glass" style="text-align:center"><div class="ttl">TODAY\'S PICK</div><div style="font-weight:900;font-size:48px">더샵 일산 엘로이</div><div class="gold" style="font-weight:900;font-size:64px">75평 펜트하우스</div></div>','slideL');
+A(35.2,40.6,1590,430,'<div class="stamp" style="font-size:58px;transform:rotate(-6deg)">파격 가격 혜택!</div>','stamp');
+A(40.9,42.4,1590,600,'<div class="chip" style="font-size:36px">🔔 채널 고정!</div>','pop');
+// ===== chapter chips (top center) =====
+const CH=[[43.3,72.2,'① 희소성 · 최상층'],[73.6,91.9,'② 입지 · 교통'],[91.9,116.7,'③ 생활 인프라 · 학군'],[116.7,190.1,'④ 평면 구성'],[190.1,212.0,'⑤ 입주 혜택'],[212.0,227.3,'⑥ 커뮤니티'],[227.3,250.5,'⑦ 프리미엄 가치'],[250.5,268.0,'☎ 상담 안내']];
+CH.forEach(([a,b,s])=>A(a,b,960,62,`<div style="font-weight:800;font-size:30px;padding:8px 26px;border-radius:999px;background:rgba(9,18,40,.72);border:2px solid rgba(226,188,98,.8);color:#ffeeb8">${s}</div>`,'drop'));
+// ===== 평면 =====
+A(120.4,133,1660,380,row('🛏','방 5개'),'slideR',{box:1});
+A(121.6,133,1660,480,row('🛁','욕실 3개'),'slideR',{box:1});
+A(123.8,133,1660,580,row('👗','드레스룸 2개'),'slideR',{box:1});
+// ===== 입주 혜택 =====
+A(197.6,211.6,1620,300,'<div class="ttl">입주 혜택</div>','rise');
+[[197.9,'🅿️','지정 주차'],[201.1,'❄️','시스템 에어컨'],[203.1,'🧊','냉장고·김치냉장고'],[205.2,'🔥','오븐 빌트인']].forEach(([t,i,s],k)=>A(t,211.6,1620,380+k*96,row(i,s),'slideR',{box:1}));
+// ===== 커뮤니티 =====
+A(215.2,227,1620,300,'<div class="ttl">단지 안팎 인프라</div>','rise');
+[[215.4,'🌿','수변 산책로'],[217.7,'🏋️','피트니스'],[218.5,'⛳','스크린 골프장'],[219.8,'🧸','키즈카페'],[220.8,'💼','비즈니스 라운지']].forEach(([t,i,s],k)=>A(t,227,1620,380+k*90,row(i,s),'slideR',{box:1}));
+// ===== 프리미엄 가치 =====
+A(229.6,240.2,960,250,'<div class="glass" style="text-align:center;padding:24px 56px"><div style="font-size:40px;font-weight:800;color:#d8deee">단순히 넓은 집이 아닌</div><div class="gold" style="font-size:78px;font-weight:900">성공과 품격의 공간</div></div>','slam');
+// ===== CTA =====
+A(251.0,266.5,1560,420,'<div class="glass" style="text-align:center;padding:24px 40px" id="cta"><div class="ttl">현장 방문 상담</div><div style="font-size:62px">☎</div><div class="gold" style="font-size:66px;font-weight:900">02-371-2454</div><div style="font-size:30px;font-weight:800;color:#d8deee;margin-top:6px">삼송아트부동산</div></div>','slideR');
+A(260.4,267.6,1540,780,'<div style="display:flex;gap:18px"><div id="bS" style="background:#FF0033;font-weight:900;font-size:40px;padding:14px 36px;border-radius:14px">구독</div><div id="bL" style="background:#fff;color:#111;font-weight:900;font-size:40px;padding:14px 26px;border-radius:14px">👍</div><div id="bB" style="background:#fff;color:#111;font-weight:900;font-size:40px;padding:14px 26px;border-radius:14px">🔔</div></div>','pop');
+const CUR=A(261.5,267.6,1500,900,'<svg width="60" height="75" viewBox="0 0 24 30"><path d="M2 2 L2 24 L8 18 L12 28 L16 26 L12 17 L20 17 Z" fill="#fff" stroke="#111" stroke-width="1.6"/></svg>','none');
+// ===== END card (original banner) =====
+A(268.6,284.4,960,885,'<div class="chip" style="font-size:38px;background:linear-gradient(135deg,#fff,#ffe9a8)">📞 지금 바로 전화 주세요!</div>','pop');
+
+function T(it,x,y,s,o,r=0,b=0){const d=it.el;d.style.display=o>0.003?'block':'none';d.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%) rotate(${r}deg) scale(${s})`;d.style.opacity=o;d.style.filter=b>.3?`blur(${b}px)`:'none'}
+function frame(t){
+  // intro dim
+  $('dim').style.opacity=t<15.8?.82*cl(t/0.4)*(1-P(t,15.3,15.8)):0;
+  for(const it of IT){
+    if(t<it.t-0.05||t>it.tout+0.5){it.el.style.display='none';continue}
+    const p=t-it.t,out=1-P(t,it.tout,it.tout+.35);let x=it.x,y=it.y,s=1,o=1,r=0,b=0;
+    if(it.anim==='pop'){const q=P(p,0,.45);s=oB(q);o=cl(q*4)}
+    else if(it.anim==='rise'){const q=oE(P(p,0,.6));y+=Lr(50,0,q);o=q;b=Lr(10,0,q)}
+    else if(it.anim==='slam'){const q=oE(P(p,0,.35));s=Lr(2.2,1,q);o=cl(q*4);b=Lr(18,0,q)}
+    else if(it.anim==='stamp'){const q=oE(P(p,0,.25));s=Lr(2.8,1,q);o=cl(q*5);b=Lr(14,0,q)}
+    else if(it.anim==='slideR'){const q=oE(P(p,0,.55));x+=Lr(420,0,q);o=q}
+    else if(it.anim==='slideL'){const q=oE(P(p,0,.55));x+=Lr(-420,0,q);o=q}
+    else if(it.anim==='drop'){const q=oE(P(p,0,.5));y+=Lr(-60,0,q);o=q}
+    if(it.box)it.el.firstChild.style.cssText='background:rgba(9,18,40,.8);border:2px solid rgba(226,188,98,.7);border-radius:18px;padding:10px 26px 10px 12px;box-shadow:0 12px 28px rgba(0,0,0,.4)';
+    T(it,x,y,s,o*out,r,b);
+  }
+  // gold shimmer
+  document.querySelectorAll('.gold').forEach(g=>g.style.backgroundPosition=`${(t*45)%200}% 0`);
+  // counter 1976 -> 8
+  const c=$('cnt');if(c){const q=ioC(P(t,9.8,11.6));const v=Math.round(Lr(1976,8,q));c.textContent=v.toLocaleString();c.parentNode.parentNode.style.transform=`scale(${t>11.6?1+.12*Math.exp(-(t-11.6)*6):1})`}
+  // CTA pulse
+  const cta=$('cta');if(cta)cta.style.boxShadow=`0 0 ${20+30*Math.abs(Math.sin(t*3))}px rgba(226,188,98,${.35+.3*Math.abs(Math.sin(t*3))})`;
+  // subscribe click
+  {const k=263.0,q=ioC(P(t,261.5,k));T({el:CUR},Lr(1500,1475,q),Lr(900,790,q),t>k&&t<k+.15?.8:1,(t>261.5&&t<267.6)?1:0);
+   const bS=$('bS');if(bS){bS.textContent=t>k?'구독중 ✓':'구독';bS.style.background=t>k?'#555':'#FF0033';bS.style.transform=`scale(${t>k?1+.15*Math.exp(-(t-k)*8):1})`;
+   $('bL').style.transform=`scale(${t>k+.5?1+.3*Math.exp(-(t-k-.5)*6):1})`;$('bB').style.transform=`rotate(${t>k+1?Math.sin((t-k-1)*30)*18*Math.exp(-(t-k-1)*3):0}deg)`}}
+  // light sweep on intro title & end banner
+  let sw=0,sx=0;[[1.2,2.2],[13.2,14.2],[269.5,270.6],[276,277.1]].forEach(([a,b])=>{if(t>=a&&t<=b){sw=1;sx=Lr(-400,2300,ioC(P(t,a,b)))}});$('sweep').style.opacity=sw*.8;$('sweep').style.left=sx+'px';
+  // flash on impacts
+  let f=0;[.6,6.2,35.2,229.6].forEach(s=>{const d=t-s;if(d>=0&&d<.25)f=Math.max(f,(1-d/.25)*.35)});$('flash').style.opacity=f;
+}
+window.frame=frame;
+</script></body></html>
