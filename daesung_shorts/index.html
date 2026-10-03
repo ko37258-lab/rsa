@@ -41,10 +41,13 @@ html,body{background:#050a18;overflow:hidden}
   <div id="capbox"><div class="cap" id="cap"></div></div>
   <div id="flash"></div><div id="grain"></div><div id="frame"></div>
 </div></div>
+<audio id="vo" src="voice.mp3" preload="auto"></audio>
 <div id="ctl"><button id="play">▶ 재생</button><button id="re">↺ 처음</button><span id="tc">0.0s</span></div>
 <script>
 // ===== 타임라인 데이터 (수정 지점) =====
-const DUR=60;
+const WARP=[[0, 0], [6.88, 5], [17.05, 20], [33.85, 35], [44.95, 50], [56.91, 60]]; // [실제 시간(초), 템플릿 시간(초)] — 음성에 맞춘 시간 매핑
+const DUR=WARP[WARP.length-1][0];
+function warp(t){for(let i=1;i<WARP.length;i++){const[a,A]=WARP[i-1],[b,B]=WARP[i];if(t<=b)return A+(B-A)*Math.max(0,t-a)/(b-a)}return WARP[WARP.length-1][1]}
 const CAPTIONS=[ // 화면 자막(장면별)
  [0,5,'대성 14억 아파트가 <b>100억</b> 된 이유?'],
  [5,20,'2015년 14.5억 → 현재 시세 약 <b>100억</b> (약 7배)'],
@@ -96,8 +99,8 @@ const E={
 const fx=$('fx').getContext('2d');const PR=[];{let s=7;const r=()=>(s=(s*16807)%2147483647)/2147483647;for(let i=0;i<60;i++)PR.push([r()*1080,r()*1920,(r()-.5)*14,-(6+r()*22),2+r()*7,r()])}
 function bokeh(t){fx.clearRect(0,0,1080,1920);for(const p of PR){let x=(p[0]+p[2]*t)%1080;if(x<0)x+=1080;let y=(p[1]+p[3]*t)%1920;if(y<0)y+=1920;fx.globalAlpha=.08+.18*Math.abs(Math.sin(t*.8+p[5]*9));fx.fillStyle=p[5]<.6?'#D9B45A':'#7fa8ff';fx.beginPath();fx.arc(x,y,p[4],0,7);fx.fill()}fx.globalAlpha=1}
 // ===== 프레임 렌더 =====
-function frame(t){
-  bokeh(t);$('barI').style.width=(t/DUR*100)+'%';
+function frame(rt){
+  const t=warp(rt);bokeh(rt);$('barI').style.width=(rt/DUR*100)+'%';
   ['g1','g2','g3','g4','cnt','bnum'].forEach(id=>{const g=$(id);if(g)g.style.backgroundPosition=`${(t*40)%200}% 0`});
   // S1 0-5
   const o1=out(t,4.6);
@@ -139,7 +142,7 @@ function frame(t){
   const c=CAPTIONS.find(c=>t>=c[0]&&t<c[1]);const cap=$('cap');if(c){if(cap.dataset.k!=c[0]){cap.innerHTML=c[2];cap.dataset.k=c[0]}const q=oE(P(t,c[0]+.15,c[0]+.55));cap.style.opacity=q*out(t,c[1]-.3,.3);cap.style.transform=`translateY(${(1-q)*30}px)`}else cap.style.opacity=0;
   // transitions flash
   let f=0;[5,20,35,50].forEach(s=>{const d=t-s;if(d>=-.05&&d<.35)f=Math.max(f,(1-Math.abs(d-.05)/.3)*.35)});$('flash').style.opacity=f;
-  $('tc').textContent=t.toFixed(1)+'s';
+  $('tc').textContent=rt.toFixed(1)+'s';
 }
 window.frame=frame;
 // ===== 브라우저 재생 & 화면 맞춤 =====
@@ -147,8 +150,8 @@ function fit(){const s=Math.min(innerWidth/1080,innerHeight/1920);$('wrap').styl
 addEventListener('resize',fit);fit();
 let t0=null,playing=false,cur=0;
 function loop(ts){if(!playing)return;if(t0===null)t0=ts-cur*1000;cur=(ts-t0)/1000;if(cur>=DUR){cur=DUR;playing=false}frame(cur);requestAnimationFrame(loop)}
-$('play').onclick=()=>{playing=!playing;t0=null;$('play').textContent=playing?'⏸ 정지':'▶ 재생';if(playing)requestAnimationFrame(loop)};
-$('re').onclick=()=>{cur=0;t0=null;frame(0)};
+$('play').onclick=()=>{playing=!playing;t0=null;const a=$('vo');if(playing){a.currentTime=cur;a.play().catch(()=>{})}else a.pause();$('play').textContent=playing?'⏸ 정지':'▶ 재생';if(playing)requestAnimationFrame(loop)};
+$('re').onclick=()=>{cur=0;t0=null;$('vo').currentTime=0;frame(0)};
 if(new URLSearchParams(location.search).has('render'))$('ctl').style.display='none';
 document.fonts.ready.then(()=>frame(0));
 </script></body></html>

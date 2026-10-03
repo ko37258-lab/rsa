@@ -1,5 +1,12 @@
 import numpy as np, wave
-SR=48000; DUR=60.0; N=int(SR*DUR); rs=np.random.RandomState(5); tt=np.arange(N)/SR
+import json
+W=json.load(open('warp.json'))
+def R(tm):  # template time -> real time
+    for i in range(1,len(W)):
+        (a,A),(b,B)=W[i-1],W[i]
+        if tm<=B: return a+(b-a)*(tm-A)/(B-A)
+    return W[-1][0]
+SR=48000; DUR=W[-1][0]; N=int(SR*DUR); rs=np.random.RandomState(5); tt=np.arange(N)/SR
 def add(b,s,t,g=1):
     i=int(t*SR);j=min(len(b),i+len(s))
     if 0<=i<len(b): b[i:j]+=s[:j-i]*g
@@ -10,7 +17,7 @@ hn=int(.05*SR);hat=np.diff(rs.randn(hn+1))*np.exp(-np.arange(hn)/SR*90)*.2
 t=0;b=0
 while t<DUR:
     bar=(b//4)%4
-    if b>=8 and not 49.6<t<50.6:
+    if b>=8 and not R(49.6)<t<R(50.6):
         if b%4 in (0,2): add(mus,kick,t,.55)
         add(mus,hat,t+beat/2,.45)
     if b%4==0:
@@ -41,12 +48,16 @@ def riser(a,b_,g=.18):
 def ticks(a,b_,g=.08):
     t=a
     while t<b_: pop(t,g,1500); t+=0.07+0.13*(1-(t-a)/(b_-a))
-for s in (5,20,35,50): whoosh(s)
-for s,g in ((0.6,.7),(21.0,.5),(50.3,.7)): impact(s,g)
-for s in (2.6,7.0,9.2,22.2,23.2,27.8,29.9,31.6,35.5,38.0,54.5): pop(s)
-ding(6.9);ticks(11.5,15.5);riser(11.5,15.5);ding(15.5,.22);impact(15.6,.35)
-ticks(41.5,45.5);riser(41.5,45.5);ding(45.5,.22);impact(45.6,.35)
-pop(58.2,.35,1200);pop(58.8,.25,900)
-mix=mus*.9+sfx*.7;mix/=np.abs(mix).max();mix*=.9
+for s in (5,20,35,50): whoosh(R(s))
+for s,g in ((0.6,.7),(21.0,.5),(50.3,.7)): impact(R(s),g)
+for s in (2.6,7.0,9.2,22.2,23.2,27.8,29.9,31.6,35.5,38.0,54.5): pop(R(s))
+ding(R(6.9));ticks(R(11.5),R(15.5));riser(R(11.5),R(15.5));ding(R(15.5),.22);impact(R(15.6),.35)
+ticks(R(41.5),R(45.5));riser(R(41.5),R(45.5));ding(R(45.5),.22);impact(R(45.6),.35)
+pop(R(58.2),.35,1200);pop(R(58.8),.25,900)
+w=wave.open('voice.wav');v=np.frombuffer(w.readframes(w.getnframes()),'<i2').astype(np.float32)/32767
+voice=np.zeros(N);voice[:min(N,len(v))]=v[:N]
+e=np.abs(voice);k=int(.15*SR);e=np.convolve(e,np.ones(k)/k,'same');e/=e.max()
+mus*=1-0.6*np.clip(e*4,0,1)
+mix=voice*1.0+mus*.32+sfx*.35;mix/=np.abs(mix).max();mix*=.9
 st=np.clip(np.stack([mix+mus*.05,mix-mus*.05],1),-1,1)
-o=wave.open('bgm_sfx.wav','wb');o.setnchannels(2);o.setsampwidth(2);o.setframerate(SR);o.writeframes((st*32767).astype('<i2').tobytes());o.close()
+o=wave.open('final_mix.wav','wb');o.setnchannels(2);o.setsampwidth(2);o.setframerate(SR);o.writeframes((st*32767).astype('<i2').tobytes());o.close()
