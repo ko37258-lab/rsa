@@ -1,0 +1,103 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:P;font-weight:900;src:url(Pretendard-Black.otf)}
+@font-face{font-family:P;font-weight:800;src:url(Pretendard-ExtraBold.otf)}
+@font-face{font-family:P;font-weight:700;src:url(Pretendard-Bold.otf)}
+:root{--gold:#E2BC62;--gold2:#FFEDB0;--goldD:#A57C2A}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:transparent;font-family:P,'Noto Color Emoji',sans-serif;color:#fff}
+.a{position:absolute;left:0;top:0;white-space:nowrap;display:none}
+.gold{background:linear-gradient(100deg,var(--goldD) 0%,var(--gold) 25%,var(--gold2) 45%,var(--gold) 60%,var(--goldD) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+.glass{background:rgba(9,18,40,.82);border:2px solid rgba(226,188,98,.8);border-radius:24px;padding:18px 34px;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+.chip{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1d1504;font-weight:900;font-size:40px;padding:12px 32px;border-radius:999px;box-shadow:0 10px 26px rgba(0,0,0,.35)}
+.stamp{font-weight:900;font-size:70px;color:#fff;background:linear-gradient(135deg,#ff5468,#c8102e);padding:10px 34px;border-radius:16px;border:5px solid #ffd2d8;box-shadow:0 14px 34px rgba(200,16,46,.5)}
+.row{display:flex;align-items:center;gap:14px;font-weight:900;font-size:42px;background:rgba(9,18,40,.85);border:2px solid rgba(226,188,98,.75);border-radius:18px;padding:10px 24px 10px 10px;box-shadow:0 12px 28px rgba(0,0,0,.4)}
+.ic{width:62px;height:62px;border-radius:14px;background:linear-gradient(135deg,var(--gold2),var(--gold));display:flex;align-items:center;justify-content:center;font-size:36px}
+.ttl{font-weight:900;font-size:28px;color:var(--gold);letter-spacing:.12em;margin-bottom:8px}
+.cap{white-space:normal;width:1000px;text-align:center;font-weight:900;font-size:56px;line-height:1.25;text-shadow:0 0 6px #000,0 4px 0 #000,3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000}
+.cap b{color:#FFE066}
+#top{position:absolute;left:0;top:0;width:1080px;height:600px;background:linear-gradient(180deg,rgba(5,10,24,.88),rgba(8,16,36,.7) 70%,rgba(8,16,36,.35))}
+#bot{position:absolute;left:0;top:1208px;width:1080px;height:712px;background:linear-gradient(0deg,rgba(5,10,24,.9),rgba(8,16,36,.72) 60%,rgba(8,16,36,.45))}
+.ln{position:absolute;left:0;width:1080px;height:4px;background:linear-gradient(90deg,transparent,var(--gold),var(--gold2),var(--gold),transparent);box-shadow:0 0 18px rgba(226,188,98,.8)}
+#sweep{position:absolute;top:0;height:600px;width:200px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);transform:skewX(-20deg);opacity:0}
+#flash{position:absolute;left:0;top:600px;width:1080px;height:608px;background:#fff6dc;opacity:0}
+#dimv{position:absolute;left:0;top:600px;width:1080px;height:608px;background:rgba(5,10,24,.7);opacity:0}
+</style></head><body>
+<div id="top"></div><div id="bot"></div>
+<div class="ln" style="top:598px"></div><div class="ln" style="top:1206px"></div>
+<div id="flash"></div><div id="dimv"></div>
+<div id="L"></div><div id="sweep"></div>
+<script>
+const $=id=>document.getElementById(id),cl=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)),P=(t,a,b)=>cl((t-a)/(b-a)),Lr=(a,b,x)=>a+(b-a)*x;
+const oE=x=>x>=1?1:1-Math.pow(2,-10*x),ioC=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const oB=x=>{const c1=1.9,c3=c1+1;return x<=0?0:1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+// original-video segments (seconds) -> back-to-back in the Short
+const SEGS=[[30.45,38.15],[43.3,56.98],[57.6,72.45],[120.5,126.85],[195.8,212.1],[227.6,231.95],[256.85,260.35]];
+const ST=[];{let s=0;for(const [a,b] of SEGS){ST.push(s);s+=b-a}}
+const VEND=ST[ST.length-1]+SEGS[SEGS.length-1][1]-SEGS[SEGS.length-1][0],END=VEND+1.8;
+const M=o=>{for(let i=0;i<SEGS.length;i++){const [a,b]=SEGS[i];if(o>=a-.01&&o<=b+.01)return ST[i]+cl(o-a,0,b-a)}return o>=SEGS[SEGS.length-1][1]?END:0};
+const IT=[];
+function A(t,tout,x,y,html,anim='pop'){const d=document.createElement('div');d.className='a';d.innerHTML=html;$('L').appendChild(d);IT.push({t,tout,x,y,el:d,anim});return d}
+const row=(ic,txt)=>`<div class="row"><div class="ic">${ic}</div><span>${txt}</span></div>`;
+// ===== header =====
+A(0,END,540,46,'<div style="font-weight:800;font-size:26px;color:#e9dcb8;letter-spacing:.06em">삼송아트부동산TV · ☎ 02-371-2454</div>','rise');
+A(.1,END,540,130,'<div style="font-weight:800;font-size:30px;letter-spacing:.45em;color:#e9dcb8">PREMIUM PENTHOUSE</div>','rise');
+A(.25,END,540,238,'<div class="gold" style="font-weight:900;font-size:112px;letter-spacing:-.03em">더샵 일산 엘로이</div>','slam');
+A(.6,END,540,352,'<div style="font-weight:900;font-size:72px">75평 <span style="color:var(--gold2)">펜트하우스</span></div>','rise');
+const CH=['🔥 파격 가격 혜택','💎 1,976세대 중 단 8세대','🏙 36~42층 최상층','🛏 평면 구성','🎁 입주 혜택','✨ 프리미엄 가치','☎ 현장 상담 안내'];
+CH.forEach((s,i)=>A(ST[i]+.15,(i+1<ST.length?ST[i+1]:END)-.05,540,488,`<div class="chip" style="font-size:42px">${s}</div>`,'drop'));
+// ===== captions (original times) =====
+const CAP=[[30.6,34.85,'바로 <b>더샵 일산 엘로이</b><br>75평형 펜트하우스가'],[34.9,38.15,'<b>파격적인 가격 혜택</b>으로<br>찾아왔다는 소식입니다'],
+[43.4,47.4,'총 <b>1,976세대</b> 대단지 안에서도'],[47.6,51.1,'75평형은 <b>단 8세대</b>만 존재합니다'],[51.2,53.4,'그야말로 <b>상위 1%</b>를 위한'],[53.4,56.98,'절대적인 희소성을 가진<br><b>특급 매물</b>입니다'],
+[57.7,61.5,'최상층인 <b>36층~42층</b>에 위치해'],[61.6,63.3,'누구의 방해도 받지 않는'],[63.3,66.12,'<b>완벽한 프라이버시</b>를 자랑합니다'],[66.2,68.85,'발아래 펼쳐지는 최상층의 뷰는'],[68.85,72.45,'그야말로 <b>압도적</b>이라는<br>말씀부터 드리고 싶네요'],
+[120.5,122.8,'<b>방 5개, 욕실 3개</b>'],[122.9,126.85,'넉넉한 <b>드레스룸 2개</b>로<br>구성되어 있습니다'],
+[195.85,201.05,'주차 스트레스 없는<br><b>지정 주차</b>는 기본이고요'],[201.1,203.2,'천장형 <b>시스템 에어컨</b>부터'],[203.2,206.4,'<b>냉장고, 김치냉장고, 오븐</b>까지'],[206.4,209.8,'최고급 가전이 모두<br><b>빌트인</b>되어 있어'],[209.8,212.1,'몸만 편하게 들어오셔도<br>될 정도입니다'],
+[227.7,229.7,'75평형 펜트하우스는'],[229.7,231.95,'단순히 <b>넓은 집이 아닙니다</b>'],[256.85,258.1,'망설이지 마시고'],[258.1,260.35,'<b>삼송아트부동산</b>으로 문의 주세요']];
+CAP.forEach(([a,b,s])=>A(M(a),M(b)-.02,540,1310,`<div class="cap">${s}</div>`,'cap'));
+// ===== cards under the video =====
+const CY=1520;
+A(M(35.0),M(38.1),540,CY,'<div class="stamp">역대급 가격 혜택 🔥</div>','stamp');
+A(M(43.4),M(51.15),540,CY,'<div class="glass" style="text-align:center;padding:14px 60px"><div style="font-size:32px;font-weight:800;color:#d8deee">총 1,976세대 중</div><div style="font-weight:900;font-size:100px;line-height:1.05"><span class="gold" id="cnt">1,976</span><span style="font-size:54px">세대</span></div></div>','pop');
+A(M(51.25),M(56.95),540,CY,'<div class="stamp" style="font-size:80px;transform:rotate(-4deg)">상위 1% 💎</div>','stamp');
+A(M(57.8),M(63.3),540,CY,'<div class="glass" style="display:flex;align-items:center;gap:26px;padding:16px 40px"><div style="display:flex;flex-direction:column-reverse;gap:5px" id="flr"></div><div><div class="ttl">TOP FLOOR</div><div class="gold" style="font-weight:900;font-size:84px">36F ~ 42F</div></div></div>','pop');
+A(M(63.4),M(66.1),540,CY,row('🔒','완벽한 프라이버시'),'pop');
+A(M(66.3),M(72.4),540,CY,'<div class="glass" style="text-align:center;padding:16px 56px"><div class="ttl">PANORAMA</div><div class="gold" style="font-weight:900;font-size:84px">압도적 최상층 VIEW</div></div>','slam');
+A(M(120.6),M(126.8),200,CY,row('🛏','방 5'),'pop');A(M(121.7),M(126.8),540,CY,row('🛁','욕실 3'),'pop');A(M(123.4),M(126.8),880,CY,row('👗','드레스룸 2'),'pop');
+[[198.1,'🅿️','지정 주차',290,1470],[201.7,'❄️','시스템 에어컨',790,1470],[203.3,'🧊','냉장고·김치냉장고',290,1580],[205.3,'🔥','오븐 빌트인',790,1580]].forEach(([t,i,s,x,y])=>A(M(t),M(212.05),x,y,row(i,s).replace('font-size:42px','')+'','pop'));
+A(M(229.7),M(231.95)+.0,540,CY,'<div class="glass" style="text-align:center;padding:18px 50px"><div style="font-size:38px;font-weight:800;color:#d8deee">단순히 넓은 집이 아닌</div><div class="gold" style="font-size:76px;font-weight:900">성공과 품격의 공간</div></div>','slam');
+A(M(256.9),END,540,CY,'<div class="glass" id="cta" style="display:flex;align-items:center;gap:26px;padding:18px 44px"><div style="font-size:70px">☎</div><div><div style="font-size:30px;font-weight:800;color:#d8deee">현장 방문 상담 · 삼송아트부동산</div><div class="gold" style="font-size:84px;font-weight:900">02-371-2454</div></div></div>','pop');
+// tail (frozen last frame)
+A(VEND+.05,END,540,830,'<div class="chip" style="font-size:52px;background:linear-gradient(135deg,#fff,#ffe9a8)">📞 지금 바로 전화 주세요!</div>','slam');
+A(VEND+.4,END,540,990,'<div style="display:flex;gap:18px"><div style="background:#FF0033;font-weight:900;font-size:44px;padding:14px 38px;border-radius:14px">구독</div><div style="background:#fff;color:#111;font-weight:900;font-size:44px;padding:14px 28px;border-radius:14px">👍 좋아요</div></div>','pop');
+// floor gauge cells
+{const f=document.createElement('div');} 
+function T(it,x,y,s,o,b=0){const d=it.el;d.style.display=o>0.003?'block':'none';d.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%) scale(${s})`;d.style.opacity=o;d.style.filter=b>.3?`blur(${b}px)`:'none'}
+let built=false;
+function frame(t){
+  if(!built){const g=$('flr');for(let i=0;i<10;i++){const c=document.createElement('div');c.style.cssText='width:70px;height:9px;border-radius:3px;background:#3a4560';g.appendChild(c)}built=true}
+  for(const it of IT){
+    if(t<it.t-0.05||t>it.tout+0.5){it.el.style.display='none';continue}
+    const p=t-it.t;let out=1-P(t,it.tout,it.tout+.3);let x=it.x,y=it.y,s=1,o=1,b=0;
+    if(it.anim==='pop'){const q=P(p,0,.4);s=oB(q);o=cl(q*4)}
+    else if(it.anim==='rise'){const q=oE(P(p,0,.6));y+=Lr(40,0,q);o=q;b=Lr(8,0,q)}
+    else if(it.anim==='slam'){const q=oE(P(p,0,.35));s=Lr(2.0,1,q);o=cl(q*4);b=Lr(16,0,q)}
+    else if(it.anim==='stamp'){const q=oE(P(p,0,.25));s=Lr(2.6,1,q);o=cl(q*5);b=Lr(12,0,q)}
+    else if(it.anim==='drop'){const q=oE(P(p,0,.45));y+=Lr(-50,0,q);o=q}
+    else if(it.anim==='cap'){const q=oE(P(p,0,.22));s=Lr(.85,1,q);o=q;out=1-P(t,it.tout-.06,it.tout)}
+    T(it,x,y,s,o*out,b);
+  }
+  document.querySelectorAll('.gold').forEach(g=>g.style.backgroundPosition=`${(t*45)%200}% 0`);
+  // counter 1976 -> 8 while "75평형은 단 8세대만"
+  const c=$('cnt');if(c){const a=M(47.8),b=M(49.9);c.textContent=Math.round(Lr(1976,8,ioC(P(t,a,b)))).toLocaleString();c.parentNode.parentNode.style.transform=`scale(${t>b?1+.12*Math.exp(-(t-b)*6):1})`}
+  // floor gauge fill (top 3 cells light up)
+  {const g=$('flr');const q=P(t,M(58.0),M(60.4));[...g.children].forEach((e,i)=>{const lit=i>=7&&q>(i-7)/3;e.style.background=lit?'linear-gradient(90deg,#FFEDB0,#E2BC62)':(q>i/10*0.7?'#5b6785':'#3a4560');e.style.boxShadow=lit?'0 0 12px rgba(226,188,98,.9)':'none'})}
+  const cta=$('cta');if(cta)cta.style.boxShadow=`0 0 ${20+30*Math.abs(Math.sin(t*3))}px rgba(226,188,98,${.35+.3*Math.abs(Math.sin(t*3))})`;
+  // flash at each cut, dim during tail
+  let f=0;ST.slice(1).forEach(s=>{const d=t-s;if(d>=0&&d<.22)f=Math.max(f,(1-d/.22)*.55)});$('flash').style.opacity=f;
+  $('dimv').style.opacity=.85*P(t,VEND,VEND+.4);
+  // title light sweeps
+  let sw=0,sx=0;[[.6,1.5],[ST[2],ST[2]+.9],[ST[4],ST[4]+.9],[ST[6],ST[6]+.9]].forEach(([a,b])=>{if(t>=a&&t<=b){sw=1;sx=Lr(-300,1300,ioC(P(t,a,b)))}});$('sweep').style.opacity=sw*.8;$('sweep').style.left=sx+'px';
+}
+window.frame=frame;window.INFO={SEGS,ST,VEND,END};
+</script></body></html>
