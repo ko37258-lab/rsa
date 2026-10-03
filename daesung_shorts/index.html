@@ -76,25 +76,38 @@ const LOCK='<svg width="200" height="240" viewBox="0 0 100 120"><path d="M25 50 
 const BLDG='<svg width="300" height="460" viewBox="0 0 150 230"><rect x="20" y="10" width="110" height="215" fill="#13224A" stroke="#D9B45A" stroke-width="3"/>'+Array.from({length:9},(_,r)=>Array.from({length:4},(_,c)=>`<rect x="${32+c*24}" y="${22+r*22}" width="14" height="14" fill="${(r+c)%4?'#2A3E72':'#F6E3A1'}"/>`).join('')).join('')+'<rect x="60" y="205" width="30" height="20" fill="#D9B45A"/></svg>';
 const GRAPH='<svg width="900" height="520" viewBox="0 0 900 520"><path d="M80 460 H860 M80 460 V40" stroke="rgba(255,255,255,.3)" stroke-width="3"/><path id="gl" d="M80 400 C300 380 420 320 560 230 S760 80 860 60" stroke="#D9B45A" stroke-width="10" fill="none" stroke-linecap="round"/><path id="ga" d="M80 400 C300 380 420 320 560 230 S760 80 860 60 V460 H80Z" fill="url(#gg)" opacity=".35"/><defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9B45A"/><stop offset="1" stop-color="#D9B45A" stop-opacity="0"/></linearGradient></defs><text x="70" y="500" fill="#b9c6e6" font-size="30" font-weight="700" font-family="P">2017</text><text x="790" y="500" fill="#b9c6e6" font-size="30" font-weight="700" font-family="P">현재</text><circle id="gd" cx="860" cy="60" r="16" fill="#F6E3A1"/></svg>';
 // ===== 장면 요소 =====
+const MAPF="filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.92) saturate(.75)";
+const circ=(img,pos,sz,size='240%')=>`<div style="width:${sz}px;height:${sz}px;border-radius:50%;border:5px solid #D9B45A;background:#13224A url(img/${img}) ${pos}/${size} no-repeat;box-shadow:0 8px 24px rgba(0,0,0,.5);flex:none"></div>`;
 const E={
- sil:el(SIL,330,1120), apt:el(APT,720,1130),
- t1:el('<div class="t1"><span class="gold" id="g1">대성 14억 아파트가</span><br><span class="gold" id="g2">100억 된 이유?</span></div>',540,560),
- q:el('<div class="lbl">단순히 운이 좋아서?</div>',540,770),
- map:el(MAP,540,600), pin:el(PIN,470,700), pinL:el('<div class="chip">흑석동 마크힐스</div>',470,860),
- y1:el('<div class="lbl">2015년 매입가</div>',540,1030), cnt:el('<div class="num gold" id="cnt">14.5억</div>',540,1150),
- x7:el('<div class="chip" style="font-size:54px">약 7배 ↑</div>',880,1030), n2:el('<div class="note">※ 현재가는 언론 보도 시세 추정치</div>',540,1265),
- wave:el(WAVE(4),540,560), lock:el(LOCK,540,860),
- v1:el('<div class="card">🌊 한강 조망권</div>',300,1080), v2:el('<div class="card">🔒 18세대 소수 단지</div>',760,1080),
- s1:el('<div class="card" style="font-size:42px">장동건·고소영 <span class="note">과거</span></div>',540,1220),
- s2:el('<div class="card" style="font-size:42px">현빈 <span class="note">과거</span></div>',540,1220),
- s3:el('<div class="card" style="font-size:42px">김연아·고우림 <span class="note">현재</span></div>',540,1220),
- bl:el(BLDG,250,560), bt:el('<div style="text-align:left"><div class="lbl">2017 · 강남구 논현동</div><div class="num gold" style="font-size:112px" id="bnum">310억</div></div>',690,560),
- graph:el(GRAPH,540,1000), bn:el('<div class="note">※ 호가 기준 시세 추정 (2024년 보도)</div>',540,1290),
+ bgR:el('<div style="width:1320px;height:2140px;background:url(img/river_night.jpg) center/cover;filter:brightness(.6) saturate(1.15)"></div>',540,960),
+ shade:el('<div style="width:1080px;height:1920px;background:linear-gradient(180deg,rgba(10,21,48,.75) 0%,rgba(10,21,48,.25) 35%,rgba(10,21,48,.35) 60%,rgba(6,12,30,.9) 100%)"></div>',540,960),
+ face:el(circ('daesung2.jpg','47% 9%',440,'250%'),540,1060),
+ t1:el('<div class="t1"><span class="gold" id="g1">대성 14억 아파트가</span><br><span class="gold" id="g2">100억 된 이유?</span></div>',540,520),
+ q:el('<div class="lbl">단순히 운이 좋아서?</div>',540,760),
+ map:el(`<div style="width:980px;height:820px;border-radius:32px;overflow:hidden;border:3px solid rgba(217,180,90,.7);position:relative;background:#0E1B3D"><img id="mapH" src="img/map_heukseok.png" style="position:absolute;left:-162px;top:-379px;width:1280px;transform-origin:652px 789px;${MAPF}"><div style="position:absolute;right:14px;bottom:10px;font:600 20px P;color:#cfd6e6;background:#0008;padding:2px 8px;border-radius:6px">© OpenStreetMap contributors</div></div>`,540,640),
+ pin:el(PIN,540,580), pinL:el('<div class="chip">흑석동 마크힐스 일대</div>',540,740),
+ riv:el('<div class="chip" style="background:linear-gradient(135deg,#9fd8ff,#3FA9F5);color:#04203a;font-size:38px">한강 · 동작대교 인접</div>',540,300),
+ pol:el('<div style="background:#fff;padding:12px 12px 44px;transform:rotate(4deg);box-shadow:0 14px 30px rgba(0,0,0,.5)"><div style="width:300px;height:225px;background:url(img/heukseok.jpg) center/cover"></div><div style="font:800 24px P;color:#222;text-align:center;margin-top:8px">수변도시 흑석동 표지석</div></div>',820,1110),
+ y1:el('<div class="lbl">2015년 매입가</div>',540,1095), cnt:el('<div class="num gold" id="cnt">14.5억</div>',540,1205),
+ x7:el('<div class="chip" style="font-size:54px">약 7배 ↑</div>',880,1095), n2:el('<div class="note">※ 현재가는 언론 보도 시세 추정치</div>',540,1310),
+ rvL:el('<div class="chip" style="font-size:34px">동작대교에서 본 한강 야경</div>',540,260),
+ lock:el(LOCK,540,560),
+ v1:el('<div class="card">🌊 한강 조망권</div>',300,800), v2:el('<div class="card">🔒 18세대 소수 단지</div>',760,800),
+ s1:el(`<div class="card" style="display:flex;align-items:center;gap:20px;font-size:44px">${circ('jangdonggun.jpg','45% 25%',150,'220%')}${circ('kosoyoung.jpg','50% 22%',150,'230%')}<div>장동건·고소영<br><span class="note" style="font-size:30px">과거 거주 (신혼집)</span></div></div>`,540,1110),
+ s2:el(`<div class="card" style="display:flex;align-items:center;gap:20px;font-size:44px">${circ('hyunbin.jpg','48% 18%',170,'230%')}<div>현빈<br><span class="note" style="font-size:30px">과거 거주</span></div></div>`,540,1110),
+ s3:el(`<div class="card" style="display:flex;align-items:center;gap:20px;font-size:44px">${circ('kimyuna.jpg','50% 22%',170,'230%')}<div>김연아·고우림 부부<br><span class="note" style="font-size:30px">현재 거주</span></div></div>`,540,1110),
+ map2:el(`<div style="width:980px;height:760px;border-radius:32px;overflow:hidden;border:3px solid rgba(217,180,90,.7);position:relative;background:#0E1B3D"><img id="mapN" src="img/map_nonhyeon.png" style="position:absolute;left:-24px;top:-492px;width:1280px;transform-origin:514px 872px;${MAPF}"><div style="position:absolute;right:14px;bottom:10px;font:600 20px P;color:#cfd6e6;background:#0008;padding:2px 8px;border-radius:6px">© OpenStreetMap contributors</div></div>`,540,600),
+ pin2:el(PIN,540,540), pin2L:el('<div class="chip">도산대로 · 논현동</div>',540,690),
+ bt:el('<div class="card" style="text-align:left;padding:18px 32px"><div class="lbl">2017 매입 → 현재 시세</div><div class="num gold" style="font-size:104px" id="bnum">310억</div></div>',330,970),
+ graph:el(GRAPH,540,1150), bn:el('<div class="note">※ 호가 기준 시세 추정 (2024년 보도)</div>',540,1325),
  key:el('<div class="t1" style="font-size:132px"><span class="gold" id="g3">대체 불가능한</span><br><span class="gold" id="g4">입지</span></div>',540,700),
  rule:el('<div style="width:620px;height:8px;border-radius:4px;background:linear-gradient(90deg,transparent,#D9B45A,transparent)"></div>',540,930),
  sub:el('<div style="display:flex;gap:28px"><div id="btnS" style="background:#FF0033;color:#fff;font-weight:900;font-size:54px;padding:22px 56px;border-radius:20px">구독</div><div id="btnL" style="background:#fff;color:#111;font-weight:900;font-size:54px;padding:22px 44px;border-radius:20px">👍 좋아요</div></div>',540,1180),
- cur:el('<svg width="80" height="100" viewBox="0 0 24 30"><path d="M2 2 L2 24 L8 18 L12 28 L16 26 L12 17 L20 17 Z" fill="#fff" stroke="#111" stroke-width="1.6"/></svg>',540,1180)
+ cur:el('<svg width="80" height="100" viewBox="0 0 24 30"><path d="M2 2 L2 24 L8 18 L12 28 L16 26 L12 17 L20 17 Z" fill="#fff" stroke="#111" stroke-width="1.6"/></svg>',540,1180),
+ cred:el('<div id="credT" style="font:600 22px P;color:#aab6d6;text-align:center;white-space:normal;width:960px"></div>',540,175)
 };
+E.graph.style.transformOrigin='50% 50%';
+const CRED=[[0,5,'사진: GOM (CC BY 4.0) · Ox1997cow (CC BY-SA 4.0) / Wikimedia Commons'],[5,20,'지도: © OpenStreetMap contributors · 사진: Integral (CC BY-SA 2.0 KR) / Wikimedia Commons'],[20,35,'사진: Ox1997cow (CC BY-SA 4.0) · Flickr 사용자·LG전자 (CC BY 2.0) · K-POPIT (CC BY 3.0) / Wikimedia Commons'],[35,50,'지도: © OpenStreetMap contributors'],[50,61,'']];
 // ===== 배경 파티클(골드 보케) =====
 const fx=$('fx').getContext('2d');const PR=[];{let s=7;const r=()=>(s=(s*16807)%2147483647)/2147483647;for(let i=0;i<60;i++)PR.push([r()*1080,r()*1920,(r()-.5)*14,-(6+r()*22),2+r()*7,r()])}
 function bokeh(t){fx.clearRect(0,0,1080,1920);for(const p of PR){let x=(p[0]+p[2]*t)%1080;if(x<0)x+=1080;let y=(p[1]+p[3]*t)%1920;if(y<0)y+=1920;fx.globalAlpha=.08+.18*Math.abs(Math.sin(t*.8+p[5]*9));fx.fillStyle=p[5]<.6?'#D9B45A':'#7fa8ff';fx.beginPath();fx.arc(x,y,p[4],0,7);fx.fill()}fx.globalAlpha=1}
@@ -102,35 +115,44 @@ function bokeh(t){fx.clearRect(0,0,1080,1920);for(const p of PR){let x=(p[0]+p[2
 function frame(rt){
   const t=warp(rt);bokeh(rt);$('barI').style.width=(rt/DUR*100)+'%';
   ['g1','g2','g3','g4','cnt','bnum'].forEach(id=>{const g=$(id);if(g)g.style.backgroundPosition=`${(t*40)%200}% 0`});
+  // 배경 사진 (S1, S3)
+  {const on1=out(t,4.6),in3=P(t,20,20.6)*out(t,34.6);const v=Math.max(t<5?rise(t,0,.8,0).o*on1:0,in3);
+   const kb=t<5?1.12-.06*P(t,0,5):1.04+.06*P(t,20,35);T(E.bgR,{o:v,s:kb,y:t<5?-30*P(t,0,5):20-40*P(t,20,35)});T(E.shade,{o:v})}
   // S1 0-5
   const o1=out(t,4.6);
-  T(E.sil,{...rise(t,.2,.9,80),o:rise(t,.2,.9).o*.9*o1,x:-20*P(t,0,5)});
-  T(E.apt,{...rise(t,.4,.9,120),o:rise(t,.4,.9).o*o1,x:20*P(t,0,5),s:1+.04*P(t,0,5)});
-  {const a=slam(t,.6,.45,1.8);T(E.t1,{s:a.s*(1+.03*P(t,1,5)),o:a.o*o1,b:a.b})}
+  {const p=pop(t,.9,.6);T(E.face,{s:p.s,o:p.o*o1,y:-10*P(t,1,5)})}
+  {const a=slam(t,.4,.45,1.8);T(E.t1,{s:a.s*(1+.03*P(t,1,5)),o:a.o*o1,b:a.b})}
   T(E.q,{...rise(t,2.6,.5,30),o:rise(t,2.6,.5).o*o1});
   // S2 5-20
   const o2=out(t,19.6);
-  T(E.map,{...rise(t,5,.8,80),o:rise(t,5,.8).o*o2,s:L(1.08,1,oE(P(t,5,6.5)))});
+  T(E.map,{...rise(t,5,.8,80),o:rise(t,5,.8).o*o2});
+  $('mapH').style.transform=`scale(${L(2.2,1,ioC(P(t,5.2,8.5)))})`;
+  T(E.riv,{...pop(t,7.6),o:pop(t,7.6).o*o2});
   {const p=P(t,6.2,6.9);T(E.pin,{y:L(-300,0,oC(p)),o:(p>0?1:0)*o2,s:1+.15*Math.sin(Math.max(0,t-6.9)*4)*Math.exp(-Math.max(0,t-6.9))})}
   T(E.pinL,{...pop(t,7.0),o:pop(t,7.0).o*o2});
-  T(E.y1,{...rise(t,9.0,.5,30),o:rise(t,9.0,.5).o*o2});
-  {const c=ioC(P(t,11.5,15.5));$('cnt').textContent=won(L(14.5,100,c));$('cnt').parentNode.parentNode&&0;T(E.cnt,{...pop(t,9.2,.5),o:pop(t,9.2,.5).o*o2,s:pop(t,9.2,.5).s*(1+.12*Math.exp(-Math.max(0,t-15.5)*5)*(t>15.5?1:0))});
+  T(E.pol,{...pop(t,16.6,.5),o:pop(t,16.6,.5).o*o2,r:4});
+  T(E.y1,{...rise(t,9.0,.5,30),o:rise(t,9.0,.5).o*o2*out(t,16.4)});
+  {const c=ioC(P(t,11.5,15.5));$('cnt').textContent=won(L(14.5,100,c));const pp=pop(t,9.2,.5);T(E.cnt,{x:-160*P(t,16.4,16.9),o:pp.o*o2,s:pp.s*(1+.12*Math.exp(-Math.max(0,t-15.5)*5)*(t>15.5?1:0))*L(1,.8,P(t,16.4,16.9))});
    E.y1.querySelector('.lbl').textContent=t<11.5?'2015년 매입가':(t<15.5?'시세 상승 중…':'현재 시세 (추정)')}
-  T(E.x7,{...pop(t,15.6),o:pop(t,15.6).o*o2,r:-6});
+  T(E.x7,{...pop(t,15.6),o:pop(t,15.6).o*o2*out(t,16.4),r:-6});
   T(E.n2,{...rise(t,16.2,.5,20),o:rise(t,16.2,.5).o*o2});
   // S3 20-35
   const o3=out(t,34.6);
-  document.querySelectorAll('.wv').forEach(w=>{const i=+w.dataset.i;let d='M0 '+(130+i*28);for(let x=0;x<=1000;x+=40)d+=` L${x} ${130+i*28+Math.sin(x/90+t*2.2+i)*18}`;w.setAttribute('d',d)});
-  T(E.wave,{...rise(t,20.1,.8,40),o:rise(t,20.1,.8).o*o3});
-  {const a=slam(t,21.0,.4,1.6);T(E.lock,{s:a.s,o:a.o*o3,b:a.b,r:t>21.4&&t<22?Math.sin(t*60)*4:0})}
+  T(E.rvL,{...pop(t,20.5),o:pop(t,20.5).o*o3});
+  {const a=slam(t,21.0,.4,1.6);T(E.lock,{s:a.s*.8,o:a.o*o3,b:a.b,r:t>21.4&&t<22?Math.sin(t*60)*4:0})}
   T(E.v1,{...pop(t,22.2),o:pop(t,22.2).o*o3});T(E.v2,{...pop(t,23.2),o:pop(t,23.2).o*o3});
   [[E.s1,27.8,29.9],[E.s2,29.9,31.6],[E.s3,31.6,34.6]].forEach(([d,a,b])=>{const p=pop(t,a,.4);T(d,{s:p.s,o:p.o*out(t,b-.3,.3),y:L(40,0,P(t,a,a+.4))})});
   // S4 35-50
   const o4=out(t,49.6);
-  T(E.bl,{...rise(t,35.1,.8,120),o:rise(t,35.1,.8).o*o4});
-  {const c=ioC(P(t,41.5,45.5));$('bnum').textContent=t<41.5?'310억':(c<1?Math.round(L(310,960,c))+'억':'900억대');T(E.bt,{...rise(t,35.5,.6,40),o:rise(t,35.5,.6).o*o4,s:1+.08*Math.exp(-Math.max(0,t-45.5)*5)*(t>45.5?1:0)})}
-  {const g=E.graph;T(g,{...rise(t,38,.6,40),o:rise(t,38,.6).o*o4});const len=1000,p=ioC(P(t,41.5,45.5));const gl=g.querySelector('#gl');gl.setAttribute('stroke-dasharray',len);gl.setAttribute('stroke-dashoffset',len*(1-p));g.querySelector('#ga').setAttribute('opacity',.35*p);g.querySelector('#gd').setAttribute('opacity',p>=1?1:0)}
+  T(E.map2,{...rise(t,35,.8,80),o:rise(t,35,.8).o*o4});
+  $('mapN').style.transform=`scale(${L(2.0,1,ioC(P(t,35.2,38.2)))})`;
+  {const p=P(t,36.0,36.7);T(E.pin2,{y:L(-300,0,oC(p)),o:(p>0?1:0)*o4})}
+  T(E.pin2L,{...pop(t,36.8),o:pop(t,36.8).o*o4});
+  {const c=ioC(P(t,41.5,45.5));$('bnum').textContent=t<41.5?'310억':(c<1?Math.round(L(310,960,c))+'억':'900억대');T(E.bt,{...rise(t,37.5,.6,40),o:rise(t,37.5,.6).o*o4,s:1+.08*Math.exp(-Math.max(0,t-45.5)*5)*(t>45.5?1:0)})}
+  {const g=E.graph;T(g,{...rise(t,38.6,.6,40),o:rise(t,38.6,.6).o*o4,s:.72});const len=1000,p=ioC(P(t,41.5,45.5));const gl=g.querySelector('#gl');gl.setAttribute('stroke-dasharray',len);gl.setAttribute('stroke-dashoffset',len*(1-p));g.querySelector('#ga').setAttribute('opacity',.35*p);g.querySelector('#gd').setAttribute('opacity',p>=1?1:0)}
   T(E.bn,{...rise(t,46,.5,20),o:rise(t,46,.5).o*o4});
+  // credits
+  {const c=CRED.find(c=>t>=c[0]&&t<c[1]);const ct=$('credT');if(c&&ct.textContent!==c[2])ct.textContent=c[2];T(E.cred,{o:c&&c[2]?.9*oE(P(t,c[0]+.3,c[0]+.8))*out(t,c[1]-.4,.3):0})}
   // S5 50-60
   {const a=slam(t,50.3,.45,2);T(E.key,{s:a.s*(1+.02*P(t,51,60)),o:a.o,b:a.b})}
   T(E.rule,{o:P(t,51,51.4),s:oE(P(t,51,51.6))});

@@ -28,3 +28,15 @@
 3. 11년 만에 약 7배. 비결은 독보적인 한강 조망권과 18세대뿐인 소수 정예 단지의 보안입니다. 장동건·고소영 부부, 현빈, 그리고 지금은 김연아·고우림 부부까지, 톱스타들이 선택한 이유가 있죠.
 4. 대성은 2017년 논현동 빌딩도 310억 원에 매입했습니다. 지금은 시세가 900억 원대로 추정되죠. 철저히 희소성 높은 입지만 골라낸 결과입니다.
 5. 부자들의 투자 공식은 결국 대체 불가능한 입지입니다. 더 많은 연예인 부동산 입지 분석이 궁금하다면 구독과 좋아요를 눌러주세요!
+
+## 사진·지도 출처 (영상 설명란에 함께 표기)
+- 지도: © OpenStreetMap contributors (ODbL / 지도 이미지 CC BY-SA 2.0)
+- daesung.jpg: nicole voon / CC BY 2.0 / Wikimedia Commons — https://commons.wikimedia.org/wiki/File:Daesung_2012.jpg
+- hyunbin.jpg: K-POPIT 케이팝잇 / CC BY 3.0 / Wikimedia Commons — https://commons.wikimedia.org/wiki/File:20240620_Hyun_Bin_(%ED%98%84%EB%B9%88)_01.jpg
+- kimyuna.jpg: K-POPIT 케이팝잇 / CC BY 3.0 / Wikimedia Commons — https://commons.wikimedia.org/wiki/File:Yuna_Kim_2024.jpg
+- heukseok.jpg: Integral (talk) / CC BY-SA 2.0 kr / Wikimedia Commons — https://commons.wikimedia.org/wiki/File:Heukseok-dong,_A_waterfront_city.jpg
+- jangdonggun.jpg: photo taken by flickr user photoren / CC BY 2.0 / Wikimedia Commons — https://commons.wikimedia.org/wiki/File:Jang_Dong-gun_Portrait_Size.jpg
+- kosoyoung.jpg: LG전자 / CC BY 2.0 / Wikimedia Commons — https://commons.wikimedia.org/wiki/File:Ko_So-young,_2011_(cropped).jpg
+- daesung2.jpg: GOM / CC BY 4.0 / Wikimedia Commons — https://commons.wikimedia.org/wiki/File:Daesung_-_MADE_THE_MOVIE_Premiere.jpg
+- river_night.jpg: Ox1997cow / CC BY-SA 4.0 / Wikimedia Commons — https://commons.wikimedia.org/wiki/File:Yeouido_seen_from_Dongjak_Bridge_at_night_20240115_01.jpg
+- ※ 흑석동 사진은 마크힐스 건물이 아닌 '수변도시 흑석동' 표지석, 한강 야경은 동작대교에서 촬영한 사진입니다. 고우림 사진은 자유 라이선스 사진이 없어 김연아 사진만 사용했습니다.
