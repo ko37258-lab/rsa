@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>대성 입지 분석 쇼츠</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+@font-face{font-family:P;font-weight:900;src:url(Pretendard-Black.otf)}
+@font-face{font-family:P;font-weight:800;src:url(Pretendard-ExtraBold.otf)}
+@font-face{font-family:P;font-weight:700;src:url(Pretendard-Bold.otf)}
+@font-face{font-family:P;font-weight:600;src:url(Pretendard-SemiBold.otf)}
+:root{--navy:#0A1530;--navy2:#13224A;--gold:#D9B45A;--gold2:#F6E3A1;--goldD:#9C7A2C;--ink:#EAF0FF;--sky:#5EC8FF}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#050a18;overflow:hidden}
+#wrap{position:absolute;left:0;top:0;width:1080px;height:1920px;transform-origin:0 0}
+#v{position:absolute;inset:0;overflow:hidden;font-family:P,sans-serif;color:var(--ink);background:radial-gradient(ellipse at 50% 30%,#1A2D5E 0%,var(--navy) 55%,#060C1E 100%)}
+.a{position:absolute;left:0;top:0;white-space:nowrap;will-change:transform,opacity}
+.gold{background:linear-gradient(100deg,var(--goldD) 0%,var(--gold) 25%,var(--gold2) 45%,var(--gold) 60%,var(--goldD) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+.t1{font-weight:900;font-size:118px;line-height:1.12;text-align:center;letter-spacing:-.03em}
+.cap{width:max-content;font-weight:800;font-size:52px;color:#fff;background:rgba(5,10,24,.78);border:2px solid rgba(217,180,90,.55);padding:16px 30px;border-radius:18px;text-align:center;white-space:normal;max-width:980px;line-height:1.35}
+.cap b{color:var(--gold2)}
+.card{background:rgba(19,34,74,.85);border:2px solid rgba(217,180,90,.6);border-radius:24px;padding:22px 34px;font-weight:800;font-size:48px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.chip{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1405;font-weight:900;font-size:46px;padding:14px 34px;border-radius:999px;box-shadow:0 10px 30px rgba(217,180,90,.35)}
+.lbl{font-weight:700;font-size:34px;color:#b9c6e6;letter-spacing:.08em}
+.num{font-weight:900;font-size:150px;letter-spacing:-.03em}
+.note{font-weight:600;font-size:28px;color:#8fa0c8}
+#grain{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 2px,transparent 2px 4px);pointer-events:none}
+#frame{position:absolute;inset:28px;border:2px solid rgba(217,180,90,.35);border-radius:28px;pointer-events:none}
+#brand{position:absolute;left:50%;top:120px;transform:translateX(-50%);font-weight:800;font-size:30px;letter-spacing:.25em;color:var(--gold)}
+#capbox{position:absolute;left:50%;bottom:400px;transform:translateX(-50%)}
+#bar{position:absolute;left:60px;right:60px;top:80px;height:6px;border-radius:3px;background:rgba(255,255,255,.12)}
+#bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--goldD),var(--gold2));border-radius:3px}
+#flash{position:absolute;inset:0;background:var(--gold2);opacity:0;mix-blend-mode:screen}
+#ctl{position:fixed;left:8px;bottom:8px;font:14px sans-serif;color:#ccd;background:#0008;padding:6px 10px;border-radius:8px;z-index:9}
+#ctl button{margin-right:6px}
+</style></head>
+<body>
+<div id="wrap"><div id="v">
+  <canvas id="fx" width="1080" height="1920" style="position:absolute;inset:0"></canvas>
+  <div id="bar"><i id="barI"></i></div>
+  <div id="brand">REAL ESTATE · INSIGHT</div>
+  <div id="stage"></div>
+  <div id="capbox"><div class="cap" id="cap"></div></div>
+  <div id="flash"></div><div id="grain"></div><div id="frame"></div>
+</div></div>
+<div id="ctl"><button id="play">▶ 재생</button><button id="re">↺ 처음</button><span id="tc">0.0s</span></div>
+<script>
+// ===== 타임라인 데이터 (수정 지점) =====
+const DUR=60;
+const CAPTIONS=[ // 화면 자막(장면별)
+ [0,5,'대성 14억 아파트가 <b>100억</b> 된 이유?'],
+ [5,20,'2015년 14.5억 → 현재 시세 약 <b>100억</b> (약 7배)'],
+ [20,35,'<b>한강 조망권</b> & 철저한 사생활 보호'],
+ [35,50,'논현동 빌딩 310억 → <b>900억대</b> (시세 추정)'],
+ [50,60,'부자들의 투자 공식: <b>대체 불가능한 입지!</b>']];
+// ===== 유틸 =====
+const $=id=>document.getElementById(id),cl=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)),P=(t,a,b)=>cl((t-a)/(b-a)),L=(a,b,x)=>a+(b-a)*x;
+const oE=x=>x>=1?1:1-Math.pow(2,-10*x),oC=x=>1-Math.pow(1-x,3),ioC=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const oB=x=>{const c1=1.9,c3=c1+1;return x<=0?0:1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+const stage=$('stage');
+function el(html,x,y){const d=document.createElement('div');d.className='a';d.innerHTML=html;d.dataset.x=x;d.dataset.y=y;stage.appendChild(d);return d}
+function T(d,o){const x=+d.dataset.x+(o.x||0),y=+d.dataset.y+(o.y||0),s=o.s??1;d.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%) rotate(${o.r||0}deg) scale(${s})`;d.style.opacity=o.o??1;d.style.filter=(o.b||0)>.3?`blur(${o.b}px)`:'none';d.style.display=(o.o??1)<=0.001?'none':'block'}
+const pop=(t,t0,d=.45)=>{const p=P(t,t0,t0+d);return{s:oB(p),o:cl(p*4)}};
+const rise=(t,t0,d=.6,dy=60)=>{const p=oE(P(t,t0,t0+d));return{y:L(dy,0,p),o:p,b:L(10,0,p)}};
+const slam=(t,t0,d=.35,f=2.2)=>{const p=oE(P(t,t0,t0+d));return{s:L(f,1,p),o:cl(p*4),b:L(18,0,p)}};
+const out=(t,t1,d=.35)=>1-P(t,t1,t1+d);
+const won=v=>v>=10?(Math.round(v*10)/10).toFixed(v<20?1:0)+'억':v.toFixed(1)+'억';
+// ===== SVG 소품 =====
+const SIL='<svg width="420" height="560" viewBox="0 0 210 280"><defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9B45A" stop-opacity=".55"/><stop offset="1" stop-color="#0A1530" stop-opacity="0"/></linearGradient></defs><circle cx="105" cy="70" r="46" fill="url(#sg)"/><path d="M20 280 C20 170 190 170 190 280Z" fill="url(#sg)"/></svg>';
+const APT='<svg width="520" height="720" viewBox="0 0 260 360">'+[[20,120,70,240],[95,40,80,320],[180,90,60,270]].map(([x,y,w,h])=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#13224A" stroke="#D9B45A" stroke-width="2"/>`+Array.from({length:Math.floor(h/26)},(_,r)=>Array.from({length:Math.floor(w/20)},(_,c)=>`<rect x="${x+6+c*20}" y="${y+10+r*26}" width="10" height="14" fill="${(r*7+c*3)%5?'#2A3E72':'#F6E3A1'}"/>`).join('')).join('')).join('')+'</svg>';
+const MAP='<svg width="980" height="760" viewBox="0 0 980 760"><rect width="980" height="760" rx="36" fill="#0E1B3D" stroke="rgba(217,180,90,.5)" stroke-width="3"/>'+Array.from({length:9},(_,i)=>`<path d="M0 ${80+i*80} H980" stroke="rgba(255,255,255,.05)"/><path d="M${80+i*110} 0 V760" stroke="rgba(255,255,255,.05)"/>`).join('')+'<path id="river" d="M-20 470 C180 400 300 520 470 460 S760 330 1000 380" stroke="#3FA9F5" stroke-width="70" fill="none" opacity=".55" stroke-linecap="round"/><text x="720" y="430" fill="#9fd8ff" font-size="34" font-weight="800" font-family="P">한강</text><text x="150" y="640" fill="#7f8db3" font-size="30" font-weight="700" font-family="P">동작구</text><text x="560" y="240" fill="#7f8db3" font-size="30" font-weight="700" font-family="P">용산구</text></svg>';
+const PIN='<svg width="90" height="120" viewBox="0 0 30 40"><path d="M15 0 C6 0 0 7 0 15 C0 26 15 40 15 40 S30 26 30 15 C30 7 24 0 15 0Z" fill="#D9B45A"/><circle cx="15" cy="15" r="6" fill="#0A1530"/></svg>';
+const WAVE=n=>`<svg width="1000" height="260" viewBox="0 0 1000 260">${Array.from({length:n},(_,i)=>`<path class="wv" data-i="${i}" d="" stroke="${['#5EC8FF','#3FA9F5','#9fd8ff'][i%3]}" stroke-width="${8-i}" fill="none" opacity="${.9-i*.15}"/>`).join('')}</svg>`;
+const LOCK='<svg width="200" height="240" viewBox="0 0 100 120"><path d="M25 50 V35 a25 25 0 0 1 50 0 V50" stroke="#D9B45A" stroke-width="10" fill="none"/><rect x="12" y="50" width="76" height="62" rx="12" fill="#D9B45A"/><circle cx="50" cy="78" r="9" fill="#0A1530"/><rect x="46" y="80" width="8" height="18" fill="#0A1530"/></svg>';
+const BLDG='<svg width="300" height="460" viewBox="0 0 150 230"><rect x="20" y="10" width="110" height="215" fill="#13224A" stroke="#D9B45A" stroke-width="3"/>'+Array.from({length:9},(_,r)=>Array.from({length:4},(_,c)=>`<rect x="${32+c*24}" y="${22+r*22}" width="14" height="14" fill="${(r+c)%4?'#2A3E72':'#F6E3A1'}"/>`).join('')).join('')+'<rect x="60" y="205" width="30" height="20" fill="#D9B45A"/></svg>';
+const GRAPH='<svg width="900" height="520" viewBox="0 0 900 520"><path d="M80 460 H860 M80 460 V40" stroke="rgba(255,255,255,.3)" stroke-width="3"/><path id="gl" d="M80 400 C300 380 420 320 560 230 S760 80 860 60" stroke="#D9B45A" stroke-width="10" fill="none" stroke-linecap="round"/><path id="ga" d="M80 400 C300 380 420 320 560 230 S760 80 860 60 V460 H80Z" fill="url(#gg)" opacity=".35"/><defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9B45A"/><stop offset="1" stop-color="#D9B45A" stop-opacity="0"/></linearGradient></defs><text x="70" y="500" fill="#b9c6e6" font-size="30" font-weight="700" font-family="P">2017</text><text x="790" y="500" fill="#b9c6e6" font-size="30" font-weight="700" font-family="P">현재</text><circle id="gd" cx="860" cy="60" r="16" fill="#F6E3A1"/></svg>';
+// ===== 장면 요소 =====
+const E={
+ sil:el(SIL,330,1120), apt:el(APT,720,1130),
+ t1:el('<div class="t1"><span class="gold" id="g1">대성 14억 아파트가</span><br><span class="gold" id="g2">100억 된 이유?</span></div>',540,560),
+ q:el('<div class="lbl">단순히 운이 좋아서?</div>',540,770),
+ map:el(MAP,540,600), pin:el(PIN,470,700), pinL:el('<div class="chip">흑석동 마크힐스</div>',470,860),
+ y1:el('<div class="lbl">2015년 매입가</div>',540,1030), cnt:el('<div class="num gold" id="cnt">14.5억</div>',540,1150),
+ x7:el('<div class="chip" style="font-size:54px">약 7배 ↑</div>',880,1030), n2:el('<div class="note">※ 현재가는 언론 보도 시세 추정치</div>',540,1265),
+ wave:el(WAVE(4),540,560), lock:el(LOCK,540,860),
+ v1:el('<div class="card">🌊 한강 조망권</div>',300,1080), v2:el('<div class="card">🔒 18세대 소수 단지</div>',760,1080),
+ s1:el('<div class="card" style="font-size:42px">장동건·고소영 <span class="note">과거</span></div>',540,1220),
+ s2:el('<div class="card" style="font-size:42px">현빈 <span class="note">과거</span></div>',540,1220),
+ s3:el('<div class="card" style="font-size:42px">김연아·고우림 <span class="note">현재</span></div>',540,1220),
+ bl:el(BLDG,250,560), bt:el('<div style="text-align:left"><div class="lbl">2017 · 강남구 논현동</div><div class="num gold" style="font-size:112px" id="bnum">310억</div></div>',690,560),
+ graph:el(GRAPH,540,1000), bn:el('<div class="note">※ 호가 기준 시세 추정 (2024년 보도)</div>',540,1290),
+ key:el('<div class="t1" style="font-size:132px"><span class="gold" id="g3">대체 불가능한</span><br><span class="gold" id="g4">입지</span></div>',540,700),
+ rule:el('<div style="width:620px;height:8px;border-radius:4px;background:linear-gradient(90deg,transparent,#D9B45A,transparent)"></div>',540,930),
+ sub:el('<div style="display:flex;gap:28px"><div id="btnS" style="background:#FF0033;color:#fff;font-weight:900;font-size:54px;padding:22px 56px;border-radius:20px">구독</div><div id="btnL" style="background:#fff;color:#111;font-weight:900;font-size:54px;padding:22px 44px;border-radius:20px">👍 좋아요</div></div>',540,1180),
+ cur:el('<svg width="80" height="100" viewBox="0 0 24 30"><path d="M2 2 L2 24 L8 18 L12 28 L16 26 L12 17 L20 17 Z" fill="#fff" stroke="#111" stroke-width="1.6"/></svg>',540,1180)
+};
+// ===== 배경 파티클(골드 보케) =====
+const fx=$('fx').getContext('2d');const PR=[];{let s=7;const r=()=>(s=(s*16807)%2147483647)/2147483647;for(let i=0;i<60;i++)PR.push([r()*1080,r()*1920,(r()-.5)*14,-(6+r()*22),2+r()*7,r()])}
+function bokeh(t){fx.clearRect(0,0,1080,1920);for(const p of PR){let x=(p[0]+p[2]*t)%1080;if(x<0)x+=1080;let y=(p[1]+p[3]*t)%1920;if(y<0)y+=1920;fx.globalAlpha=.08+.18*Math.abs(Math.sin(t*.8+p[5]*9));fx.fillStyle=p[5]<.6?'#D9B45A':'#7fa8ff';fx.beginPath();fx.arc(x,y,p[4],0,7);fx.fill()}fx.globalAlpha=1}
+// ===== 프레임 렌더 =====
+function frame(t){
+  bokeh(t);$('barI').style.width=(t/DUR*100)+'%';
+  ['g1','g2','g3','g4','cnt','bnum'].forEach(id=>{const g=$(id);if(g)g.style.backgroundPosition=`${(t*40)%200}% 0`});
+  // S1 0-5
+  const o1=out(t,4.6);
+  T(E.sil,{...rise(t,.2,.9,80),o:rise(t,.2,.9).o*.9*o1,x:-20*P(t,0,5)});
+  T(E.apt,{...rise(t,.4,.9,120),o:rise(t,.4,.9).o*o1,x:20*P(t,0,5),s:1+.04*P(t,0,5)});
+  {const a=slam(t,.6,.45,1.8);T(E.t1,{s:a.s*(1+.03*P(t,1,5)),o:a.o*o1,b:a.b})}
+  T(E.q,{...rise(t,2.6,.5,30),o:rise(t,2.6,.5).o*o1});
+  // S2 5-20
+  const o2=out(t,19.6);
+  T(E.map,{...rise(t,5,.8,80),o:rise(t,5,.8).o*o2,s:L(1.08,1,oE(P(t,5,6.5)))});
+  {const p=P(t,6.2,6.9);T(E.pin,{y:L(-300,0,oC(p)),o:(p>0?1:0)*o2,s:1+.15*Math.sin(Math.max(0,t-6.9)*4)*Math.exp(-Math.max(0,t-6.9))})}
+  T(E.pinL,{...pop(t,7.0),o:pop(t,7.0).o*o2});
+  T(E.y1,{...rise(t,9.0,.5,30),o:rise(t,9.0,.5).o*o2});
+  {const c=ioC(P(t,11.5,15.5));$('cnt').textContent=won(L(14.5,100,c));$('cnt').parentNode.parentNode&&0;T(E.cnt,{...pop(t,9.2,.5),o:pop(t,9.2,.5).o*o2,s:pop(t,9.2,.5).s*(1+.12*Math.exp(-Math.max(0,t-15.5)*5)*(t>15.5?1:0))});
+   E.y1.querySelector('.lbl').textContent=t<11.5?'2015년 매입가':(t<15.5?'시세 상승 중…':'현재 시세 (추정)')}
+  T(E.x7,{...pop(t,15.6),o:pop(t,15.6).o*o2,r:-6});
+  T(E.n2,{...rise(t,16.2,.5,20),o:rise(t,16.2,.5).o*o2});
+  // S3 20-35
+  const o3=out(t,34.6);
+  document.querySelectorAll('.wv').forEach(w=>{const i=+w.dataset.i;let d='M0 '+(130+i*28);for(let x=0;x<=1000;x+=40)d+=` L${x} ${130+i*28+Math.sin(x/90+t*2.2+i)*18}`;w.setAttribute('d',d)});
+  T(E.wave,{...rise(t,20.1,.8,40),o:rise(t,20.1,.8).o*o3});
+  {const a=slam(t,21.0,.4,1.6);T(E.lock,{s:a.s,o:a.o*o3,b:a.b,r:t>21.4&&t<22?Math.sin(t*60)*4:0})}
+  T(E.v1,{...pop(t,22.2),o:pop(t,22.2).o*o3});T(E.v2,{...pop(t,23.2),o:pop(t,23.2).o*o3});
+  [[E.s1,27.8,29.9],[E.s2,29.9,31.6],[E.s3,31.6,34.6]].forEach(([d,a,b])=>{const p=pop(t,a,.4);T(d,{s:p.s,o:p.o*out(t,b-.3,.3),y:L(40,0,P(t,a,a+.4))})});
+  // S4 35-50
+  const o4=out(t,49.6);
+  T(E.bl,{...rise(t,35.1,.8,120),o:rise(t,35.1,.8).o*o4});
+  {const c=ioC(P(t,41.5,45.5));$('bnum').textContent=t<41.5?'310억':(c<1?Math.round(L(310,960,c))+'억':'900억대');T(E.bt,{...rise(t,35.5,.6,40),o:rise(t,35.5,.6).o*o4,s:1+.08*Math.exp(-Math.max(0,t-45.5)*5)*(t>45.5?1:0)})}
+  {const g=E.graph;T(g,{...rise(t,38,.6,40),o:rise(t,38,.6).o*o4});const len=1000,p=ioC(P(t,41.5,45.5));const gl=g.querySelector('#gl');gl.setAttribute('stroke-dasharray',len);gl.setAttribute('stroke-dashoffset',len*(1-p));g.querySelector('#ga').setAttribute('opacity',.35*p);g.querySelector('#gd').setAttribute('opacity',p>=1?1:0)}
+  T(E.bn,{...rise(t,46,.5,20),o:rise(t,46,.5).o*o4});
+  // S5 50-60
+  {const a=slam(t,50.3,.45,2);T(E.key,{s:a.s*(1+.02*P(t,51,60)),o:a.o,b:a.b})}
+  T(E.rule,{o:P(t,51,51.4),s:oE(P(t,51,51.6))});
+  T(E.sub,{...pop(t,54.5,.5)});
+  {const k=58.2,p=ioC(P(t,55.6,k));T(E.cur,{x:L(330,-120,p),y:L(420,40,p),o:t>55.6?1:0,s:t>k&&t<k+.15?.8:1});
+   const bs=$('btnS');bs.style.transform=`scale(${t>54.5&&t<k?1+.06*Math.sin(t*10):(t>k?1+.15*Math.exp(-(t-k)*8):1)})`;bs.textContent=t>k?'구독중 ✓':'구독';bs.style.background=t>k?'#444':'#FF0033';
+   $('btnL').style.transform=`scale(${t>k+.6?1+.25*Math.exp(-(t-k-.6)*6):1})`}
+  // captions
+  const c=CAPTIONS.find(c=>t>=c[0]&&t<c[1]);const cap=$('cap');if(c){if(cap.dataset.k!=c[0]){cap.innerHTML=c[2];cap.dataset.k=c[0]}const q=oE(P(t,c[0]+.15,c[0]+.55));cap.style.opacity=q*out(t,c[1]-.3,.3);cap.style.transform=`translateY(${(1-q)*30}px)`}else cap.style.opacity=0;
+  // transitions flash
+  let f=0;[5,20,35,50].forEach(s=>{const d=t-s;if(d>=-.05&&d<.35)f=Math.max(f,(1-Math.abs(d-.05)/.3)*.35)});$('flash').style.opacity=f;
+  $('tc').textContent=t.toFixed(1)+'s';
+}
+window.frame=frame;
+// ===== 브라우저 재생 & 화면 맞춤 =====
+function fit(){const s=Math.min(innerWidth/1080,innerHeight/1920);$('wrap').style.transform=`scale(${s})`}
+addEventListener('resize',fit);fit();
+let t0=null,playing=false,cur=0;
+function loop(ts){if(!playing)return;if(t0===null)t0=ts-cur*1000;cur=(ts-t0)/1000;if(cur>=DUR){cur=DUR;playing=false}frame(cur);requestAnimationFrame(loop)}
+$('play').onclick=()=>{playing=!playing;t0=null;$('play').textContent=playing?'⏸ 정지':'▶ 재생';if(playing)requestAnimationFrame(loop)};
+$('re').onclick=()=>{cur=0;t0=null;frame(0)};
+if(new URLSearchParams(location.search).has('render'))$('ctl').style.display='none';
+document.fonts.ready.then(()=>frame(0));
+</script></body></html>
