@@ -90,7 +90,7 @@ python SKILL_DIR/scripts/render.py 작업폴더/plan.json --only 9x16
   - `{name}_16x9.mp4`: 1920×1080, 30fps
   - `{name}_9x16_쇼츠.mp4`: 1080×1920
   - `youtube_chapters.txt`
-- 둘 다 오디오는 AAC 192k, 약 -14 LUFS로 맞춰진다.
+- 둘 다 오디오는 AAC 192k, 약 -14 LUFS(±1) 로 맞춰진다.
 
 ## 6단계 — 최종 확인과 전달
 

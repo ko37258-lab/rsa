@@ -86,7 +86,7 @@ def worker(job):
     ff = subprocess.Popen([FF, '-hide_banner', '-loglevel', 'error', '-y', '-ss', f'{T0:.4f}', '-i', inp,
                            '-f', 'image2pipe', '-framerate', str(FPS), '-c:v', 'png', '-i', '-',
                            '-filter_complex', filt, '-map', '[v]', '-frames:v', str(b - a), '-an',
-                           '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-r', str(FPS), out], stdin=subprocess.PIPE)
+                           '-c:v', 'libx264', '-preset', 'medium', '-crf', '21', '-maxrate', '6M', '-bufsize', '12M', '-r', str(FPS), out], stdin=subprocess.PIPE)
     with sync_playwright() as pw:
         br, pg = open_page(pw, fmt, plan, meta)
         for f in range(a, b):
