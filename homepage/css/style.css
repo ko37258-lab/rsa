@@ -291,17 +291,18 @@ button { font: inherit; color: inherit; }
 .c-area { font-size: 13px; color: #d6d5ce; }
 .c-title { margin: 0; font: 700 1.2rem/1.35 var(--f-display); letter-spacing: -.02em; }
 .c-price { font: 800 1.55rem/1.2 var(--f-num); letter-spacing: -.01em; color: #fff; margin-top: 4px; }
+.c-more { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .5s cubic-bezier(.2,.7,.2,1), opacity .4s; }
 .c-specs {
   list-style: none; margin: 0; padding: 0; display: grid; gap: 2px;
+  min-height: 0; overflow: hidden;
   font-size: 13px; color: #e6e5df;
-  max-height: 0; opacity: 0; overflow: hidden;
-  transition: max-height .5s cubic-bezier(.2,.7,.2,1), opacity .4s, margin .4s;
 }
+.c-specs li:first-child { padding-top: 6px; }
 .c-sample { position: absolute; right: 18px; bottom: 18px; z-index: 1; font-size: 11.5px; color: #cfcec7; }
 .c-card.is-hot { transform: translateY(-8px); box-shadow: 0 24px 44px -18px rgb(14 14 13 / .55); }
 .c-card.is-hot img { transform: scale(1.1) translateY(-3%); }
 .c-card.is-hot::after { background: linear-gradient(180deg, rgb(14 14 13 / .1) 0%, rgb(14 14 13 / .2) 30%, rgb(14 14 13 / .94) 100%); }
-.c-card.is-hot .c-specs { max-height: 4em; opacity: 1; margin-top: 6px; }
+.c-card.is-hot .c-more { grid-template-rows: 1fr; opacity: 1; }
 
 /* ---------- 전문성 ---------- */
 .expert { background: var(--paper-2); border-top: 1px solid var(--line); padding-block: clamp(72px, 9vw, 120px); }
@@ -327,9 +328,10 @@ button { font: inherit; color: inherit; }
 .pillars h3 { margin: 0; font: 700 1.2rem/1.4 var(--f-body); grid-column: 2; }
 .pillars p { margin: 6px 0 0; color: var(--ink-2); grid-column: 2; }
 .quote {
-  margin: 36px 0 0; padding: 0 0 0 20px; border-left: 3px solid var(--accent);
+  margin: 36px 0 0; padding: 0;
   font: 500 clamp(1.05rem, 1rem + .3vw, 1.2rem)/1.7 var(--f-display); letter-spacing: -.01em;
 }
+.quote::before { content: "\201C"; display: block; height: .5em; font: 800 3.2rem/1 var(--f-num); color: var(--accent); }
 
 /* ---------- 거래 순서 ---------- */
 .process { padding-block: clamp(56px, 7vw, 88px); }

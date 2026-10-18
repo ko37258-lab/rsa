@@ -76,7 +76,7 @@
       '<div class="c-top"><span class="c-type">' + esc(c.type) + '</span><span class="c-status">' + esc(c.deal) + (c.status && c.status !== "매물" ? " · " + esc(c.status) : "") + "</span></div>" +
       '<div class="c-body"><span class="c-area">' + esc(c.area) + '</span><h3 class="c-title">' + esc(c.title) + "</h3>" +
       '<span class="c-price">' + esc(c.price) + "</span>" +
-      '<ul class="c-specs">' + (c.specs || []).map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ul></div>" +
+      '<div class="c-more"><ul class="c-specs">' + (c.specs || []).map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ul></div></div>" +
       (SITE.SAMPLE_MODE ? '<span class="c-sample">예시</span>' : "") +
       "</article>";
   }
