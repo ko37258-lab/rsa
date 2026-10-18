@@ -526,6 +526,13 @@ button { font: inherit; color: inherit; }
 .foot-bottom { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 22px; font-size: 12.5px; }
 .foot-bottom p { margin: 0; max-width: 60em; }
 
+/* ---------- 설정 오류 안내 ---------- */
+.config-error {
+  position: sticky; top: 0; z-index: 70;
+  padding: 12px var(--gutter-r) 12px var(--gutter-l);
+  background: #c0271d; color: #fff; font-weight: 600; text-align: center;
+}
+
 /* ---------- 모바일 하단 고정 ---------- */
 .dock {
   display: none;
@@ -534,6 +541,7 @@ button { font: inherit; color: inherit; }
   background: rgb(26 26 24 / .96); border-top: 1px solid var(--night-line);
   grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
 }
+.dock.has-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .dock a { text-align: center; text-decoration: none; color: var(--on-night); padding: 11px 4px; border-radius: var(--r); font-weight: 600; font-size: 15px; background: var(--night-2); }
 .dock a:first-child { background: var(--accent-fill); color: #fff; }
 

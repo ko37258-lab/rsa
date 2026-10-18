@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--page-->
+<title>중개사무소 홈페이지 템플릿 사용설명서</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 레이아웃: 왼쪽 목차 + 오른쪽 단계별 본문. 홈페이지와 같은 먹색·미색·딥레드. */
+:root {
+  --paper: #faf9f6; --paper-2: #f1efea; --card: #ffffff;
+  --ink: #1a1a18; --ink-2: #6b6b66; --line: #e3e1dc;
+  --accent: #8c1d18; --accent-fill: #8c1d18; --code-bg: #1f1f1c; --code-fg: #ecebe6; --code-key: #e9a89f; --code-str: #d7c98f;
+  --ok: #2f6b3a; --warn-bg: #fbeeec;
+  --f-body: "Pretendard Variable", "Pretendard", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #141413; --paper-2: #1c1c1a; --card: #21211e;
+    --ink: #f1f0ec; --ink-2: #aeada5; --line: #33332f;
+    --accent: #e36a5f; --code-bg: #0e0e0d; --ok: #7cc48a; --warn-bg: #2a1a18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #141413; --paper-2: #1c1c1a; --card: #21211e;
+  --ink: #f1f0ec; --ink-2: #aeada5; --line: #33332f;
+  --accent: #e36a5f; --code-bg: #0e0e0d; --ok: #7cc48a; --warn-bg: #2a1a18;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.75 var(--f-body); word-break: keep-all; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+.wrap { max-width: 1160px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.top { background: #1a1a18; color: #f4f3ef; padding-block: 56px 48px; }
+.top .kicker { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: #e36a5f; }
+.top h1 { margin: 0; font: 800 clamp(1.8rem, 1.2rem + 2.4vw, 2.8rem)/1.25 var(--f-body); letter-spacing: -.03em; text-wrap: balance; }
+.top p.lead { margin: 16px 0 0; max-width: 40em; color: #c9c8c0; }
+.top code { background: #262623; border-color: #3a3a35; color: #f4f3ef; }
+.dl-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: var(--r); font-weight: 700; text-decoration: none; }
+.btn-light { background: #faf9f6; color: #1a1a18; }
+.btn-ghost { border: 1px solid rgb(244 243 239 / .4); color: #f4f3ef; }
+.btn svg { width: 18px; height: 18px; fill: currentColor; }
+.dl-note { font-size: 13px; color: #b3b2aa; }
+
+.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; padding-block: 48px 96px; }
+.toc { position: sticky; top: 24px; align-self: start; font-size: 14px; }
+.toc p { margin: 0 0 8px; font-weight: 700; }
+.toc ol { margin: 0; padding: 0 0 0 1.3em; display: grid; gap: 6px; color: var(--ink-2); }
+.toc a { color: inherit; text-decoration: none; }
+.toc a:hover { color: var(--accent); }
+
+main section { padding-bottom: 40px; margin-bottom: 40px; border-bottom: 1px solid var(--line); scroll-margin-top: 16px; }
+main section:last-child { border-bottom: 0; }
+h2 { margin: 0 0 14px; font: 800 1.55rem/1.35 var(--f-body); letter-spacing: -.02em; display: flex; gap: 12px; align-items: baseline; }
+h2 .no { font: 700 .85rem/1 var(--f-mono); color: var(--accent); }
+h3 { margin: 26px 0 8px; font-size: 1.08rem; }
+p, li { max-width: 46em; }
+ol.steps-list, ul.plain { padding-left: 1.3em; display: grid; gap: 6px; }
+code { font: 500 .9em var(--f-mono); background: var(--paper-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+pre { margin: 14px 0; padding: 16px 18px; border-radius: var(--r); background: var(--code-bg); color: var(--code-fg); overflow-x: auto; font: 400 13.5px/1.7 var(--f-mono); }
+pre code { background: none; border: 0; padding: 0; font: inherit; color: inherit; }
+pre .k { color: var(--code-key); }
+pre .s { color: var(--code-str); }
+pre .c { color: #8f8e86; }
+.table-wrap { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--ink-2); font-size: 13px; }
+td code { white-space: nowrap; }
+.note { margin: 16px 0; padding: 14px 16px; border-radius: var(--r); background: var(--paper-2); border: 1px solid var(--line); font-size: 15px; }
+.note.warn { background: var(--warn-bg); border-color: transparent; }
+.note b { display: block; margin-bottom: 4px; }
+.check { list-style: none; padding: 0; display: grid; gap: 8px; }
+.check li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; }
+.check li::before { content: ""; width: 16px; height: 16px; margin-top: .3em; border: 2px solid var(--ink-2); border-radius: 3px; }
+.prompt { white-space: pre-wrap; }
+footer { padding-block: 32px 48px; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 13.5px; }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .toc { position: static; padding: 16px; border: 1px solid var(--line); border-radius: var(--r); }
+}
+</style>
+<!--/head-->
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <p class="kicker">수강생용 · 중개사무소 홈페이지 템플릿</p>
+    <h1>내 중개사무소 홈페이지,<br>설정 파일 하나로 완성하기</h1>
+    <p class="lead">미스터홈즈 서초 부동산 홈페이지를 그대로 본떠 쓸 수 있게 만든 템플릿입니다. 코딩을 몰라도 <code>js/config.js</code> 한 파일의 글자만 바꾸면 사무소 이름, 연락처, 대표 소개, 지하철 길 안내 애니메이션까지 내 사무소로 바뀝니다.</p>
+    <div class="dl-row">
+      <a class="btn btn-light" href="https://github.com/ko37258-lab/rsa/raw/claude/trusting-mccarthy-oliqsz/downloads/mrhomes-homepage-template.zip">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4h2v9.2l3.3-3.3 1.4 1.4L12 17l-5.7-5.7 1.4-1.4 3.3 3.3zM5 19h14v2H5z"/></svg>
+        템플릿 내려받기 (ZIP)
+      </a>
+      <span class="dl-note">압축을 풀면 <code>mrhomes-homepage</code> 폴더가 나옵니다.</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <nav class="toc" aria-label="목차">
+    <p>순서</p>
+    <ol>
+      <li><a href="#s1">열어 보기</a></li>
+      <li><a href="#s2">폴더 구성</a></li>
+      <li><a href="#s3">사무소 정보 바꾸기</a></li>
+      <li><a href="#s4">지도 좌표 넣기</a></li>
+      <li><a href="#s5">매물 바꾸기</a></li>
+      <li><a href="#s6">사진 바꾸기</a></li>
+      <li><a href="#s7">카톡 미리보기 문구</a></li>
+      <li><a href="#s8">인터넷에 올리기</a></li>
+      <li><a href="#s9">상담 신청서 연결</a></li>
+      <li><a href="#s10">AI로 한 번에 고치기</a></li>
+      <li><a href="#s11">올리기 전 점검표</a></li>
+      <li><a href="#s12">자주 묻는 질문</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="s1">
+      <h2><span class="no">01</span>압축 풀고 열어 보기</h2>
+      <ol class="steps-list">
+        <li>내려받은 <code>mrhomes-homepage-template.zip</code>을 마우스 오른쪽 클릭 → <b>압축 풀기</b>.</li>
+        <li><code>mrhomes-homepage</code> 폴더 안의 <code>index.html</code>을 더블클릭하면 크롬·엣지에서 홈페이지가 열립니다.</li>
+        <li>지금은 예시로 미스터홈즈 서초 부동산 정보가 들어 있습니다. 아래 순서대로 내 정보로 바꾸면 됩니다.</li>
+      </ol>
+      <div class="note"><b>준비물</b>메모장(윈도우 기본) 또는 무료 편집기 <a href="https://code.visualstudio.com/" target="_blank" rel="noopener">VS Code</a>, 사무소·매물 사진, 중개사무소 등록증.</div>
+    </section>
+
+    <section id="s2">
+      <h2><span class="no">02</span>폴더 구성</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일</th><th>하는 일</th><th>고치나요?</th></tr></thead>
+          <tbody>
+            <tr><td><code>js/config.js</code></td><td>사무소 이름·주소·전화·등록번호, 맨 위 문구, 대표 소개, 지도 좌표</td><td><b>예 — 가장 먼저</b></td></tr>
+            <tr><td><code>js/listings.js</code></td><td>대표 매물 2개, 유형별 사례 6개</td><td><b>예</b></td></tr>
+            <tr><td><code>images/</code></td><td>사진 폴더</td><td><b>예 — 같은 이름으로 덮어쓰기</b></td></tr>
+            <tr><td><code>index.html</code></td><td>화면 뼈대</td><td>맨 위 카톡 미리보기 3줄만</td></tr>
+            <tr><td><code>css/style.css</code>, <code>js/main.js</code></td><td>디자인과 움직임</td><td>아니요</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="s3">
+      <h2><span class="no">03</span>사무소 정보 바꾸기 — <code>js/config.js</code></h2>
+      <p>메모장으로 <code>js/config.js</code>를 열고, <b>따옴표 안의 글자만</b> 바꿉니다. 저장한 뒤 <code>index.html</code>을 새로고침(F5)하면 바로 반영됩니다.</p>
+<pre><code><span class="k">office</span>: <span class="s">"미스터홈즈 부동산중개"</span>,   <span class="c">// 등록증의 중개사무소 명칭</span>
+<span class="k">address</span>: <span class="s">"서울특별시 강남구 봉은사로 404, 2층 202호 (삼성동)"</span>,
+<span class="k">phone</span>: <span class="s">"02-566-0338"</span>,
+<span class="k">regNo</span>: <span class="s">"11170-2016-00105"</span>,    <span class="c">// 중개사무소 등록번호</span>
+<span class="k">broker</span>: <span class="s">"고상철"</span>,              <span class="c">// 개업공인중개사 성명</span></code></pre>
+      <div class="note warn"><b>이 다섯 줄은 법정 표시사항입니다</b>공인중개사법 제18조의2에 따라 홈페이지(표시·광고)에는 중개사무소 명칭·소재지·연락처·등록번호·개업공인중개사 성명을 반드시 적어야 합니다. 등록증과 한 글자도 다르지 않게 넣으세요.</div>
+      <h3>지켜야 할 세 가지</h3>
+      <ul class="plain">
+        <li>따옴표 <code>"</code>, 쉼표 <code>,</code>, 괄호 <code>[ ] { }</code>는 지우지 않습니다.</li>
+        <li>글자 안에 큰따옴표가 필요하면 작은따옴표 <code>‘ ’</code>를 씁니다.</li>
+        <li>저장할 때 인코딩은 <b>UTF-8</b>(메모장 기본값)을 유지합니다.</li>
+      </ul>
+      <h3>맨 위 큰 문구</h3>
+<pre><code><span class="k">title</span>: [<span class="s">"삼성동의 최상위 매물 보유한"</span>, <span class="s">"신뢰와 실력으로 *전문중개*합니다."</span>],</code></pre>
+      <p>한 줄씩 나뉘어 보이고, <code>*별표*</code>로 감싼 글자는 빨간색으로 강조됩니다. 대표 소개(<code>ceo</code>), 강점 3가지(<code>expert</code>), 거래 순서(<code>process</code>), 상담 구역(<code>contact</code>)도 같은 방식입니다.</p>
+    </section>
+
+    <section id="s4">
+      <h2><span class="no">04</span>지하철 길 안내 지도 — 좌표만 넣기</h2>
+      <p>“오시는 길”의 애니메이션 지도는 <code>config.js</code>의 <code>map</code> 부분 좌표로 자동으로 그려집니다. 좌표는 구글 지도에서 얻습니다.</p>
+      <ol class="steps-list">
+        <li><a href="https://www.google.com/maps" target="_blank" rel="noopener">구글 지도</a>에서 원하는 지점을 <b>마우스 오른쪽 클릭</b>합니다.</li>
+        <li>메뉴 맨 위의 숫자(예: <code>37.5101, 127.0443</code>)를 누르면 복사됩니다.</li>
+        <li><code>[37.5101, 127.0443]</code>처럼 대괄호 안에 <b>위도, 경도</b> 순서로 붙여 넣습니다.</li>
+      </ol>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>찍을 지점</th></tr></thead>
+          <tbody>
+            <tr><td><code>center</code></td><td>역 앞 사거리 한가운데</td></tr>
+            <tr><td><code>roads</code></td><td>사거리를 이루는 큰길(최대 2개). <code>toward</code>는 그 길 위로 200m쯤 떨어진 아무 점</td></tr>
+            <tr><td><code>lines</code></td><td>노선 이름·색·몇 번째 길 밑인지(<code>road: 0</code> 또는 <code>1</code>). <code>at</code>은 역 위치(선택)</td></tr>
+            <tr><td><code>exits</code></td><td>출구 번호와 위치. 찾아오는 출구에 <code>target: true</code></td></tr>
+            <tr><td><code>office</code></td><td>사무소 건물 위치, 건물 이름, 층·호수</td></tr>
+            <tr><td><code>walk</code></td><td>출구 → 건물 입구까지 꺾이는 지점들(선택). 비워 두면 직선</td></tr>
+            <tr><td><code>landmarks</code>, <code>bus</code></td><td>주변 건물·버스 정류장(선택)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>노선 공식 색: 1호선 <code>#0052A4</code> · 2호선 <code>#00A84D</code> · 3호선 <code>#EF7C1C</code> · 4호선 <code>#00A5DE</code> · 5호선 <code>#996CAC</code> · 6호선 <code>#CD7C2F</code> · 7호선 <code>#747F00</code> · 8호선 <code>#E6186C</code> · 9호선 <code>#BDB092</code> · 수인분당선 <code>#F5A200</code> · 신분당선 <code>#D4003B</code></p>
+      <div class="note"><b>확인 방법</b>저장 후 새로고침하고 “지하철에서 오시는 길 재생”을 눌러 보세요. 출구에서 건물까지 선이 이어지면 성공입니다. 지도는 실제 축척이라 출구 위치가 정확할수록 보기 좋습니다.</div>
+    </section>
+
+    <section id="s5">
+      <h2><span class="no">05</span>매물 바꾸기 — <code>js/listings.js</code></h2>
+      <p><code>FEATURED</code>는 맨 위 대표 매물 2개, <code>CASES</code>는 유형별 사례 6개입니다. 대표 매물의 <code>legal</code> 항목은 “상세 · 법정 표시사항” 창에 그대로 나옵니다.</p>
+      <div class="note warn"><b>인터넷 매물 광고의 필수 항목 (공인중개사법 시행령 제17조의2)</b>소재지 · 면적 · 가격 · 중개대상물 종류 · 거래 형태 · 총 층수 · 사용승인일 · 방향 · 방/욕실 수 · 입주가능일 · 주차대수 · 관리비. 해당 없는 항목은 “해당 없음”으로 적습니다. 면적은 ㎡로 쓰고 평은 괄호 병기만 합니다.</div>
+      <ul class="plain">
+        <li>실제 매물로 모두 바꾼 뒤 <code>config.js</code>의 <code>SAMPLE_MODE: true</code>를 <code>false</code>로 바꾸면 “예시” 표시가 사라집니다.</li>
+        <li>계약이 끝난 매물은 <code>status: "계약완료"</code>로 바꾸면 화면에서 바로 빠집니다. 계약된 매물을 계속 올려 두면 허위·미끼 매물 광고에 해당합니다.</li>
+        <li><code>checked</code>에는 매물을 마지막으로 확인한 날짜를 적습니다.</li>
+      </ul>
+    </section>
+
+    <section id="s6">
+      <h2><span class="no">06</span>사진 바꾸기 — <code>images/</code></h2>
+      <p>같은 이름의 파일로 덮어쓰면 끝입니다. 사진 한 장은 1MB 이하가 좋습니다(<a href="https://squoosh.app" target="_blank" rel="noopener">squoosh.app</a>에서 무료로 줄일 수 있습니다).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>파일 이름</th><th>들어가는 곳</th><th>권장 크기</th></tr></thead>
+          <tbody>
+            <tr><td><code>hero.jpg</code></td><td>맨 위 대표 이미지 (어둡게 덮어 글자를 올림)</td><td>가로 1920px</td></tr>
+            <tr><td><code>featured-1.jpg</code>, <code>featured-2.jpg</code></td><td>대표 매물 2개</td><td>1200×900</td></tr>
+            <tr><td><code>type-building.jpg</code> 외 5장</td><td>유형별 사례 카드 (세로형)</td><td>900×1100</td></tr>
+            <tr><td><code>ceo.jpg</code></td><td>대표 사진 — 넣기만 하면 자동 표시</td><td>800×1000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><b>들어 있는 사진</b>예시 사진은 무료 이미지(Unsplash)입니다. 실제 매물 광고에는 반드시 해당 매물을 직접 찍은 사진을 쓰세요.</div>
+    </section>
+
+    <section id="s7">
+      <h2><span class="no">07</span>카톡 미리보기 문구 — <code>index.html</code> 맨 위 3줄</h2>
+      <p>카카오톡·문자로 홈페이지 주소를 보낼 때 뜨는 제목·설명은 프로그램이 읽기 전에 정해지므로, <code>index.html</code> 위쪽의 아래 3줄을 직접 바꿉니다.</p>
+<pre><code>&lt;meta property=<span class="s">"og:title"</span> content=<span class="s">"미스터홈즈 서초 부동산 | 삼성동 빌딩·토지·상가 전문중개"</span>&gt;
+&lt;meta property=<span class="s">"og:description"</span> content=<span class="s">"삼성동의 최상위 매물 보유한 … · 02-566-0338"</span>&gt;
+&lt;meta property=<span class="s">"og:image"</span> content=<span class="s">"images/hero.jpg"</span>&gt;</code></pre>
+    </section>
+
+    <section id="s8">
+      <h2><span class="no">08</span>인터넷에 올리기 — 무료, 5분</h2>
+      <ol class="steps-list">
+        <li><a href="https://app.netlify.com/drop" target="_blank" rel="noopener">app.netlify.com/drop</a>에 접속해 무료로 가입합니다.</li>
+        <li><code>mrhomes-homepage</code> <b>폴더째로</b> 화면에 끌어다 놓습니다. (<code>index.html</code>이 들어 있는 폴더)</li>
+        <li>몇 초 뒤 <code>https://○○○.netlify.app</code> 주소가 생깁니다. 이 주소를 명함·블로그·카톡에 쓰면 됩니다.</li>
+        <li>사이트 설정(Site configuration) → 사이트 이름 변경에서 주소 앞부분을 사무소 이름으로 바꿀 수 있습니다.</li>
+        <li>수정할 때는 내 컴퓨터에서 고친 뒤 Deploys 화면에 폴더를 다시 끌어다 놓습니다.</li>
+      </ol>
+      <div class="note"><b>내 도메인(예: www.○○부동산.com)을 쓰려면</b>가비아·후이즈 등에서 도메인을 산 뒤 Netlify의 Domain management에서 연결합니다. 선택 사항입니다.</div>
+    </section>
+
+    <section id="s9">
+      <h2><span class="no">09</span>상담 신청서 연결</h2>
+      <p>그대로 두면 상담 신청 내용을 정리해 보여 주고 전화로 안내합니다. 신청서를 이메일로 받고 싶다면:</p>
+      <ol class="steps-list">
+        <li><a href="https://formspree.io" target="_blank" rel="noopener">formspree.io</a>에 무료 가입 → New Form 만들기.</li>
+        <li>나오는 주소(예: <code>https://formspree.io/f/abcdwxyz</code>)를 복사합니다.</li>
+        <li><code>config.js</code>의 <code>formEndpoint: ""</code> 따옴표 안에 붙여 넣고 저장합니다.</li>
+      </ol>
+      <p>카카오톡 채널이 있다면 <code>kakaoChannel</code>에 채널 주소를 넣으세요. 휴대폰 화면 아래에 “카톡 상담” 버튼이 생깁니다.</p>
+    </section>
+
+    <section id="s10">
+      <h2><span class="no">10</span>AI로 한 번에 고치기</h2>
+      <p>Claude 같은 AI에게 <code>config.js</code> 내용을 통째로 붙여 넣고 아래처럼 부탁하면 빠르게 바꿀 수 있습니다. 결과를 다시 <code>config.js</code>에 붙여 넣고 저장하세요.</p>
+<pre class="prompt"><code>아래는 중개사무소 홈페이지 설정 파일(config.js)이야.
+형식(따옴표, 쉼표, 괄호)은 그대로 두고 내용만 내 사무소 정보로 바꿔 줘.
+
+- 중개사무소 명칭: ○○공인중개사사무소
+- 소재지: ○○시 ○○구 ○○로 00, 0층
+- 연락처: 02-000-0000 / 등록번호: 00000-0000-00000 / 대표: ○○○
+- 주력: 아파트·상가 임대차, 강점: ○○역 상권 10년
+- 가까운 역: ○○역 ○번 출구에서 도보 약 50m
+
+(여기에 config.js 내용 붙여넣기)</code></pre>
+      <div class="note warn"><b>AI가 만든 내용은 꼭 확인하세요</b>등록번호·전화번호·이력·좌표는 AI가 지어낼 수 있습니다. 법정 표시사항과 매물 정보는 등록증·대장 원본과 대조한 뒤 올리세요.</div>
+    </section>
+
+    <section id="s11">
+      <h2><span class="no">11</span>올리기 전 점검표</h2>
+      <ul class="check">
+        <li>등록증과 똑같은 명칭·소재지·연락처·등록번호·대표자 이름 (config.js 맨 위 5줄)</li>
+        <li>예시 매물(미스터홈즈 매물)을 모두 내 매물로 바꾸고 <code>SAMPLE_MODE: false</code></li>
+        <li>매물마다 법정 명시사항 12개 항목 채움, 면적은 ㎡ 기준</li>
+        <li>예시 사진을 내 사진으로 교체 (특히 매물 사진은 실제 사진)</li>
+        <li>대표 소개·이력·강점 문구를 내 내용으로 교체</li>
+        <li>지도 좌표와 출구 번호, “오시는 길” 문구 확인 — 재생 버튼으로 동선 확인</li>
+        <li>index.html 맨 위 카톡 미리보기 3줄 교체</li>
+        <li>“최고·최상·초역세권·급매”처럼 과장 광고로 보일 수 있는 표현 점검</li>
+        <li>휴대폰으로 열어 전화 버튼이 내 번호로 걸리는지 확인</li>
+      </ul>
+    </section>
+
+    <section id="s12">
+      <h2><span class="no">12</span>자주 묻는 질문</h2>
+      <h3>화면 맨 위에 빨간 “설정 오류” 줄이 떠요</h3>
+      <p>안내된 파일·줄 번호 근처에서 따옴표나 쉼표가 빠졌습니다. 바로 위 줄 끝에 쉼표가 있는지, 따옴표가 짝이 맞는지 확인하세요.</p>
+      <h3>고쳤는데 화면이 안 바뀌어요</h3>
+      <p>저장했는지 확인하고 <b>Ctrl + Shift + R</b>(맥은 Cmd + Shift + R)로 강력 새로고침합니다. 사진은 파일 이름(대소문자, .jpg/.png)이 정확히 같아야 합니다.</p>
+      <h3>“실제 지도” 탭이 비어 있어요</h3>
+      <p>내 컴퓨터에서 파일로 열면 지도가 안 나올 때가 있습니다. 인터넷에 올린 뒤에는 정상적으로 보입니다. 아래 네이버·카카오·구글 지도 버튼은 항상 동작합니다.</p>
+      <h3>지도에서 건물 위치가 조금 어긋나요</h3>
+      <p><code>office.at</code>을 건물 한가운데로, <code>exits</code>를 출구 계단 위치로 다시 찍어 보세요. 건물 크기는 <code>office.size</code>(m)로 조절합니다.</p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p>예시로 들어 있는 상호·연락처·대표 이력·매물 정보는 미스터홈즈 서초 부동산의 것입니다. 내 홈페이지로 올리기 전 반드시 모두 바꿔 주세요. 예시 사진은 Unsplash 라이선스, 글꼴은 Pretendard·IBM Plex Sans KR(SIL Open Font License)입니다.</p>
+  </div>
+</footer>
+
+</body>
+</html>
