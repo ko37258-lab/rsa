@@ -82,6 +82,11 @@ td code { white-space: nowrap; }
 .check li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; }
 .check li::before { content: ""; width: 16px; height: 16px; margin-top: .3em; border: 2px solid var(--ink-2); border-radius: 3px; }
 .prompt { white-space: pre-wrap; }
+.quick { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 28px clamp(16px, 3vw, 32px) 32px; border-bottom: 1px solid var(--line) !important; }
+.prompt-box { position: relative; }
+.prompt-box .copy { position: absolute; top: 10px; right: 10px; border: 1px solid #4a4a44; background: #2a2a26; color: #f4f3ef; border-radius: 4px; padding: 6px 14px; font: 600 13.5px/1 var(--f-body); cursor: pointer; }
+.prompt-box .copy:hover { background: #3a3a35; }
+.prompt-box pre { padding-top: 48px; }
 footer { padding-block: 32px 48px; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 13.5px; }
 @media (max-width: 860px) {
   .layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
@@ -110,7 +115,8 @@ footer { padding-block: 32px 48px; border-top: 1px solid var(--line); color: var
 <div class="wrap layout">
   <nav class="toc" aria-label="목차">
     <p>순서</p>
-    <ol>
+    <ol start="0">
+      <li><a href="#s0">가장 쉬운 방법 (GPT)</a></li>
       <li><a href="#s1">열어 보기</a></li>
       <li><a href="#s2">폴더 구성</a></li>
       <li><a href="#s3">사무소 정보 바꾸기</a></li>
@@ -127,6 +133,50 @@ footer { padding-block: 32px 48px; border-top: 1px solid var(--line); color: var
   </nav>
 
   <main>
+    <section id="s0" class="quick">
+      <h2><span class="no">00</span>가장 쉬운 방법 — GPT에 ZIP 넣고 5칸만 채우기</h2>
+      <p>코드를 열지 않아도 됩니다. ChatGPT나 Claude에 ZIP 파일을 첨부하고 아래 글을 붙여 넣으면, AI가 <code>js/my-office.js</code>의 5칸(명칭·소재지·연락처·등록번호·대표자)을 채운 ZIP을 돌려줍니다.</p>
+      <ol class="steps-list">
+        <li>위의 <b>템플릿 내려받기</b>로 ZIP 파일을 받습니다. (압축은 풀지 않아도 됩니다)</li>
+        <li>ChatGPT 또는 Claude에서 새 대화를 열고 ZIP 파일을 첨부합니다.</li>
+        <li>아래 글을 <b>복사</b>해 붙여 넣고, ○○ 부분을 내 사무소 정보로 바꾼 뒤 보냅니다.</li>
+        <li>AI가 준 <code>my-homepage.zip</code>을 내려받아 압축을 풀고 <code>index.html</code>을 열어 확인합니다.</li>
+        <li><a href="https://app.netlify.com/drop" target="_blank" rel="noopener">app.netlify.com/drop</a>에 <code>mrhomes-homepage</code> 폴더를 끌어다 놓으면 인터넷 주소가 생깁니다. (자세한 방법은 08번)</li>
+      </ol>
+      <div class="prompt-box">
+        <button type="button" class="copy" id="copy-prompt">복사</button>
+<pre class="prompt" id="prompt-text"><code>첨부한 ZIP 파일은 공인중개사무소 홈페이지 템플릿이야. 코드 실행(파이썬) 기능으로 아래 순서대로 작업해 줘.
+
+1. ZIP을 풀어. 안에 mrhomes-homepage 폴더가 있어.
+
+2. mrhomes-homepage/js/my-office.js 파일을 열고, 따옴표 안의 빈칸 5개를 아래 정보로 채워.
+   name    = ○○공인중개사사무소
+   address = ○○시 ○○구 ○○로 00, 0층 000호 (○○동)
+   phone   = 000-000-0000
+   regNo   = 00000-0000-00000
+   broker  = ○○○
+   - 따옴표, 쉼표, 주석(// 뒤의 글자)과 다른 줄은 그대로 둬.
+   - 내가 준 글자를 한 글자도 바꾸거나 보태지 마.
+
+3. mrhomes-homepage/index.html 위쪽에서 아래 두 줄의 content 값만 바꿔.
+   og:title       → ○○공인중개사사무소 | ○○동 부동산
+   og:description → ○○동 아파트·주택·상가·토지 중개 · 000-000-0000
+
+4. 위 두 파일 말고 다른 파일은 건드리지 마.
+
+5. 바꾼 부분을 바꾸기 전 / 바꾼 후로 나란히 보여 줘.
+
+6. 폴더 구조(mrhomes-homepage/…)를 그대로 유지한 채 다시 ZIP으로 묶어서 내려받기 링크를 줘. 파일 이름은 my-homepage.zip 으로 해 줘.</code></pre>
+      </div>
+      <h3>5칸을 채우면 자동으로 바뀌는 것</h3>
+      <ul class="plain">
+        <li>화면 맨 위 이름, 전화 버튼, 맨 아래 법정 표시사항이 모두 내 정보로 바뀝니다.</li>
+        <li>예시 사무소의 대표 이력·강점 문구·지하철 길 안내는 일반 문구와 <b>내 주소의 실제 지도</b>로 바뀝니다. 맨 위 문구는 주소에서 읽은 지역 이름(예: “분당구 정자동의 좋은 매물”)으로 바뀝니다.</li>
+        <li>예시 매물은 “예시” 표시를 단 채로 남습니다. 실제 매물로 바꾸는 방법은 05번을 보세요.</li>
+      </ul>
+      <div class="note warn"><b>AI가 할 수 없는 것 · 꼭 확인할 것</b>인터넷에 올리는 일(08번)은 직접 폴더를 끌어다 놓아야 합니다. 또 AI가 옮겨 적은 등록번호·전화번호가 등록증과 똑같은지 마지막에 꼭 눈으로 확인하세요. 대표 사진·이력·지하철 길 안내 애니메이션까지 넣고 싶다면 03·04번처럼 <code>js/config.js</code>를 고칩니다.</div>
+    </section>
+
     <section id="s1">
       <h2><span class="no">01</span>압축 풀고 열어 보기</h2>
       <ol class="steps-list">
@@ -143,7 +193,8 @@ footer { padding-block: 32px 48px; border-top: 1px solid var(--line); color: var
         <table>
           <thead><tr><th>파일</th><th>하는 일</th><th>고치나요?</th></tr></thead>
           <tbody>
-            <tr><td><code>js/config.js</code></td><td>사무소 이름·주소·전화·등록번호, 맨 위 문구, 대표 소개, 지도 좌표</td><td><b>예 — 가장 먼저</b></td></tr>
+            <tr><td><code>js/my-office.js</code></td><td>명칭·소재지·연락처·등록번호·대표자 5칸</td><td><b>예 — 가장 먼저 (이것만 채워도 됨)</b></td></tr>
+            <tr><td><code>js/config.js</code></td><td>맨 위 문구, 대표 소개·이력, 지하철 길 안내 지도 좌표 등 자세한 내용</td><td>더 꾸미고 싶을 때</td></tr>
             <tr><td><code>js/listings.js</code></td><td>대표 매물 2개, 유형별 사례 6개</td><td><b>예</b></td></tr>
             <tr><td><code>images/</code></td><td>사진 폴더</td><td><b>예 — 같은 이름으로 덮어쓰기</b></td></tr>
             <tr><td><code>index.html</code></td><td>화면 뼈대</td><td>맨 위 카톡 미리보기 3줄만</td></tr>
@@ -155,6 +206,7 @@ footer { padding-block: 32px 48px; border-top: 1px solid var(--line); color: var
 
     <section id="s3">
       <h2><span class="no">03</span>사무소 정보 바꾸기 — <code>js/config.js</code></h2>
+      <p>5칸만으로 부족하다면 <code>js/config.js</code>에서 문구·대표 소개·이력을 직접 고칩니다. 고친 뒤에는 파일 위쪽 <code>DEMO_CONTENT: true</code>를 <code>false</code>로 바꿔야 내가 쓴 내용이 그대로 보입니다.</p>
       <p>메모장으로 <code>js/config.js</code>를 열고, <b>따옴표 안의 글자만</b> 바꿉니다. 저장한 뒤 <code>index.html</code>을 새로고침(F5)하면 바로 반영됩니다.</p>
 <pre><code><span class="k">office</span>: <span class="s">"미스터홈즈 부동산중개"</span>,   <span class="c">// 등록증의 중개사무소 명칭</span>
 <span class="k">address</span>: <span class="s">"서울특별시 강남구 봉은사로 404, 2층 202호 (삼성동)"</span>,
@@ -277,7 +329,7 @@ footer { padding-block: 32px 48px; border-top: 1px solid var(--line); color: var
     <section id="s11">
       <h2><span class="no">11</span>올리기 전 점검표</h2>
       <ul class="check">
-        <li>등록증과 똑같은 명칭·소재지·연락처·등록번호·대표자 이름 (config.js 맨 위 5줄)</li>
+        <li>등록증과 똑같은 명칭·소재지·연락처·등록번호·대표자 이름 (my-office.js 5칸)</li>
         <li>예시 매물(미스터홈즈 매물)을 모두 내 매물로 바꾸고 <code>SAMPLE_MODE: false</code></li>
         <li>매물마다 법정 명시사항 12개 항목 채움, 면적은 ㎡ 기준</li>
         <li>예시 사진을 내 사진으로 교체 (특히 매물 사진은 실제 사진)</li>
@@ -309,5 +361,22 @@ footer { padding-block: 32px 48px; border-top: 1px solid var(--line); color: var
   </div>
 </footer>
 
+<script>
+(function () {
+  var btn = document.getElementById("copy-prompt"), pre = document.getElementById("prompt-text");
+  if (!btn || !pre) return;
+  btn.addEventListener("click", function () {
+    var text = pre.textContent;
+    var done = function () { btn.textContent = "복사됨"; setTimeout(function () { btn.textContent = "복사"; }, 1600); };
+    var fallback = function () {
+      var r = document.createRange(); r.selectNodeContents(pre);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      btn.textContent = "선택됨 · Ctrl+C";
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  });
+})();
+</script>
 </body>
 </html>

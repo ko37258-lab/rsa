@@ -258,10 +258,11 @@
 /* 설정 파일에 오타가 있으면 화면 맨 위에 알려 줍니다 */
 window.addEventListener("error", function (e) {
   var file = String(e.filename || "").split("/").pop();
-  if (!/^(config|listings)\.js$/.test(file)) return;
+  if (!/^(my-office|config|listings)\.js$/.test(file)) return;
   window.__configError = file + " 파일 " + e.lineno + "번째 줄 근처에 오타가 있습니다. 따옴표(\")·쉼표(,)·괄호가 빠지지 않았는지 확인해 주세요.";
 });
 </script>
+<script src="js/my-office.js"></script>
 <script src="js/config.js"></script>
 <script src="js/listings.js"></script>
 <script src="js/main.js"></script>

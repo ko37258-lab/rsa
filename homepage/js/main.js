@@ -19,6 +19,82 @@
   function easeInOut(k) { return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; }
   function easeOut(k) { return 1 - Math.pow(1 - k, 3); }
 
+  /* ---------- my-office.js 5칸을 채웠을 때: 내 정보로 바꾸고 예시 사무소 내용은 일반 문구로 ---------- */
+  function regionOf(addr) {
+    addr = String(addr || "");
+    var gu = (/(\S+?[구군])(?=[\s,]|$)/.exec(addr) || [])[1];
+    if (!gu) gu = (/(\S+?시)(?=[\s,])/.exec(addr.replace(/^\S+(특별시|광역시|특별자치시|특별자치도|도)\s/, "")) || [])[1];
+    var dong = (/\((\S+?[동읍면리가])(?=[,)\s])/.exec(addr) || [])[1];
+    return [gu, dong].filter(Boolean).join(" ");
+  }
+
+  function applyMyOffice() {
+    var my = window.MY_OFFICE || {};
+    var name = String(my.name || "").trim();
+    if (!name) return;
+    var region = regionOf(my.address);
+    SITE.office = name;
+    SITE.address = String(my.address || "").trim();
+    SITE.phone = String(my.phone || "").trim();
+    SITE.regNo = String(my.regNo || "").trim();
+    SITE.broker = String(my.broker || "").trim();
+    if (SITE.DEMO_CONTENT === false) return;   // config.js 를 직접 고친 경우 그 내용을 그대로 씀
+
+    var place = region || "우리 동네";
+    SITE.pageTitle = name;
+    SITE.brand = name;
+    SITE.brandSub = region || "공인중개사사무소";
+    SITE.logoLetter = name.charAt(0);
+    SITE.services = "아파트 · 주택 · 상가 · 토지 · 상담";
+    SITE.areaServed = SITE.address;
+    SITE.description = (region ? region + " " : "") + name + ". 아파트·주택·상가·토지 매매와 임대차, 부동산 상담.";
+    SITE.kakaoChannel = SITE.kakaoChannel || "";
+    SITE.hero = {
+      eyebrow: region ? region + " · " + name : name,
+      title: [place + "의 좋은 매물,", "신뢰와 실력으로 *전문중개*합니다."],
+      sub: ["아파트 · 주택 · 상가 · 토지 매매와 임대차, 부동산 상담.", "대표 공인중개사가 직접 확인하고 안내합니다."]
+    };
+    SITE.typesTitle = ["매물 유형별", "거래 사례"];
+    SITE.proof = [];
+    SITE.ceo = { label: "대표 공인중개사", name: SITE.broker, role: name, initial: SITE.broker.charAt(0) || name.charAt(0), cv: [] };
+    SITE.expert = {
+      eyebrow: "왜 " + name + "인가",
+      title: ["가격만 보는 중개가 아니라,", "조건까지 함께 따지는 중개"],
+      lede: "같은 가격이라도 권리관계, 대출 조건, 입주 시기에 따라 결과가 달라집니다. 계약 전에 확인할 것을 하나씩 짚어 드립니다.",
+      points: [
+        { title: "계약 전 권리관계 확인", text: "등기사항증명서와 건축물대장을 함께 보고 선순위 권리와 위반건축물 여부를 확인합니다." },
+        { title: "시세와 조건 비교", text: "인근 실거래가와 매물 조건을 나란히 놓고 적정 가격을 함께 판단합니다." },
+        { title: "계약 후까지 안내", text: "잔금, 전입신고, 확정일자처럼 계약 뒤에 챙길 일정까지 알려 드립니다." }
+      ],
+      quote: ""
+    };
+    SITE.location = {
+      title: [SITE.address.split(",")[0].trim(), (SITE.address.split(",")[1] || "").replace(/\(.*\)/, "").trim()].filter(Boolean),
+      steps: [], building: "", bus: "", kakaoPlaceId: "", captions: []
+    };
+    SITE.map = null;   // 지도 좌표는 config.js 에서 따로 넣을 수 있습니다
+    SITE.contact = {
+      title: ["매물 의뢰도, 매입 상담도", "대표가 직접 답합니다"],
+      lede: "집을 팔거나 구하려는 분, 상가·토지가 궁금한 분 모두 편하게 남겨 주세요.",
+      prep: [
+        "매도·임대 의뢰: 주소, 희망 가격, 입주 가능일",
+        "매수·임차 상담: 예산, 희망 지역, 입주 시기",
+        "기타 상담: 궁금한 매물 주소나 계약서"
+      ],
+      budgets: ["1억 미만", "1억 ~ 5억", "5억 ~ 10억", "10억 이상", "정하지 않음"],
+      placeholder: "예: " + (region ? region.split(" ").pop() + " " : "") + "전용 59㎡ 아파트 전세, 3월 입주"
+    };
+    // 아직 예시 매물이면 예시 사무소의 지역 이름을 빼고 내 지역으로
+    if (SITE.SAMPLE_MODE) {
+      FEATURED.concat(CASES).forEach(function (f) {
+        if (f.generic) f.title = f.generic;
+        f.area = region || "";
+        f.station = "";
+        if (f.legal && f.legal["소재지"]) f.legal["소재지"] = (region || "소재지") + " (예시)";
+      });
+    }
+  }
+
   /* ---------- config.js 내용을 화면에 채우기 ---------- */
   function get(path) {
     return path.split(".").reduce(function (o, k) { return o == null ? undefined : o[k]; }, SITE);
@@ -42,7 +118,9 @@
       el.innerHTML = asList(get(el.getAttribute("data-lines"))).map(esc).join("<br>");
     });
     $all("[data-list]").forEach(function (el) {
-      el.innerHTML = asList(get(el.getAttribute("data-list"))).map(function (l) { return "<li>" + esc(l) + "</li>"; }).join("");
+      var items = asList(get(el.getAttribute("data-list")));
+      el.innerHTML = items.map(function (l) { return "<li>" + esc(l) + "</li>"; }).join("");
+      el.hidden = !items.length;
     });
     $all("[data-if]").forEach(function (el) { el.hidden = !get(el.getAttribute("data-if")); });
     $all("[data-tel]").forEach(function (el) { el.setAttribute("href", telHref(SITE.phone)); });
@@ -70,6 +148,7 @@
 
   function renderSections() {
     var proof = $("#proof-row");
+    if (proof) proof.closest(".proof").hidden = !asList(SITE.proof).length;
     if (proof) proof.innerHTML = asList(SITE.proof).map(function (p) {
       var isNum = /^[0-9.,]+$/.test(p.big);
       return '<div class="proof-item"><b class="num' + (isNum ? "" : " kr") + '">' + esc(p.big) + (p.unit ? "<small>" + esc(p.unit) + "</small>" : "") + "</b><span>" + esc(p.text) + "</span></div>";
@@ -95,6 +174,7 @@
       '<span class="floor-badge" aria-hidden="true">' + esc((M.office && M.office.floorShort) || "") + "</span>"
     ];
     var rs = $("#route-steps");
+    if (rs) rs.hidden = !asList(L.steps).length;
     if (rs) rs.innerHTML = asList(L.steps).slice(0, 3).map(function (st, i) {
       return '<li data-step="' + (i + 1) + '">' + badges[i] + "<div><b>" + esc(st.title) + "</b><span>" + esc(st.text) + "</span></div></li>";
     }).join("");
@@ -105,6 +185,7 @@
     var links = [["네이버 지도", "https://map.naver.com/p/search/" + q]];
     if (L.kakaoPlaceId) links.push(["카카오맵 길찾기", "https://map.kakao.com/link/to/" + encodeURIComponent(L.kakaoPlaceId)]);
     else if (at) links.push(["카카오맵 길찾기", "https://map.kakao.com/link/to/" + name + "," + at[0] + "," + at[1]]);
+    else links.push(["카카오맵", "https://map.kakao.com/?q=" + q]);
     links.push(["구글 지도", at ? "https://www.google.com/maps/dir/?api=1&destination=" + at[0] + "," + at[1] + "&travelmode=transit" : "https://www.google.com/maps/search/?api=1&query=" + q]);
     var ml = $("#map-links");
     if (ml) ml.innerHTML = links.map(function (l) { return '<a href="' + esc(l[1]) + '" target="_blank" rel="noopener">' + esc(l[0]) + "</a>"; }).join("");
@@ -541,7 +622,14 @@
     var holder = $("#map-holder"), btn = $("#route-play");
     var G = buildMap(SITE.map);
     if (!holder || !btn) return;
-    if (!G) { holder.closest(".map-panel").hidden = true; return; }
+    if (!G) {
+      // 좌표가 없으면 길 안내 애니메이션 대신 실제 지도만 보여 줌
+      $("#panel-guide").hidden = true;
+      $("#panel-map").hidden = false;
+      $(".loc-tabs").hidden = true;
+      loadRealMap();
+      return;
+    }
     holder.innerHTML = G.html;
     var svg = $("#route-map");
     var WIDE = [0, 0, 960, 660], ZOOM = G.zoom;
@@ -733,6 +821,7 @@
 
   // 설정 파일을 못 읽었을 때 원인을 화면에 표시
   var problem = window.__configError ||
+    (!window.MY_OFFICE ? "js/my-office.js 파일을 읽지 못했습니다. 따옴표(\")·쉼표(,)가 빠지지 않았는지 확인해 주세요." : "") ||
     (!window.SITE || !window.SITE.office ? "js/config.js 파일을 읽지 못했습니다. 따옴표(\")·쉼표(,)·괄호가 빠지지 않았는지 확인해 주세요." : "") ||
     (!window.FEATURED || !window.CASES ? "js/listings.js 파일을 읽지 못했습니다. 따옴표(\")·쉼표(,)·괄호가 빠지지 않았는지 확인해 주세요." : "");
   if (problem) {
@@ -745,6 +834,7 @@
   }
 
   document.getElementById("year") && (document.getElementById("year").textContent = new Date().getFullYear());
+  applyMyOffice();
   bindSite();
   renderSections();
   renderFeatured();

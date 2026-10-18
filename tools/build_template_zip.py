@@ -12,15 +12,23 @@ OUT = ROOT / "downloads" / "mrhomes-homepage-template.zip"
 FOLDER = "mrhomes-homepage"  # 압축을 풀면 나오는 폴더 이름 (윈도우 호환을 위해 영문)
 SKIP = {"README.md"}
 
-README_TXT = """﻿미스터홈즈 중개사무소 홈페이지 템플릿 (수강생용)
+README_TXT = """\ufeff미스터홈즈 중개사무소 홈페이지 템플릿 (수강생용)
 
-1. guide.html 을 더블클릭해 사용설명서를 먼저 읽어 보세요.
-2. index.html 을 더블클릭하면 홈페이지가 열립니다.
-3. 내 사무소로 바꾸기: js/config.js (사무소 정보·지도), js/listings.js (매물), images 폴더 (사진)
-4. 인터넷에 올리기: https://app.netlify.com/drop 에 이 폴더를 끌어다 놓기
+[가장 쉬운 방법 — 코드를 열지 않고 5칸만]
+1. ChatGPT 또는 Claude에 이 ZIP 파일을 첨부합니다.
+2. gpt-prompt.txt 의 글을 복사해 ○○ 부분만 내 정보로 바꿔 붙여 넣습니다.
+3. AI가 돌려준 ZIP을 풀고 index.html 을 열어 확인합니다.
+4. https://app.netlify.com/drop 에 mrhomes-homepage 폴더를 끌어다 놓으면 인터넷 주소가 생깁니다.
+
+[직접 고치기]
+- js/my-office.js : 명칭·소재지·연락처·등록번호·대표자 5칸 (이것만 채워도 내 홈페이지가 됩니다)
+- js/config.js    : 문구·대표 소개·이력·지하철 길 안내 지도 등 자세한 내용
+- js/listings.js  : 매물
+- images 폴더     : 사진
+자세한 설명은 guide.html 을 더블클릭해서 보세요.
 
 예시로 들어 있는 상호·연락처·이력·매물은 미스터홈즈 서초 부동산의 것입니다.
-올리기 전에 반드시 내 정보로 모두 바꿔 주세요.
+my-office.js 를 채우면 예시 사무소의 이력·지도·문구는 일반 문구로 바뀌고, 예시 매물에는 "예시" 표시가 붙습니다.
 """
 
 
