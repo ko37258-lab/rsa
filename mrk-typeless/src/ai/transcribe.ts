@@ -3,17 +3,19 @@
 
 export type SttProvider = "elevenlabs" | "openai";
 
-export const STT_PROVIDERS: { id: SttProvider; label: string; keyHint: string; keyPlaceholder: string }[] = [
+export const STT_PROVIDERS: { id: SttProvider; label: string; keyHint: string; keyUrl: string; keyPlaceholder: string }[] = [
   {
     id: "elevenlabs",
     label: "ElevenLabs Scribe",
-    keyHint: "elevenlabs.io → 설정(Settings) → API Keys에서 발급합니다.",
+    keyHint: "ElevenLabs에 로그인해 API 키를 만듭니다. 권한을 고를 수 있으면 Speech to Text만 켜 두세요.",
+    keyUrl: "https://elevenlabs.io/app/developers/api-keys",
     keyPlaceholder: "sk_…",
   },
   {
     id: "openai",
     label: "OpenAI (gpt-4o-transcribe)",
-    keyHint: "platform.openai.com → API keys에서 발급합니다.",
+    keyHint: "OpenAI 플랫폼에 로그인해 API 키를 만듭니다. 결제 수단이 등록되어 있어야 합니다.",
+    keyUrl: "https://platform.openai.com/api-keys",
     keyPlaceholder: "sk-…",
   },
 ];

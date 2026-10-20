@@ -127,8 +127,12 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
                   {showKey ? "숨기기" : "보기"}
                 </button>
               </div>
+              <a className="key-link" href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener noreferrer">
+                Anthropic API 키 발급받기 ↗
+              </a>
               <p className="field__hint">
-                console.anthropic.com에서 발급합니다. 키는 이 브라우저에만 저장되고 Claude 서버로만 전송됩니다. 여러 사람이 쓰는 컴퓨터에서는 쓰지 마세요.
+                Claude 개발자 플랫폼에 로그인해 키를 만들고 붙여넣으세요. 키는 이 브라우저에만 저장되고 Claude 서버로만 전송됩니다.
+                여러 사람이 쓰는 컴퓨터에서는 쓰지 마세요.
               </p>
             </div>
             <div className="field__grid">
@@ -245,6 +249,9 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
                 </div>
               </div>
             </div>
+            <a className="key-link" href={stt.keyUrl} target="_blank" rel="noopener noreferrer">
+              {stt.label} API 키 발급받기 ↗
+            </a>
             <p className="field__hint">
               {stt.keyHint} 키는 이 브라우저에만 저장되고 받아쓰기 서버로만 전송됩니다. 녹음 받아쓰기는 이용한 시간만큼 해당 서비스 요금이 나옵니다.
               {settings.speechEngine === "record" && !settings.sttKey.trim() && " 키를 넣기 전까지는 브라우저 음성인식을 씁니다."}
