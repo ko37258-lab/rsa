@@ -14,14 +14,18 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # Windows 콘솔 기본 인코딩(cp1252)에서 한글 출력이 깨지지 않도록
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
     defaults:
       run:
         shell: pwsh
         working-directory: desktop
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
