@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyReplacements, DEFAULT_DICTIONARY } from "./dictionary";
+import { addToHistory, type HistoryItem } from "./history";
 import { localCleanup } from "./localCleanup";
 import { getMode } from "./modes";
 import { buildEditPrompt, buildPolishPrompt, toSingleInput } from "./prompts";
@@ -87,5 +88,28 @@ describe("stats", () => {
     expect(formatDuration(90_000)).toBe("1분 30초");
     expect(formatDuration(3_720_000)).toBe("1시간 2분");
     expect(formatClock(75_000)).toBe("01:15");
+  });
+});
+
+describe("addToHistory", () => {
+  const item = (raw: string, createdAt: number): HistoryItem => ({
+    id: raw,
+    createdAt,
+    kind: "dictation",
+    mode: "clean",
+    raw,
+    result: raw,
+    engine: "local",
+    savedMs: 0,
+  });
+
+  it("이어서 말해 다시 정리하면 앞 기록을 바꾼다", () => {
+    const list = addToHistory([item("첫 문장", 1_000)], item("첫 문장 둘째 문장", 5_000));
+    expect(list.map((h) => h.raw)).toEqual(["첫 문장 둘째 문장"]);
+  });
+
+  it("다른 내용이거나 시간이 많이 지났으면 새 기록으로 쌓는다", () => {
+    expect(addToHistory([item("가", 0)], item("나", 1_000))).toHaveLength(2);
+    expect(addToHistory([item("가", 0)], item("가 나", 11 * 60_000))).toHaveLength(2);
   });
 });

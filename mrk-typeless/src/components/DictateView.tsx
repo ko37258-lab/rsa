@@ -45,6 +45,9 @@ interface Props {
   onOpenSettings: () => void;
 }
 
+// 키보드 음성 입력(Win+H 등)으로 원문 칸에 말한 뒤 이만큼 조용하면 자동으로 정리합니다.
+const VOICE_IDLE_MS = 3000;
+
 const MOD_KEY = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘" : "Ctrl";
 
 function isEditable(target: EventTarget | null): boolean {
@@ -171,6 +174,35 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
   // 단축키: Space 길게 누르기 = 말하기, Ctrl/⌘+Enter = 정리, Esc = 멈춤
   const latest = useRef({ active, startListening, stopAndPolish, polish, speech, ai });
   latest.current = { active, startListening, stopAndPolish, polish, speech, ai };
+
+  // 키보드 음성 입력 감지: 손으로 친 글자는 키 누름이 먼저 오고, Win+H 같은 음성 입력은
+  // 키 누름 없이 글자만 들어옵니다. 음성으로 들어온 글이 있고 잠시 조용해지면 자동 정리합니다.
+  const lastKeyAtRef = useRef(0);
+  const composingRef = useRef(false);
+  const voiceTypedRef = useRef(false);
+  const idleTimerRef = useRef<number | null>(null);
+  const [voicePending, setVoicePending] = useState(false);
+
+  const clearVoiceTimer = useCallback(() => {
+    if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = null;
+    setVoicePending(false);
+  }, []);
+
+  const scheduleVoicePolish = useCallback(() => {
+    clearVoiceTimer();
+    if (!settings.autoPolish || !voiceTypedRef.current || composingRef.current) return;
+    setVoicePending(true);
+    idleTimerRef.current = window.setTimeout(() => {
+      idleTimerRef.current = null;
+      setVoicePending(false);
+      if (!voiceTypedRef.current || composingRef.current) return;
+      voiceTypedRef.current = false;
+      void latest.current.polish(false);
+    }, VOICE_IDLE_MS);
+  }, [clearVoiceTimer, settings.autoPolish]);
+
+  useEffect(() => clearVoiceTimer, [clearVoiceTimer]);
   useEffect(() => {
     let spaceHeld = false;
     const down = (e: KeyboardEvent) => {
@@ -280,12 +312,44 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
             className="pad__text"
             value={raw}
             placeholder="마이크를 누르고 말하거나, 이 칸을 누르고 키보드의 음성 입력으로 말하세요."
+            onFocus={() => {
+              // 예시 문장이 있으면 지우고 새로 받아씁니다.
+              if (leaveExample()) {
+                updateRaw("");
+                ai.show("");
+              }
+            }}
+            onKeyDown={(e) => {
+              // 실제 키보드로 친 글자만 '직접 입력'으로 봅니다 (Win 키 조합은 제외).
+              if (e.code && !e.metaKey && e.key !== "Meta" && e.key !== "OS") {
+                lastKeyAtRef.current = Date.now();
+                voiceTypedRef.current = false;
+                clearVoiceTimer();
+              }
+            }}
+            onCompositionStart={() => {
+              composingRef.current = true;
+              if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current);
+              idleTimerRef.current = null;
+            }}
+            onCompositionEnd={() => {
+              composingRef.current = false;
+              scheduleVoicePolish();
+            }}
             onChange={(e) => {
               leaveExample();
+              const grew = e.target.value.trim().length > rawRef.current.trim().length;
               updateRaw(e.target.value);
+              if (grew && Date.now() - lastKeyAtRef.current > 1200) voiceTypedRef.current = true;
+              scheduleVoicePolish();
             }}
             rows={6}
           />
+          {voicePending && (
+            <p className="pad__interim pad__interim--voice">
+              음성 입력을 받았습니다. 말을 멈추면 3초 뒤 자동으로 정리합니다.
+            </p>
+          )}
           {speech.interim && <p className="pad__interim">{speech.interim}</p>}
           {speech.listening && recordMode && <p className="pad__interim">녹음하고 있습니다. 다 말하면 마이크를 떼거나 다시 누르세요.</p>}
           <div className="pad__bar">

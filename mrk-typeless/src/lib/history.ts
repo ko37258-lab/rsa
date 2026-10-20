@@ -21,8 +21,18 @@ export function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** 이어서 말해 다시 정리한 경우(원문이 앞 기록을 이어 씀)는 앞 기록을 새 기록으로 바꿉니다. */
+const CONTINUE_WINDOW_MS = 10 * 60_000;
+
 export function addToHistory(list: HistoryItem[], item: HistoryItem): HistoryItem[] {
-  return [item, ...list].slice(0, HISTORY_LIMIT);
+  const prev = list[0];
+  const continues =
+    prev !== undefined &&
+    prev.kind === "dictation" &&
+    item.kind === "dictation" &&
+    item.createdAt - prev.createdAt < CONTINUE_WINDOW_MS &&
+    item.raw.startsWith(prev.raw);
+  return [item, ...(continues ? list.slice(1) : list)].slice(0, HISTORY_LIMIT);
 }
 
 export function formatWhen(ts: number, now = Date.now()): string {

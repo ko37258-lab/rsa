@@ -512,6 +512,12 @@ textarea:focus {
   padding-left: 10px;
 }
 
+.pad__interim--voice {
+  font-style: normal;
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+
 .pad__bar {
   display: flex;
   flex-wrap: wrap;

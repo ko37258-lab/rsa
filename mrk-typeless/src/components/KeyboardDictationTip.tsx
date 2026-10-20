@@ -12,7 +12,7 @@ export function KeyboardDictationTip({ reason }: { reason: SpeechProblem }) {
   return (
     <aside className="tip" aria-label="키보드 음성 입력 안내">
       <p className="tip__head">
-        {headline} 대신 키보드의 음성 입력으로 원문 칸에 말하면, 정리는 똑같이 됩니다.
+        {headline} 대신 원문 칸을 누르고 키보드의 음성 입력으로 말하세요. 말을 멈추면 3초 뒤 자동으로 정리하고 복사합니다.
         {!__ARTIFACT__ && reason === "unsupported" && " 설정 → 음성 인식에서 녹음 받아쓰기 키를 넣으면 어느 브라우저에서나 마이크 버튼을 쓸 수 있습니다."}
       </p>
       <dl className="tip__list">
