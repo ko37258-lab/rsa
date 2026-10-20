@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { STT_PROVIDERS } from "../ai/transcribe";
 import {
+  GEMINI_MODEL_OPTIONS,
   MODEL_OPTIONS,
   SPEECH_LANGS,
   TARGET_LANGS,
@@ -35,8 +36,12 @@ const SPEECH_ENGINES: { id: SpeechEngine; label: string; desc: string }[] = [
 
 export function SettingsView({ settings, onSettings, engine, accountAvailable }: Props) {
   const [showKey, setShowKey] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showSttKey, setShowSttKey] = useState(false);
   const stt = STT_PROVIDERS.find((p) => p.id === settings.sttProvider) ?? STT_PROVIDERS[0];
+  // Gemini 받아쓰기는 정리용 Gemini 키를 같이 씁니다 (어느 칸에 넣어도 같은 키).
+  const sttUsesGemini = settings.sttProvider === "gemini";
+  const sttKey = sttUsesGemini ? settings.geminiKey : settings.sttKey;
 
   const options: EngineOption[] = [
     { id: "auto", label: "자동", desc: "쓸 수 있는 방식을 알아서 고릅니다.", available: true },
@@ -54,6 +59,12 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
             id: "apikey" as const,
             label: "Claude API 키",
             desc: "내 Anthropic API 키로 정리합니다. 키는 이 브라우저에만 저장됩니다.",
+            available: true,
+          },
+          {
+            id: "gemini" as const,
+            label: "Gemini API 키",
+            desc: "내 Google Gemini API 키로 정리합니다. 키는 이 브라우저에만 저장됩니다.",
             available: true,
           },
         ]),
@@ -150,11 +161,60 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
               </div>
               <div className="field">
                 <label htmlFor="effort" className="label">
-                  생각하는 정도
+                  생각하는 정도 <small className="label__note">Claude·Gemini 공통</small>
                 </label>
                 <select id="effort" value={settings.effort} onChange={(e) => onSettings({ effort: e.target.value as Settings["effort"] })}>
                   <option value="low">빠르게 (받아쓰기에 권장)</option>
                   <option value="medium">꼼꼼하게</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!__ARTIFACT__ && (
+          <div className="api">
+            <div className="field">
+              <label htmlFor="gemini-key" className="label">
+                Gemini API 키
+              </label>
+              <div className="field__row">
+                <input
+                  id="gemini-key"
+                  type={showGeminiKey ? "text" : "password"}
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={settings.geminiKey}
+                  placeholder="AIza…"
+                  onChange={(e) => onSettings({ geminiKey: e.target.value })}
+                />
+                <button type="button" className="btn btn--ghost" onClick={() => setShowGeminiKey((v) => !v)}>
+                  {showGeminiKey ? "숨기기" : "보기"}
+                </button>
+              </div>
+              <a className="key-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
+                Gemini API 키 발급받기 ↗
+              </a>
+              <p className="field__hint">
+                Google AI Studio에 로그인해 키를 만들고 붙여넣으세요. 키는 이 브라우저에만 저장되고 Google 서버로만 전송됩니다. 두 키를
+                모두 넣으면 정리된 글 아래 <em>Claude·Gemini 비교</em>로 같은 원문을 나란히 견줘 볼 수 있습니다.
+              </p>
+            </div>
+            <div className="field__grid">
+              <div className="field">
+                <label htmlFor="gemini-model" className="label">
+                  Gemini 모델
+                </label>
+                <select
+                  id="gemini-model"
+                  value={settings.geminiModel}
+                  onChange={(e) => onSettings({ geminiModel: e.target.value as Settings["geminiModel"] })}
+                >
+                  {GEMINI_MODEL_OPTIONS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label} — {m.note}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -239,9 +299,9 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
                     type={showSttKey ? "text" : "password"}
                     autoComplete="off"
                     spellCheck={false}
-                    value={settings.sttKey}
+                    value={sttKey}
                     placeholder={stt.keyPlaceholder}
-                    onChange={(e) => onSettings({ sttKey: e.target.value })}
+                    onChange={(e) => onSettings(sttUsesGemini ? { geminiKey: e.target.value } : { sttKey: e.target.value })}
                   />
                   <button type="button" className="btn btn--ghost" onClick={() => setShowSttKey((v) => !v)}>
                     {showSttKey ? "숨기기" : "보기"}
@@ -254,7 +314,7 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
             </a>
             <p className="field__hint">
               {stt.keyHint} 키는 이 브라우저에만 저장되고 받아쓰기 서버로만 전송됩니다. 녹음 받아쓰기는 이용한 시간만큼 해당 서비스 요금이 나옵니다.
-              {settings.speechEngine === "record" && !settings.sttKey.trim() && " 키를 넣기 전까지는 브라우저 음성인식을 씁니다."}
+              {settings.speechEngine === "record" && !sttKey.trim() && " 키를 넣기 전까지는 브라우저 음성인식을 씁니다."}
             </p>
           </div>
         )}

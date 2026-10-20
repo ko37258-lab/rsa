@@ -8,13 +8,14 @@ import { newId, type HistoryItem } from "../lib/history";
 import { localCleanup } from "../lib/localCleanup";
 import { sanitizeDictation } from "../lib/sanitize";
 import { MODES, getMode, type ModeId } from "../lib/modes";
-import { buildPolishPrompt } from "../lib/prompts";
+import { buildPolishPrompt, type AiRequest } from "../lib/prompts";
 import type { EngineId, Settings } from "../lib/settings";
 import { countChars, estimateSavedMs, formatClock, formatDuration } from "../lib/stats";
 import { load, save } from "../lib/storage";
 import { HandNote } from "./HandNote";
 import { KeyboardDictationTip } from "./KeyboardDictationTip";
 import { MicButton, Waveform } from "./MicButton";
+import { ComparePanel } from "./ComparePanel";
 import { ResultPanel } from "./ResultPanel";
 import { Segmented } from "./Segmented";
 import { StrikePreview } from "./StrikePreview";
@@ -33,6 +34,7 @@ const EXAMPLE_RESULT = `이번 주 금요일 오후 3시에 분당 정자동 상
 export const ENGINE_LABEL: Record<EngineId, string> = {
   account: "내 Claude 계정",
   apikey: "Claude API",
+  gemini: "Gemini API",
   local: "기본 정리(AI 없이)",
 };
 
@@ -43,6 +45,7 @@ interface Props {
   onSettings: (patch: Partial<Settings>) => void;
   dictionary: Dictionary;
   engine: EngineId;
+  accountAvailable: boolean;
   firstVisit: boolean;
   onSave: (item: HistoryItem) => void;
   onSendToEdit: (text: string) => void;
@@ -60,7 +63,18 @@ function isEditable(target: EventTarget | null): boolean {
   return el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(el.tagName);
 }
 
-export function DictateView({ active, settings, onSettings, dictionary, engine, firstVisit, onSave, onSendToEdit, onOpenSettings }: Props) {
+export function DictateView({
+  active,
+  settings,
+  onSettings,
+  dictionary,
+  engine,
+  accountAvailable,
+  firstVisit,
+  onSave,
+  onSendToEdit,
+  onOpenSettings,
+}: Props) {
   const [raw, setRaw] = useState<string>(() => load<string>("draft") ?? (firstVisit ? EXAMPLE_RAW : ""));
   const [isExample, setIsExample] = useState(() => load<string>("draft") === undefined && firstVisit);
   const [original, setOriginal] = useState(isExample ? EXAMPLE_RAW : "");
@@ -70,6 +84,10 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
   const rawRef = useRef(raw);
   const exampleRef = useRef(isExample);
   const ai = useAiRun();
+  // 지금 보이는 정리 글을 만든 엔진 (비교에서 다른 쪽을 고르면 바뀝니다)
+  const [resultEngine, setResultEngine] = useState<EngineId>(engine);
+  const [compare, setCompare] = useState<{ id: number; req: AiRequest } | null>(null);
+  const [swapKey, setSwapKey] = useState(0);
 
   const updateRaw = useCallback((next: string) => {
     rawRef.current = next;
@@ -92,7 +110,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
     [leaveExample, updateRaw],
   );
 
-  const speech = useDictation(settings, appendFinal);
+  const speech = useDictation(settings, appendFinal, dictionary.terms);
 
   useEffect(() => {
     if (isExample) ai.show(EXAMPLE_RESULT);
@@ -117,6 +135,21 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
     setVoicePending(false);
   }, []);
 
+  /** 사전의 바꿔쓰기를 적용한 원문과, 그 원문으로 만든 AI 지시 */
+  const requestFor = useCallback(
+    (source: string): { corrected: string; req: AiRequest } => {
+      const { text: corrected } = applyReplacements(source, dictionary.replacements);
+      const req = buildPolishPrompt(corrected, getMode(settings.mode), {
+        dictionary,
+        styleNote: settings.styleNote,
+        targetLanguage: settings.targetLanguage,
+        signature: settings.signature,
+      });
+      return { corrected, req };
+    },
+    [dictionary, settings.mode, settings.signature, settings.styleNote, settings.targetLanguage],
+  );
+
   const polish = useCallback(
     async (fresh = false, spokenMs?: number) => {
       // Win+H가 끼워 넣은 깨진 문자는 원문 칸에서도 지웁니다.
@@ -131,8 +164,10 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
       setCopyNote(null);
       setLastSaved(null);
       setOriginal(source);
+      setCompare(null);
+      setResultEngine(engine);
       const mode = getMode(settings.mode);
-      const { text: corrected } = applyReplacements(source, dictionary.replacements);
+      const { corrected, req } = requestFor(source);
 
       let result: string | null;
       if (engine === "local") {
@@ -145,12 +180,6 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
             : `AI가 꺼져 있어 '${mode.label}' 형식 대신 기본 정리만 했습니다. 설정에서 AI 정리를 켜 주세요.`,
         );
       } else {
-        const req = buildPolishPrompt(corrected, mode, {
-          dictionary,
-          styleNote: settings.styleNote,
-          targetLanguage: settings.targetLanguage,
-          signature: settings.signature,
-        });
         result = await ai.run(engine, req, settings, fresh);
       }
       if (!result) return;
@@ -173,7 +202,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
         setCopyNote(ok ? "클립보드에 복사했습니다. 쓰던 곳에 붙여넣기만 하세요." : null);
       }
     },
-    [ai, clearVoiceTimer, dictionary, engine, leaveExample, onSave, settings, updateRaw],
+    [ai, clearVoiceTimer, engine, leaveExample, onSave, requestFor, settings, updateRaw],
   );
 
   const spokenRef = useRef<number | undefined>(undefined);
@@ -186,6 +215,32 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
     rawAtStartRef.current = null;
     if (settings.autoPolish && heardSomething) await polish(false, spokenMs);
   }, [polish, settings.autoPolish, speech]);
+
+  // 비교에서 고른 글로 바꾸고, 방금 기록도 그 글로 고칩니다 (같은 원문이면 기록이 덮어써집니다).
+  const adopt = useCallback(
+    async (text: string, from: EngineId, brand: string) => {
+      ai.show(text);
+      setResultEngine(from);
+      setSwapKey((k) => k + 1);
+      setNote(null);
+      const savedMs = estimateSavedMs(text, original, spokenRef.current);
+      setLastSaved(savedMs);
+      onSave({
+        id: newId(),
+        createdAt: Date.now(),
+        kind: "dictation",
+        mode: settings.mode,
+        raw: original,
+        result: text,
+        engine: from,
+        spokenMs: spokenRef.current,
+        savedMs,
+      });
+      const ok = settings.autoCopy && (await copyText(text));
+      setCopyNote(`${brand}가 정리한 글로 바꿨습니다.${ok ? " 클립보드에도 복사했습니다." : ""}`);
+    },
+    [ai, onSave, original, settings.autoCopy, settings.mode],
+  );
 
   const [usedMic, setUsedMic] = useState(() => load<boolean>("usedMic") === true);
 
@@ -433,6 +488,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
         onCancel={ai.cancel}
         copyNote={copyNote ?? note}
         preview={original ? <StrikePreview text={original} /> : null}
+        swapKey={swapKey}
         meta={
           ai.text && (
             <>
@@ -455,7 +511,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
               )}
               <span className="metric">
                 <span className="metric__label">정리한 곳</span>
-                <span className="metric__value">{isExample ? "예시 결과" : ENGINE_LABEL[engine]}</span>
+                <span className="metric__value">{isExample ? "예시 결과" : ENGINE_LABEL[resultEngine]}</span>
               </span>
             </>
           )
@@ -467,12 +523,38 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
                 다시 정리
               </button>
             )}
+            {!isExample && !__ARTIFACT__ && original && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--compare"
+                aria-expanded={!!compare}
+                onClick={() => setCompare({ id: Date.now(), req: requestFor(original).req })}
+              >
+                <span className="btn--compare__dots" aria-hidden="true">
+                  <i />
+                  <i />
+                </span>
+                Claude·Gemini 비교
+              </button>
+            )}
             <button type="button" className="btn btn--ghost" onClick={() => onSendToEdit(ai.text)}>
               음성 편집으로 보내기
             </button>
           </>
         }
       />
+
+      {compare && (
+        <ComparePanel
+          key={compare.id}
+          req={compare.req}
+          settings={settings}
+          accountAvailable={accountAvailable}
+          onAdopt={(text, from, brand) => void adopt(text, from, brand)}
+          onOpenSettings={onOpenSettings}
+          onClose={() => setCompare(null)}
+        />
+      )}
 
       <p className="shortcuts">
         <kbd>Space</kbd> 길게 누르기 말하기 · <kbd>{MOD_KEY}</kbd>+<kbd>Enter</kbd> 정리 · <kbd>Esc</kbd> 멈춤

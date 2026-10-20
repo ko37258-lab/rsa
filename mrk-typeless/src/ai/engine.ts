@@ -68,5 +68,10 @@ export async function runAi(engine: EngineId, req: AiRequest, settings: Settings
     const { runWithApiKey } = await import("./apiKeyEngine");
     return runWithApiKey(req, settings, opts);
   }
+  if (engine === "gemini") {
+    if (__ARTIFACT__) throw new EngineError("unavailable", "claude.ai 안에서는 Gemini를 쓸 수 없습니다.");
+    const { runWithGemini } = await import("./geminiEngine");
+    return runWithGemini(req, settings, opts);
+  }
   throw new EngineError("unavailable", "AI 정리가 꺼져 있습니다.");
 }

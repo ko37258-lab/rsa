@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserName, hasNativeSpeechService } from "../lib/browser";
-import type { Settings } from "../lib/settings";
+import { sttKeyFor, type Settings } from "../lib/settings";
 import { load, save } from "../lib/storage";
 import { useRecorder } from "./useRecorder";
 import { useSpeech, type StopResult } from "./useSpeech";
@@ -28,7 +28,7 @@ function rememberFailure(failed: boolean): void {
   save(FAILED_KEY, failed ? [...list, name] : list);
 }
 
-export function useDictation(settings: Settings, onFinal: (text: string) => void) {
+export function useDictation(settings: Settings, onFinal: (text: string) => void, hints?: string[]) {
   const [browserFailed, setBrowserFailed] = useState(rememberedFailure);
   const failedRef = useRef(browserFailed);
   failedRef.current = browserFailed;
@@ -42,10 +42,10 @@ export function useDictation(settings: Settings, onFinal: (text: string) => void
     onFinal(text);
   });
   const recorder = useRecorder(
-    { lang: settings.speechLang, provider: settings.sttProvider, apiKey: settings.sttKey },
+    { lang: settings.speechLang, provider: settings.sttProvider, apiKey: sttKeyFor(settings), hints },
     onFinal,
   );
-  const hasKey = !__ARTIFACT__ && settings.sttKey.trim().length > 0 && recorder.supported;
+  const hasKey = !__ARTIFACT__ && sttKeyFor(settings).trim().length > 0 && recorder.supported;
   const wantRef = useRef(false);
 
   const useRecord =

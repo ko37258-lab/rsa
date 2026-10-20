@@ -107,7 +107,7 @@ export function App() {
         <p className="banner">
           지금은 AI 없이 기본 정리만 합니다.{" "}
           <button type="button" className="link" onClick={() => setTab("settings")}>
-            {__ARTIFACT__ ? "Claude 사용을 허용하면" : "설정에서 Claude API 키를 넣으면"}
+            {__ARTIFACT__ ? "Claude 사용을 허용하면" : "설정에서 Claude나 Gemini API 키를 넣으면"}
           </button>{" "}
           말 바꿈 정리, 목록, 이메일·보고서 형식까지 됩니다.
         </p>
@@ -121,6 +121,7 @@ export function App() {
             onSettings={patchSettings}
             dictionary={dictionary}
             engine={engine}
+            accountAvailable={accountAvailable}
             firstVisit={firstVisit}
             onSave={saveItem}
             onSendToEdit={sendToEdit}

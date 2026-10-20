@@ -38,10 +38,14 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
     setCommand(next);
   }, []);
 
-  const speech = useDictation(settings, (said) => {
-    const base = commandRef.current.trimEnd();
-    updateCommand(base ? `${base} ${said}` : said);
-  });
+  const speech = useDictation(
+    settings,
+    (said) => {
+      const base = commandRef.current.trimEnd();
+      updateCommand(base ? `${base} ${said}` : said);
+    },
+    dictionary.terms,
+  );
 
   const apply = useCallback(
     async (instruction: string) => {

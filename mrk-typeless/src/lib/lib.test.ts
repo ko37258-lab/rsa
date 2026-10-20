@@ -5,7 +5,7 @@ import { localCleanup } from "./localCleanup";
 import { sanitizeDictation } from "./sanitize";
 import { getMode } from "./modes";
 import { buildEditPrompt, buildPolishPrompt, toSingleInput } from "./prompts";
-import { DEFAULT_SETTINGS, resolveEngine } from "./settings";
+import { DEFAULT_SETTINGS, resolveEngine, sttKeyFor } from "./settings";
 import { countChars, estimateSavedMs, formatClock, formatDuration } from "./stats";
 
 const ctx = { dictionary: DEFAULT_DICTIONARY, styleNote: "", targetLanguage: "영어", signature: "" };
@@ -70,6 +70,23 @@ describe("resolveEngine", () => {
   it("고른 방식을 쓸 수 없으면 기본 정리로 내려간다", () => {
     expect(resolveEngine({ ...DEFAULT_SETTINGS, engine: "account" }, false, true)).toBe("local");
     expect(resolveEngine({ ...DEFAULT_SETTINGS, engine: "apikey" }, true, true)).toBe("local");
+    expect(resolveEngine({ ...DEFAULT_SETTINGS, engine: "gemini" }, true, true)).toBe("local");
+  });
+
+  it("Gemini 키만 있으면 자동에서 Gemini를, 직접 고르면 Claude 키가 있어도 Gemini를 쓴다", () => {
+    const gemini = { ...DEFAULT_SETTINGS, geminiKey: "AIza-x" };
+    expect(resolveEngine(gemini, false, true)).toBe("gemini");
+    expect(resolveEngine({ ...gemini, apiKey: "sk-ant-x" }, false, true)).toBe("apikey");
+    expect(resolveEngine({ ...gemini, apiKey: "sk-ant-x", engine: "gemini" }, false, true)).toBe("gemini");
+    expect(resolveEngine(gemini, false, false)).toBe("local");
+  });
+});
+
+describe("sttKeyFor", () => {
+  it("Gemini 받아쓰기는 정리용 Gemini 키를 같이 쓴다", () => {
+    const s = { ...DEFAULT_SETTINGS, sttKey: "sk_eleven", geminiKey: "AIza-x" };
+    expect(sttKeyFor(s)).toBe("sk_eleven");
+    expect(sttKeyFor({ ...s, sttProvider: "gemini" })).toBe("AIza-x");
   });
 });
 

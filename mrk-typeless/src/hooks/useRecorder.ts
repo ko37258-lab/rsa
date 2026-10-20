@@ -24,6 +24,7 @@ interface RecorderOptions {
   lang: string;
   provider: SttProvider;
   apiKey: string;
+  hints?: string[];
 }
 
 /**

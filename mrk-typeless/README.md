@@ -32,7 +32,7 @@ Typeless는 "Speak, don't type"을 내건 음성 키보드입니다. 말하기(�
 ### Typeless와 다른 점
 
 - **어디서나 바로 입력되지는 않습니다.** Typeless는 운영체제 전체에 설치되는 키보드·데스크톱 앱이라 아무 앱에서나 단축키로 바로 입력됩니다. MR.K - Typeless는 웹앱이라, 정리된 글을 클립보드에 자동 복사하고 쓰던 곳에 붙여넣는 방식입니다.
-- **음성인식은 두 가지입니다.** 기본은 브라우저 음성인식(무료, Chrome·Edge·Safari)입니다. Chrome은 음성을 Google 서버로 보내 인식하므로, 네이버 웨일·브레이브 같은 일부 브라우저나 막힌 네트워크에서는 "음성인식 서버에 연결하지 못했습니다"가 뜹니다. 이때는 **설정 → 음성 인식**에 녹음 받아쓰기 API 키(ElevenLabs Scribe 또는 OpenAI)를 넣으면 어느 브라우저에서나 받아씁니다. "자동"이면 브라우저 음성인식이 실패하는 순간 녹음 받아쓰기로 이어서 듣습니다.
+- **음성인식은 두 가지입니다.** 기본은 브라우저 음성인식(무료, Chrome·Edge·Safari)입니다. Chrome은 음성을 Google 서버로 보내 인식하므로, 네이버 웨일·브레이브 같은 일부 브라우저나 막힌 네트워크에서는 "음성인식 서버에 연결하지 못했습니다"가 뜹니다. 이때는 **설정 → 음성 인식**에 녹음 받아쓰기 API 키(ElevenLabs Scribe, OpenAI 또는 Gemini)를 넣으면 어느 브라우저에서나 받아씁니다. "자동"이면 브라우저 음성인식이 실패하는 순간 녹음 받아쓰기로 이어서 듣습니다.
 - **claude.ai 아티팩트 안에서는 마이크를 직접 쓸 수 없습니다.** 대신 원문 칸을 누르고 키보드의 음성 입력(휴대폰 키보드 마이크, Windows `Win`+`H`, Mac `Fn` 두 번)으로 말하면 정리는 똑같이 됩니다.
 
 ---
@@ -94,16 +94,27 @@ npm run build   # → dist/ 폴더
 | --- | --- | --- |
 | 내 Claude 계정 | claude.ai 아티팩트로 열었을 때 (자동 선택) | 내 Claude 구독 사용량 |
 | Claude API 키 | 독립 웹앱(②, ③) | Anthropic API 요금. 기본 모델 Claude Opus 5.5, 설정에서 Sonnet 5.5·Haiku 5.5로 바꿀 수 있음 |
+| Gemini API 키 | 독립 웹앱(②, ③) | Google Gemini API 요금. 기본 모델 Gemini 3.8 Flash, 설정에서 Gemini 4 Argon·3.5 Flash-Lite로 바꿀 수 있음 |
 | AI 없이 | 언제나 | 무료. 군더더기 말과 반복만 지움 (말 바꿈·목록·형식 변환은 안 됨) |
 
-API 키 방식은 Opus·Sonnet에서 서버 측 거절 대체(`fallbacks: "default"`)를 켜 두었습니다. 안전 분류기가 요청을 거절하면 Claude가 알맞은 모델로 다시 실행합니다.
+"자동"은 내 Claude 계정 → Claude API 키 → Gemini API 키 → AI 없이 순서로 고릅니다. '생각하는 정도'는 두 AI에 함께 적용됩니다(Gemini는 `thinkingLevel`로 바꿔 보냄).
+
+Claude API 키 방식은 Opus·Sonnet에서 서버 측 거절 대체(`fallbacks: "default"`)를 켜 두었습니다. 안전 분류기가 요청을 거절하면 Claude가 알맞은 모델로 다시 실행합니다.
+
+### Claude · Gemini 비교
+
+정리된 글 아래 **Claude·Gemini 비교**를 누르면 같은 원문과 같은 지시를 두 AI에 동시에 보내 나란히 보여 줍니다. 걸린 시간과 글자 수가 함께 나오고, 먼저 끝난 쪽에 "더 빠름"이 붙습니다. 마음에 드는 쪽의 **이 글 쓰기**를 누르면 그 글이 정리 결과가 되고, 기록과 클립보드도 그 글로 바뀝니다. 키가 하나만 있으면 다른 쪽에는 키를 넣는 곳으로 가는 버튼이 나옵니다.
+
+### Gemini로 녹음 받아쓰기
+
+설정 → 음성 인식에서 녹음 받아쓰기 서비스를 **Gemini**로 고르면 정리용 Gemini 키 하나로 받아쓰기까지 됩니다(Gemini 3.8 Flash가 녹음을 직접 듣고 적음). 개인 사전의 용어를 미리 알려 주므로 '지구단위계획' 같은 말을 더 잘 알아듣습니다.
 
 ---
 
 ## 4. 개인정보
 
 - 기록·사전·설정·API 키는 **이 브라우저의 저장소(localStorage)에만** 저장됩니다. 서버로 보내지 않습니다.
-- 정리할 때는 원문이 Claude(Anthropic)로 전송됩니다.
+- 정리할 때는 원문이 고른 AI(Claude는 Anthropic, Gemini는 Google)로 전송됩니다. 비교를 누르면 두 곳 모두로 갑니다.
 - API 키는 브라우저에 저장되므로 여러 사람이 쓰는 컴퓨터에서는 쓰지 마세요.
 
 ---
@@ -130,12 +141,16 @@ mrk-typeless/
       DictionaryView.tsx     개인 사전
       HistoryView.tsx        기록과 통계
       SettingsView.tsx       AI 정리 방식, 언어, 문체
+      ComparePanel.tsx       Claude · Gemini 나란히 비교
     hooks/
       useSpeech.ts           브라우저 음성인식 (Web Speech API)
       useAiRun.ts            AI 정리 진행 상태와 멈춤
     ai/
       engine.ts              엔진 선택, 내 Claude 계정(sample) 연결
       apiKeyEngine.ts        Claude API (공식 SDK, 스트리밍)
+      gemini.ts              Gemini API 공통 (SSE 읽기, 오류 문구, 생각 단계)
+      geminiEngine.ts        Gemini API 정리 (스트리밍)
+      transcribe.ts          녹음 받아쓰기 (ElevenLabs · OpenAI · Gemini)
     lib/
       prompts.ts             정리·편집 지시문
       modes.ts               글의 형식 7가지

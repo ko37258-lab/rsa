@@ -16,9 +16,11 @@ interface Props {
   copyNote?: string | null;
   /** 정리하는 동안 보여 줄 것 (원문에 줄 긋기 등) */
   preview?: ReactNode;
+  /** 바뀔 때마다 글이 새로 나타나는 움직임을 다시 보여 줍니다 (비교에서 다른 글을 골랐을 때) */
+  swapKey?: number;
 }
 
-export function ResultPanel({ title, status, text, error, badge, meta, original, onCancel, actions, copyNote, preview }: Props) {
+export function ResultPanel({ title, status, text, error, badge, meta, original, onCancel, actions, copyNote, preview, swapKey = 0 }: Props) {
   const [copied, setCopied] = useState<"ok" | "fail" | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
   const busy = status === "thinking" || status === "streaming";
@@ -31,6 +33,9 @@ export function ResultPanel({ title, status, text, error, badge, meta, original,
     if (status === "done" && prevStatus.current === "thinking") setRevealKey((k) => k + 1);
     prevStatus.current = status;
   }, [status]);
+  useEffect(() => {
+    if (swapKey > 0) setRevealKey((k) => k + 1);
+  }, [swapKey]);
 
   async function copy() {
     const ok = await copyText(text);
