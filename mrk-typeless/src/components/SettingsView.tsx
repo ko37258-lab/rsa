@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { STT_PROVIDERS } from "../ai/transcribe";
 import {
   MODEL_OPTIONS,
   SPEECH_LANGS,
@@ -7,6 +8,7 @@ import {
   type EngineChoice,
   type EngineId,
   type Settings,
+  type SpeechEngine,
 } from "../lib/settings";
 import { ENGINE_LABEL } from "./DictateView";
 
@@ -25,8 +27,16 @@ interface EngineOption {
   why?: string;
 }
 
+const SPEECH_ENGINES: { id: SpeechEngine; label: string; desc: string }[] = [
+  { id: "auto", label: "자동 (권장)", desc: "브라우저 음성인식을 먼저 쓰고, 연결이 안 되면 녹음 받아쓰기로 넘어갑니다." },
+  { id: "browser", label: "브라우저 음성인식", desc: "무료. 말하는 동안 글자가 바로 보입니다. Chrome·Edge·Safari에서 됩니다." },
+  { id: "record", label: "녹음 받아쓰기", desc: "다 말하면 녹음을 받아쓰기 API로 보냅니다. 어느 브라우저에서나 됩니다." },
+];
+
 export function SettingsView({ settings, onSettings, engine, accountAvailable }: Props) {
   const [showKey, setShowKey] = useState(false);
+  const [showSttKey, setShowSttKey] = useState(false);
+  const stt = STT_PROVIDERS.find((p) => p.id === settings.sttProvider) ?? STT_PROVIDERS[0];
 
   const options: EngineOption[] = [
     { id: "auto", label: "자동", desc: "쓸 수 있는 방식을 알아서 고릅니다.", available: true },
@@ -178,6 +188,69 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
             </select>
           </div>
         </div>
+        {!__ARTIFACT__ && (
+          <div className="api">
+            <div className="field">
+              <span className="label">음성 인식 방식</span>
+              <div className="engines engines--3" role="radiogroup" aria-label="음성 인식 방식">
+                {SPEECH_ENGINES.map((o) => (
+                  <label key={o.id} className={`engine${settings.speechEngine === o.id ? " is-on" : ""}`}>
+                    <input
+                      type="radio"
+                      name="speech-engine"
+                      id={`speech-engine-${o.id}`}
+                      checked={settings.speechEngine === o.id}
+                      onChange={() => onSettings({ speechEngine: o.id })}
+                    />
+                    <span className="engine__label">{o.label}</span>
+                    <span className="engine__desc">{o.desc}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="field__grid">
+              <div className="field">
+                <label htmlFor="stt-provider" className="label">
+                  녹음 받아쓰기 서비스
+                </label>
+                <select
+                  id="stt-provider"
+                  value={settings.sttProvider}
+                  onChange={(e) => onSettings({ sttProvider: e.target.value as Settings["sttProvider"] })}
+                >
+                  {STT_PROVIDERS.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="stt-key" className="label">
+                  {stt.label} API 키
+                </label>
+                <div className="field__row">
+                  <input
+                    id="stt-key"
+                    type={showSttKey ? "text" : "password"}
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={settings.sttKey}
+                    placeholder={stt.keyPlaceholder}
+                    onChange={(e) => onSettings({ sttKey: e.target.value })}
+                  />
+                  <button type="button" className="btn btn--ghost" onClick={() => setShowSttKey((v) => !v)}>
+                    {showSttKey ? "숨기기" : "보기"}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p className="field__hint">
+              {stt.keyHint} 키는 이 브라우저에만 저장되고 받아쓰기 서버로만 전송됩니다. 녹음 받아쓰기는 이용한 시간만큼 해당 서비스 요금이 나옵니다.
+              {settings.speechEngine === "record" && !settings.sttKey.trim() && " 키를 넣기 전까지는 브라우저 음성인식을 씁니다."}
+            </p>
+          </div>
+        )}
         <label className="toggle" htmlFor="auto-polish">
           <input id="auto-polish" type="checkbox" checked={settings.autoPolish} onChange={(e) => onSettings({ autoPolish: e.target.checked })} />
           <span>

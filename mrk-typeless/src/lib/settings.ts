@@ -1,9 +1,12 @@
+import type { SttProvider } from "../ai/transcribe";
 import type { ModeId } from "./modes";
 
 export type EngineChoice = "auto" | "account" | "apikey" | "local";
 export type EngineId = "account" | "apikey" | "local";
 export type ModelId = "claude-opus-5-5" | "claude-sonnet-5-5" | "claude-haiku-5-5";
 export type AccountTier = "quick" | "default" | "complex";
+/** 음성 인식: 브라우저 음성인식(무료) 또는 녹음 후 받아쓰기 API */
+export type SpeechEngine = "auto" | "browser" | "record";
 
 export interface Settings {
   engine: EngineChoice;
@@ -12,6 +15,9 @@ export interface Settings {
   effort: "low" | "medium";
   accountTier: AccountTier;
   speechLang: string;
+  speechEngine: SpeechEngine;
+  sttProvider: SttProvider;
+  sttKey: string;
   targetLanguage: string;
   signature: string;
   styleNote: string;
@@ -27,6 +33,9 @@ export const DEFAULT_SETTINGS: Settings = {
   effort: "low",
   accountTier: "quick",
   speechLang: "ko-KR",
+  speechEngine: "auto",
+  sttProvider: "elevenlabs",
+  sttKey: "",
   targetLanguage: "영어",
   signature: "",
   styleNote: "",

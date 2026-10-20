@@ -641,6 +641,30 @@ textarea:focus {
   font-size: var(--step--1);
 }
 
+.tip--warn {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+  background: var(--warn-soft);
+}
+
+.tip__fixes {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 4px;
+  font-size: var(--step--1);
+}
+
+.stage__engine {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+
 .tip__list {
   margin: 0;
   display: grid;
@@ -939,6 +963,10 @@ textarea:focus {
   gap: 10px;
 }
 
+.engines--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .engine {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1164,6 +1192,7 @@ textarea:focus {
   }
 
   .engines,
+  .engines--3,
   .field__grid {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useAiRun } from "../hooks/useAiRun";
-import { useSpeech } from "../hooks/useSpeech";
+import { useDictation } from "../hooks/useDictation";
 import type { Dictionary } from "../lib/dictionary";
 import { newId, type HistoryItem } from "../lib/history";
 import { buildEditPrompt } from "../lib/prompts";
@@ -37,7 +37,7 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
     setCommand(next);
   }, []);
 
-  const speech = useSpeech(settings.speechLang, (said) => {
+  const speech = useDictation(settings, (said) => {
     const base = commandRef.current.trimEnd();
     updateCommand(base ? `${base} ${said}` : said);
   });
@@ -101,7 +101,7 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
             size="small"
             listening={speech.listening}
             pulse={speech.pulse}
-            disabled={aiOff || speech.problem === "unsupported"}
+            disabled={aiOff || !speech.supported || speech.transcribing}
             label={speech.listening ? "지시 말하기 멈추고 적용" : "지시를 말로 하기"}
             onPressStart={() => {
               updateCommand("");
@@ -144,7 +144,11 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
           ))}
         </div>
         {aiOff && <p className="notice">음성 편집은 AI가 필요합니다. 설정에서 Claude 연결 방식을 골라 주세요.</p>}
-        {speech.problem === "blocked" && <p className="notice">이 화면에서는 마이크를 쓸 수 없어 지시를 글로 적어 주세요. 키보드의 음성 입력도 됩니다.</p>}
+        {(speech.problem === "blocked" || speech.problem === "network") && (
+          <p className="notice">지금은 마이크로 지시를 받을 수 없어 글로 적어 주세요. 키보드의 음성 입력도 됩니다.</p>
+        )}
+        {speech.transcribing && <p className="notice">지시를 받아쓰는 중…</p>}
+        {speech.error && <p className="notice">{speech.error}</p>}
       </div>
 
       <ResultPanel

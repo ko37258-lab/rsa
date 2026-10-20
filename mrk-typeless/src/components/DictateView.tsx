@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAiRun } from "../hooks/useAiRun";
-import { useSpeech } from "../hooks/useSpeech";
+import { useDictation } from "../hooks/useDictation";
+import { browserName } from "../lib/browser";
 import { copyText } from "../lib/clipboard";
 import { applyReplacements, type Dictionary } from "../lib/dictionary";
 import { newId, type HistoryItem } from "../lib/history";
@@ -41,6 +42,7 @@ interface Props {
   firstVisit: boolean;
   onSave: (item: HistoryItem) => void;
   onSendToEdit: (text: string) => void;
+  onOpenSettings: () => void;
 }
 
 const MOD_KEY = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘" : "Ctrl";
@@ -51,7 +53,7 @@ function isEditable(target: EventTarget | null): boolean {
   return el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(el.tagName);
 }
 
-export function DictateView({ active, settings, onSettings, dictionary, engine, firstVisit, onSave, onSendToEdit }: Props) {
+export function DictateView({ active, settings, onSettings, dictionary, engine, firstVisit, onSave, onSendToEdit, onOpenSettings }: Props) {
   const [raw, setRaw] = useState<string>(() => load<string>("draft") ?? (firstVisit ? EXAMPLE_RAW : ""));
   const [isExample, setIsExample] = useState(() => load<string>("draft") === undefined && firstVisit);
   const [original, setOriginal] = useState(isExample ? EXAMPLE_RAW : "");
@@ -83,7 +85,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
     [leaveExample, updateRaw],
   );
 
-  const speech = useSpeech(settings.speechLang, appendFinal);
+  const speech = useDictation(settings, appendFinal);
 
   useEffect(() => {
     if (isExample) ai.show(EXAMPLE_RESULT);
@@ -149,15 +151,20 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
   );
 
   const spokenRef = useRef<number | undefined>(undefined);
+  const rawAtStartRef = useRef<string | null>(null);
   const stopAndPolish = useCallback(async () => {
     const { spokenMs } = await speech.stop();
     spokenRef.current = spokenMs;
-    if (settings.autoPolish) await polish(false, spokenMs);
+    // 이번에 받아쓴 말이 없으면(인식 실패 등) 예전 원문을 다시 정리하지 않습니다.
+    const heardSomething = rawRef.current !== rawAtStartRef.current;
+    rawAtStartRef.current = null;
+    if (settings.autoPolish && heardSomething) await polish(false, spokenMs);
   }, [polish, settings.autoPolish, speech]);
 
   const startListening = useCallback(() => {
     ai.cancel();
     if (leaveExample()) updateRaw("");
+    rawAtStartRef.current = rawRef.current;
     speech.start();
   }, [ai, leaveExample, speech, updateRaw]);
 
@@ -170,7 +177,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
       const { active, startListening, polish, speech, ai } = latest.current;
       if (!active) return;
       if (e.key === "Escape") {
-        if (speech.listening) speech.cancel();
+        if (speech.listening || speech.transcribing) speech.cancel();
         ai.cancel();
         return;
       }
@@ -179,7 +186,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
         void polish(false, spokenRef.current);
         return;
       }
-      if (e.code === "Space" && !e.repeat && !isEditable(e.target) && !speech.listening) {
+      if (e.code === "Space" && !e.repeat && !isEditable(e.target) && !speech.listening && !speech.transcribing) {
         e.preventDefault();
         spaceHeld = true;
         startListening();
@@ -201,6 +208,16 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
   }, []);
 
   const micUnavailable = speech.problem === "unsupported" || speech.problem === "blocked";
+  const recordMode = speech.engine === "record";
+  const stateLabel = speech.transcribing
+    ? "받아쓰는 중…"
+    : speech.listening
+      ? recordMode
+        ? "녹음 중"
+        : "듣는 중"
+      : micUnavailable
+        ? "키보드 음성 입력"
+        : "누르고 말하기";
   const mode = getMode(settings.mode);
   const resultChars = countChars(ai.text);
   const rawChars = countChars(original);
@@ -233,6 +250,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
         <div className="stage__mic">
           <MicButton
             listening={speech.listening}
+            disabled={speech.transcribing}
             pulse={speech.pulse}
             label={speech.listening ? "받아쓰기 멈추고 정리하기" : "누르고 말하기"}
             onPressStart={startListening}
@@ -240,15 +258,14 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
             onToggle={() => void stopAndPolish()}
           />
           <div className="stage__status">
-            <span className={`stage__state${speech.listening ? " is-live" : ""}`}>
-              {speech.listening ? "듣는 중" : micUnavailable ? "키보드 음성 입력" : "누르고 말하기"}
-            </span>
+            <span className={`stage__state${speech.listening ? " is-live" : ""}`}>{stateLabel}</span>
             <span className="stage__clock">{formatClock(speech.elapsedMs)}</span>
           </div>
           <Waveform live={speech.listening} pulse={speech.pulse} />
           <p className="stage__help">
             길게 누르면 누르는 동안만, 짧게 누르면 다시 누를 때까지 받아씁니다.
           </p>
+          <span className="stage__engine">{recordMode ? "녹음 받아쓰기" : "브라우저 음성인식"}</span>
         </div>
 
         <div className="stage__pad">
@@ -270,6 +287,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
             rows={6}
           />
           {speech.interim && <p className="pad__interim">{speech.interim}</p>}
+          {speech.listening && recordMode && <p className="pad__interim">녹음하고 있습니다. 다 말하면 마이크를 떼거나 다시 누르세요.</p>}
           <div className="pad__bar">
             <span className="pad__count">{countChars(raw)}자</span>
             <div className="pad__actions">
@@ -296,8 +314,24 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
       {micUnavailable && <KeyboardDictationTip reason={speech.problem} />}
       {speech.problem === "no-mic" && <p className="notice">마이크를 찾지 못했습니다. 마이크가 연결되어 있는지 확인해 주세요.</p>}
       {speech.problem === "network" && (
-        <p className="notice">음성인식 서버에 연결하지 못했습니다. 인터넷 연결을 확인하거나 키보드의 음성 입력을 써 주세요.</p>
+        <aside className="tip tip--warn" aria-label="음성인식 연결 실패 안내">
+          <p className="tip__head">
+            <strong>{browserName()}에서 음성인식 서버에 연결하지 못했습니다.</strong> 브라우저 음성인식은 구글 서버를 거치는데,
+            웨일·브레이브 같은 일부 브라우저나 회사 네트워크에서는 막혀 있습니다.
+          </p>
+          <ul className="tip__fixes">
+            <li>
+              <strong>가장 확실한 방법:</strong> 설정에서 <em>녹음 받아쓰기</em> API 키를 넣으면 어느 브라우저에서나 됩니다.{" "}
+              <button type="button" className="link" onClick={onOpenSettings}>
+                설정 열기
+              </button>
+            </li>
+            <li>Chrome이나 Edge로 이 주소를 열어 보세요.</li>
+            <li>당장은 원문 칸을 누르고 키보드의 음성 입력(Windows는 Win+H)으로 말해도 됩니다.</li>
+          </ul>
+        </aside>
       )}
+      {speech.error && <p className="notice">{speech.error}</p>}
 
       <ResultPanel
         title={`정리된 글 · ${mode.label}`}

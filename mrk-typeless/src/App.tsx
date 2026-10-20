@@ -109,6 +109,7 @@ export function App() {
             firstVisit={firstVisit}
             onSave={saveItem}
             onSendToEdit={sendToEdit}
+            onOpenSettings={() => setTab("settings")}
           />
         </div>
         <div role="tabpanel" id="panel-edit" aria-labelledby="tab-edit" hidden={tab !== "edit"}>
