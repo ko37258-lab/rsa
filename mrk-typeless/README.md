@@ -67,6 +67,8 @@ npm run build   # → dist/ 폴더
 
 `dist/` 폴더를 Vercel·Netlify 같은 정적 호스팅에 올리면 됩니다. 마이크는 **HTTPS 주소**(또는 localhost)에서만 동작합니다.
 
+현재 배포: **https://mrk-typeless.vercel.app** (Vercel 프로젝트 `mrk-typeless`, 루트 디렉터리 `mrk-typeless`, Vercel 로그인한 본인만 접속)
+
 ---
 
 ## 3. 사용법
