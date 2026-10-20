@@ -5,7 +5,7 @@ n8n·Make 같은 **월 구독 툴 없이**, 구독료 0원으로 동작합니다
 
 > 참고 영상: 방구석컴퍼니 —「스레드 자동화 프로그램 무료로 드립니다」
 
-> 이 저장소에는 AI 받아쓰기 앱 **[MR.K - Typeless](mrk-typeless/)** (React)도 들어 있습니다.
+> 이 저장소에는 AI 받아쓰기 앱 **[MR.K - Typeless](mrk-typeless/)** (React 웹)와 **[MR.K Typeless 데스크톱](desktop/)** (Windows)도 들어 있습니다.
 
 ## 기능
 

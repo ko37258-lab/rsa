@@ -1,0 +1,8 @@
+anthropic>=1.15,<2
+requests>=2.31
+keyboard==0.13.5
+pystray>=0.19.5
+Pillow>=10
+sounddevice>=0.5
+numpy>=1.26
+pyperclip>=1.9
