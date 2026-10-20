@@ -1,15 +1,37 @@
 import { useMemo, useState } from "react";
+import { useCountUp } from "../hooks/useCountUp";
 import { copyText } from "../lib/clipboard";
 import { formatWhen, type HistoryItem } from "../lib/history";
 import { getMode } from "../lib/modes";
 import { countChars, formatDuration } from "../lib/stats";
+import { Sparkline } from "./Sparkline";
 
 interface Props {
   history: HistoryItem[];
   onChange: (next: HistoryItem[]) => void;
+  /** 기록 탭이 보일 때 숫자가 차오릅니다 */
+  active: boolean;
 }
 
-export function HistoryView({ history, onChange }: Props) {
+/** 최근 7일, 날마다 정리한 글자 수 */
+function lastSevenDays(history: HistoryItem[]): { labels: string[]; values: number[] } {
+  const labels: string[] = [];
+  const values: number[] = [];
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const next = d.getTime() + 86_400_000;
+    labels.push(`${d.getMonth() + 1}/${d.getDate()}`);
+    values.push(
+      history
+        .filter((h) => h.kind === "dictation" && h.createdAt >= d.getTime() && h.createdAt < next)
+        .reduce((sum, h) => sum + countChars(h.result), 0),
+    );
+  }
+  return { labels, values };
+}
+
+export function HistoryView({ history, onChange, active }: Props) {
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -24,6 +46,10 @@ export function HistoryView({ history, onChange }: Props) {
     };
   }, [history]);
 
+  const week = useMemo(() => lastSevenDays(history), [history]);
+  const count = useCountUp(totals.count, active);
+  const chars = useCountUp(totals.chars, active);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return history;
@@ -32,26 +58,37 @@ export function HistoryView({ history, onChange }: Props) {
 
   return (
     <div className="view history">
-      <dl className="stats">
-        <div className="stat">
-          <dt>받아쓰기</dt>
-          <dd>
-            {totals.count.toLocaleString("ko-KR")}
-            <small>회</small>
-          </dd>
+      <div className="stats-card">
+        <dl className="stats">
+          <div className="stat">
+            <dt>받아쓰기</dt>
+            <dd>
+              {count.toLocaleString("ko-KR")}
+              <small>회</small>
+            </dd>
+          </div>
+          <div className="stat">
+            <dt>정리한 글</dt>
+            <dd>
+              {chars.toLocaleString("ko-KR")}
+              <small>자</small>
+            </dd>
+          </div>
+          <div className="stat">
+            <dt>아낀 시간 (추정)</dt>
+            <dd>{totals.saved > 0 ? formatDuration(totals.saved) : "0초"}</dd>
+          </div>
+        </dl>
+        <div className="week">
+          <p className="week__title">최근 7일 정리한 글자 수</p>
+          <Sparkline values={week.values} labels={week.labels} />
+          <div className="week__labels" aria-hidden="true">
+            {week.labels.map((l) => (
+              <span key={l}>{l}</span>
+            ))}
+          </div>
         </div>
-        <div className="stat">
-          <dt>정리한 글</dt>
-          <dd>
-            {totals.chars.toLocaleString("ko-KR")}
-            <small>자</small>
-          </dd>
-        </div>
-        <div className="stat">
-          <dt>절약한 시간 (추정)</dt>
-          <dd>{totals.saved > 0 ? formatDuration(totals.saved) : "0초"}</dd>
-        </div>
-      </dl>
+      </div>
 
       <div className="history__bar">
         <label htmlFor="history-search" className="sr-only">

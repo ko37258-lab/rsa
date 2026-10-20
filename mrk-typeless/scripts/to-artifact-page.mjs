@@ -8,7 +8,10 @@ const dist = `${root}dist-artifact/`;
 
 const indexHtml = readFileSync(`${root}index.html`, "utf8");
 const title = indexHtml.match(/<title>(.*?)<\/title>/)?.[1] ?? "MR.K - Typeless";
-const fontLinks = [...indexHtml.matchAll(/<link rel="(?:stylesheet|preconnect)"[^>]*>/g)].map((m) => m[0]);
+// 아티팩트는 Google Fonts 스타일시트만 허용하므로 그 밖의 글꼴 링크(Pretendard 등)는 뺍니다.
+const fontLinks = [...indexHtml.matchAll(/<link rel="(?:stylesheet|preconnect)"[^>]*>/g)]
+  .map((m) => m[0])
+  .filter((tag) => /fonts\.(googleapis|gstatic)\.com/.test(tag));
 const css = readFileSync(`${dist}app.css`, "utf8").trim();
 const js = readFileSync(`${dist}app.js`, "utf8").trim().replaceAll("</script", "<\\/script");
 

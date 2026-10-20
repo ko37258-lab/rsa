@@ -3,7 +3,9 @@ import { getSample } from "./ai/engine";
 import { DictateView, ENGINE_LABEL } from "./components/DictateView";
 import { DictionaryView } from "./components/DictionaryView";
 import { EditView } from "./components/EditView";
+import { HandNote } from "./components/HandNote";
 import { HistoryView } from "./components/HistoryView";
+import { Segmented } from "./components/Segmented";
 import { SettingsView } from "./components/SettingsView";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { DEFAULT_DICTIONARY, type Dictionary } from "./lib/dictionary";
@@ -58,35 +60,48 @@ export function App() {
 
   return (
     <div className="app">
-      <header className="top">
+      <header className="nav">
         <div className="brand">
-          <span className="brand__mark">MR.K</span>
-          <span className="brand__name">Typeless</span>
+          <span className="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <rect x="9" y="4" width="6" height="11" rx="3" />
+              <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v3" />
+            </svg>
+          </span>
+          <span className="brand__name">
+            MR.K <b>Typeless</b>
+          </span>
         </div>
-        <p className="brand__tag">말하면, 정리된 글이 됩니다</p>
         <button type="button" className={`engine-pill is-${engine}`} onClick={() => setTab("settings")}>
           <span className="engine-pill__dot" aria-hidden="true" />
           {checking ? "연결 확인 중" : ENGINE_LABEL[engine]}
         </button>
       </header>
 
-      <nav className="tabs" role="tablist" aria-label="메뉴">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={tab === t.id}
-            aria-controls={`panel-${t.id}`}
-            className={`tabs__item${tab === t.id ? " is-on" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-            {t.id === "history" && history.length > 0 && <span className="tabs__count">{history.length}</span>}
-          </button>
-        ))}
-      </nav>
+      <section className="hero">
+        <h1 className="hero__title">
+          말하면, <span className="hero__accent">정리된 글</span>이 됩니다
+        </h1>
+        <p className="hero__sub">"음, 어"는 걷어내고, 말을 바꾼 곳은 마지막 뜻만 남겨 바로 붙여넣을 글로 만들어 드립니다.</p>
+        <HandNote text="부동산공법 용어도 알아들어요" className="hero__note" />
+      </section>
+
+      <Segmented
+        variant="tabs"
+        ariaLabel="메뉴"
+        value={tab}
+        onChange={setTab}
+        panelId={(id) => `panel-${id}`}
+        options={TABS.map((t) => ({
+          id: t.id,
+          label: (
+            <>
+              {t.label}
+              {t.id === "history" && history.length > 0 && <span className="tabs__count">{history.length}</span>}
+            </>
+          ),
+        }))}
+      />
 
       {aiMissing && tab !== "settings" && (
         <p className="banner">
@@ -119,7 +134,7 @@ export function App() {
           <DictionaryView dictionary={dictionary} onChange={setDictionary} />
         </div>
         <div role="tabpanel" id="panel-history" aria-labelledby="tab-history" hidden={tab !== "history"}>
-          <HistoryView history={history} onChange={setHistory} />
+          <HistoryView history={history} onChange={setHistory} active={tab === "history"} />
         </div>
         <div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden={tab !== "settings"}>
           <SettingsView settings={settings} onSettings={patchSettings} engine={engine} accountAvailable={accountAvailable} />
@@ -127,7 +142,8 @@ export function App() {
       </main>
 
       <footer className="foot">
-        Typeless를 분석해 만든 MR.K 전용 받아쓰기 · 기록·사전·설정은 이 기기에만 저장됩니다
+        <span>Typeless를 분석해 만든 MR.K 전용 받아쓰기</span>
+        <span>기록·사전·설정은 이 기기에만 저장됩니다</span>
       </footer>
     </div>
   );

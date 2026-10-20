@@ -63,5 +63,25 @@ export function useAiRun() {
     setStatus(value ? "done" : "idle");
   }, []);
 
-  return { status, text, error, run, cancel, show, busy: status === "thinking" || status === "streaming" };
+  /** AI 없이 만든 결과도 잠깐 '정리하는 중' 화면(줄 긋기)을 보여 준 뒤 나타나게 합니다. */
+  const simulate = useCallback((value: string, ms = 1100) => {
+    ctlRef.current?.abort();
+    ctlRef.current = null;
+    setError(null);
+    setText("");
+    setStatus("thinking");
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    return new Promise<void>((resolve) => {
+      window.setTimeout(
+        () => {
+          setText(value);
+          setStatus(value ? "done" : "idle");
+          resolve();
+        },
+        reduced ? 0 : ms,
+      );
+    });
+  }, []);
+
+  return { status, text, error, run, cancel, show, simulate, busy: status === "thinking" || status === "streaming" };
 }

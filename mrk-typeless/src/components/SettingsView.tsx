@@ -89,14 +89,14 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
         {accountAvailable && (
           <div className="field">
             <span className="label">정리 속도 (Claude 계정)</span>
-            <div className="seg" role="radiogroup" aria-label="정리 속도">
+            <div className="tier" role="radiogroup" aria-label="정리 속도">
               {TIER_OPTIONS.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   role="radio"
                   aria-checked={settings.accountTier === t.id}
-                  className={`seg__item${settings.accountTier === t.id ? " is-on" : ""}`}
+                  className={`tier__item${settings.accountTier === t.id ? " is-on" : ""}`}
                   onClick={() => onSettings({ accountTier: t.id })}
                 >
                   <span>{t.label}</span>

@@ -12,9 +12,12 @@ import { buildPolishPrompt } from "../lib/prompts";
 import type { EngineId, Settings } from "../lib/settings";
 import { countChars, estimateSavedMs, formatClock, formatDuration } from "../lib/stats";
 import { load, save } from "../lib/storage";
+import { HandNote } from "./HandNote";
 import { KeyboardDictationTip } from "./KeyboardDictationTip";
 import { MicButton, Waveform } from "./MicButton";
 import { ResultPanel } from "./ResultPanel";
+import { Segmented } from "./Segmented";
+import { StrikePreview } from "./StrikePreview";
 
 const EXAMPLE_RAW =
   "음 그러니까 이번 주 목요일 아 아니다 금요일 오후 세 시에 어 분당 정자동 그 상가 건물 현장 답사 가기로 했고요 어 확인할 거는 일단 용도지역이랑 어 건폐률 용적율 그리고 뭐 지구 단위 계획 있는지 그거 확인하고 마지막으로 주차장 그 대수 확인하면 될 것 같아요";
@@ -100,9 +103,26 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
     if (!isExample) save("draft", raw);
   }, [raw, isExample]);
 
+  // 키보드 음성 입력 감지: 손으로 친 글자는 키 누름이 먼저 오고, Win+H 같은 음성 입력은
+  // 키 누름 없이 글자만 들어옵니다. 음성으로 들어온 글이 있고 잠시 조용해지면 자동 정리합니다.
+  const lastKeyAtRef = useRef(0);
+  const composingRef = useRef(false);
+  const voiceTypedRef = useRef(false);
+  const idleTimerRef = useRef<number | null>(null);
+  const [voicePending, setVoicePending] = useState(false);
+
+  const clearVoiceTimer = useCallback(() => {
+    if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = null;
+    setVoicePending(false);
+  }, []);
+
   const polish = useCallback(
     async (fresh = false, spokenMs?: number) => {
       // Win+H가 끼워 넣은 깨진 문자는 원문 칸에서도 지웁니다.
+      // 직접 '정리하기'를 눌렀으면 기다리던 음성 입력 자동 정리는 취소합니다.
+      voiceTypedRef.current = false;
+      clearVoiceTimer();
       const source = sanitizeDictation(rawRef.current).trim();
       if (!source) return;
       if (source !== rawRef.current.trim()) updateRaw(source);
@@ -117,7 +137,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
       let result: string | null;
       if (engine === "local") {
         const { text, removed } = localCleanup(corrected);
-        ai.show(text);
+        await ai.simulate(text);
         result = text;
         setNote(
           mode.id === "clean"
@@ -153,7 +173,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
         setCopyNote(ok ? "클립보드에 복사했습니다. 쓰던 곳에 붙여넣기만 하세요." : null);
       }
     },
-    [ai, dictionary, engine, leaveExample, onSave, settings, updateRaw],
+    [ai, clearVoiceTimer, dictionary, engine, leaveExample, onSave, settings, updateRaw],
   );
 
   const spokenRef = useRef<number | undefined>(undefined);
@@ -167,30 +187,22 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
     if (settings.autoPolish && heardSomething) await polish(false, spokenMs);
   }, [polish, settings.autoPolish, speech]);
 
+  const [usedMic, setUsedMic] = useState(() => load<boolean>("usedMic") === true);
+
   const startListening = useCallback(() => {
+    if (!usedMic) {
+      setUsedMic(true);
+      save("usedMic", true);
+    }
     ai.cancel();
     if (leaveExample()) updateRaw("");
     rawAtStartRef.current = rawRef.current;
     speech.start();
-  }, [ai, leaveExample, speech, updateRaw]);
+  }, [ai, leaveExample, speech, updateRaw, usedMic]);
 
   // 단축키: Space 길게 누르기 = 말하기, Ctrl/⌘+Enter = 정리, Esc = 멈춤
   const latest = useRef({ active, startListening, stopAndPolish, polish, speech, ai });
   latest.current = { active, startListening, stopAndPolish, polish, speech, ai };
-
-  // 키보드 음성 입력 감지: 손으로 친 글자는 키 누름이 먼저 오고, Win+H 같은 음성 입력은
-  // 키 누름 없이 글자만 들어옵니다. 음성으로 들어온 글이 있고 잠시 조용해지면 자동 정리합니다.
-  const lastKeyAtRef = useRef(0);
-  const composingRef = useRef(false);
-  const voiceTypedRef = useRef(false);
-  const idleTimerRef = useRef<number | null>(null);
-  const [voicePending, setVoicePending] = useState(false);
-
-  const clearVoiceTimer = useCallback(() => {
-    if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = null;
-    setVoicePending(false);
-  }, []);
 
   const scheduleVoicePolish = useCallback(() => {
     clearVoiceTimer();
@@ -206,6 +218,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
   }, [clearVoiceTimer, settings.autoPolish]);
 
   useEffect(() => clearVoiceTimer, [clearVoiceTimer]);
+
   useEffect(() => {
     let spaceHeld = false;
     const down = (e: KeyboardEvent) => {
@@ -259,30 +272,31 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
 
   return (
     <div className="view dictate">
-      <fieldset className="modes">
-        <legend className="label">글의 형식</legend>
-        <div className="modes__list" role="radiogroup">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={settings.mode === m.id}
-              className={`chip${settings.mode === m.id ? " is-on" : ""}`}
-              onClick={() => onSettings({ mode: m.id as ModeId })}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <p className="modes__hint">
+      <section className="modes" aria-label="글의 형식">
+        <p className="eyebrow">
+          <span className="eyebrow__icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16">
+              <path d="M3 4h10M3 8h7M3 12h9" />
+            </svg>
+          </span>
+          글의 형식
+        </p>
+        <Segmented
+          variant="chips"
+          ariaLabel="글의 형식"
+          value={settings.mode}
+          onChange={(id) => onSettings({ mode: id as ModeId })}
+          options={MODES.map((m) => ({ id: m.id, label: m.label }))}
+        />
+        <p key={mode.id} className="modes__hint">
           {mode.hint}
           {mode.id === "translate" && ` · ${settings.targetLanguage}`}
         </p>
-      </fieldset>
+      </section>
 
       <section className="stage">
         <div className="stage__mic">
+          {!usedMic && <HandNote text="꾹 누르고 말해 보세요" className="stage__note" />}
           <MicButton
             listening={speech.listening}
             disabled={speech.transcribing}
@@ -418,14 +432,31 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
         original={original}
         onCancel={ai.cancel}
         copyNote={copyNote ?? note}
+        preview={original ? <StrikePreview text={original} /> : null}
         meta={
           ai.text && (
             <>
-              <span>
-                원문 {rawChars}자 → {resultChars}자
+              <span className="metric">
+                <span className="metric__label">원문 → 정리</span>
+                <span className="metric__value">
+                  {rawChars}자 → {resultChars}자
+                </span>
+                {rawChars > 0 && (
+                  <span className="metric__bar" aria-hidden="true">
+                    <span style={{ width: `${Math.min(100, Math.round((resultChars / rawChars) * 100))}%` }} />
+                  </span>
+                )}
               </span>
-              {lastSaved !== null && lastSaved > 0 && <span>약 {formatDuration(lastSaved)} 절약 (추정)</span>}
-              <span>{isExample ? "예시 결과" : ENGINE_LABEL[engine]}</span>
+              {lastSaved !== null && lastSaved > 0 && (
+                <span className="metric">
+                  <span className="metric__label">아낀 시간 (추정)</span>
+                  <span className="metric__value">{formatDuration(lastSaved)}</span>
+                </span>
+              )}
+              <span className="metric">
+                <span className="metric__label">정리한 곳</span>
+                <span className="metric__value">{isExample ? "예시 결과" : ENGINE_LABEL[engine]}</span>
+              </span>
             </>
           )
         }
