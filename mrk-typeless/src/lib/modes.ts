@@ -1,0 +1,66 @@
+export type ModeId = "clean" | "message" | "email" | "report" | "lecture" | "consult" | "translate";
+
+export interface Mode {
+  id: ModeId;
+  label: string;
+  /** 화면에 보이는 한 줄 설명 */
+  hint: string;
+  /** AI에게 주는 형식 지시 */
+  instruction: string;
+}
+
+export const MODES: Mode[] = [
+  {
+    id: "clean",
+    label: "자동 정리",
+    hint: "말한 그대로의 뜻과 말투를 살려 글로",
+    instruction:
+      "말한 사람의 말투(존댓말/반말)와 어조를 그대로 살린 자연스러운 글로 정리합니다. 문체를 새로 바꾸지 않습니다.",
+  },
+  {
+    id: "message",
+    label: "메시지",
+    hint: "카톡·문자에 바로 보낼 짧은 글",
+    instruction:
+      "카카오톡이나 문자로 바로 보낼 메시지로 다듬습니다. 짧고 친근하게, 한두 문단 이내로 씁니다. 원문에 없는 인사말이나 이모티콘은 붙이지 않습니다.",
+  },
+  {
+    id: "email",
+    label: "이메일",
+    hint: "제목·인사·본문·맺음말을 갖춘 업무 메일",
+    instruction:
+      '업무용 이메일로 씁니다. 첫 줄은 "제목: …"으로 시작하고, 빈 줄 다음에 받는 사람에 맞는 인사, 용건이 분명한 본문, 정중한 맺음말 순서로 씁니다. 받는 사람 이름을 모르면 "안녕하세요."로 시작합니다.',
+  },
+  {
+    id: "report",
+    label: "보고서",
+    hint: "개조식(~함, ~임)으로 핵심만",
+    instruction:
+      '사내 보고서용 개조식으로 정리합니다. 문장은 "~함", "~임", "~예정"처럼 명사형으로 끝내고, 소제목과 "- " 목록을 써서 핵심만 남깁니다.',
+  },
+  {
+    id: "lecture",
+    label: "강의 원고",
+    hint: "강의·유튜브용으로 읽기 좋은 원고",
+    instruction:
+      "강의나 유튜브 영상에서 그대로 읽을 수 있는 원고로 다듬습니다. 말하는 사람의 목소리와 예시는 살리고, 문장은 짧게, 생각 하나에 문단 하나로 나눕니다. 법령 용어와 숫자는 정확하게 씁니다.",
+  },
+  {
+    id: "consult",
+    label: "상담 노트",
+    hint: "부동산 상담 내용을 항목별로 기록",
+    instruction:
+      '부동산 상담 기록으로 정리합니다. 다음 항목 가운데 원문에 나온 것만 "항목: 내용" 형식으로 씁니다: 고객, 일시, 지역·매물, 예산·조건, 요청사항, 확인할 사항(용도지역·건폐율·용적률·규제 등), 다음 할 일. 원문에 없는 항목은 빼고, 내용을 추측해서 채우지 않습니다.',
+  },
+  {
+    id: "translate",
+    label: "번역",
+    hint: "정리한 뒤 설정한 언어로 번역",
+    instruction:
+      "먼저 원문을 정리한 다음, 그 내용을 [번역할 언어]로 자연스럽게 번역합니다. 번역문만 출력합니다.",
+  },
+];
+
+export function getMode(id: ModeId): Mode {
+  return MODES.find((m) => m.id === id) ?? MODES[0];
+}
