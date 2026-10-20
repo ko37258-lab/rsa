@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAiRun } from "../hooks/useAiRun";
 import { useDictation } from "../hooks/useDictation";
-import { browserName } from "../lib/browser";
+import { browserName, hasNativeSpeechService } from "../lib/browser";
 import { copyText } from "../lib/clipboard";
 import { applyReplacements, type Dictionary } from "../lib/dictionary";
 import { newId, type HistoryItem } from "../lib/history";
@@ -316,8 +316,17 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
       {speech.problem === "network" && (
         <aside className="tip tip--warn" aria-label="음성인식 연결 실패 안내">
           <p className="tip__head">
-            <strong>{browserName()}에서 음성인식 서버에 연결하지 못했습니다.</strong> 브라우저 음성인식은 구글 서버를 거치는데,
-            웨일·브레이브 같은 일부 브라우저나 회사 네트워크에서는 막혀 있습니다.
+            {hasNativeSpeechService() ? (
+              <>
+                <strong>{browserName()}에서 음성인식 서버에 연결하지 못했습니다.</strong> 회사·학교 네트워크나 VPN이 구글 음성인식 서버를
+                막고 있을 수 있습니다.
+              </>
+            ) : (
+              <>
+                <strong>{browserName()}에서는 무료 브라우저 음성인식을 쓸 수 없습니다.</strong> 이 기능은 구글 정식 Chrome·Edge에서만
+                되고, Aside·웨일·브레이브처럼 Chrome을 바탕으로 만든 브라우저에서는 막혀 있습니다.
+              </>
+            )}
           </p>
           <ul className="tip__fixes">
             <li>
