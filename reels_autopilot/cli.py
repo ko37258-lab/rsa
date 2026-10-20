@@ -152,7 +152,22 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 1
 
 
+def _attach_log_when_windowless() -> None:
+    """창 없이(pythonw) 켜면 출력할 곳이 없어 진행 막대 등이 오류를 냅니다 → 기록 파일로 보냄."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    from .settings import ROOT
+
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    log_dir = ROOT / "작업폴더"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log = open(log_dir / "실행기록.txt", "a", encoding="utf-8", buffering=1)
+    sys.stdout = sys.stdout or log
+    sys.stderr = sys.stderr or log
+
+
 def main(argv: list[str] | None = None) -> int:
+    _attach_log_when_windowless()
     if sys.platform == "win32":  # 콘솔 한글 깨짐 방지
         try:
             sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]

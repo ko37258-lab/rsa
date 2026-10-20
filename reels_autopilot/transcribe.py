@@ -128,9 +128,18 @@ def load_model(name: str, device_pref: str, cache_dir: Path, log: Callable[[str]
             local = os.environ.get("WHISPER_MODEL_DIR")
             source = local if local and Path(local).exists() else name
             log(f"  받아쓰기 모델 준비: {name} ({device}) — 처음 한 번은 1.6GB 내려받느라 오래 걸려요. 고장이 아닙니다.")
-            _models[key] = WhisperModel(
-                source, device=device, compute_type=compute, download_root=str(cache_dir / "models")
-            )
+            try:
+                _models[key] = WhisperModel(
+                    source, device=device, compute_type=compute, download_root=str(cache_dir / "models")
+                )
+            except Exception as e:
+                if device == "cpu":
+                    raise
+                # 그래픽카드는 있는데 CUDA 부품이 없으면 CPU 로 다시
+                log(f"  그래픽카드로 못 열어 CPU 로 받아쓰기합니다 ({e.__class__.__name__}).")
+                _models[key] = WhisperModel(
+                    source, device="cpu", compute_type="int8", download_root=str(cache_dir / "models")
+                )
         return _models[key]
 
 
