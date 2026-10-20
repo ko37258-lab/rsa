@@ -9,6 +9,7 @@
     python -m reels_autopilot bench 레퍼런스폴더 --apply     # 잘 되는 릴스 재서 기준값 바꾸기
     python -m reels_autopilot templates --preview          # 템플릿 100개 미리보기 그림
     python -m reels_autopilot fonts                        # 무료 한글 글꼴 30종 받기
+    python -m reels_autopilot shortcut                     # 바탕화면에 '릴스 만들기' 바로가기 (윈도우)
     python -m reels_autopilot doctor                       # 설치 점검
 """
 from __future__ import annotations
@@ -152,6 +153,15 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 1
 
 
+def cmd_shortcut(args) -> int:
+    from . import launcher
+
+    made = launcher.make()
+    if made:
+        print(f"이제 바탕화면의 '{launcher.LINK_NAME}' 을 두 번 누르면 프로그램이 열립니다.")
+    return 0
+
+
 def _attach_log_when_windowless() -> None:
     """창 없이(pythonw) 켜면 출력할 곳이 없어 진행 막대 등이 오류를 냅니다 → 기록 파일로 보냄."""
     if sys.stdout is not None and sys.stderr is not None:
@@ -224,6 +234,9 @@ def main(argv: list[str] | None = None) -> int:
 
     f = sub.add_parser("fonts", help="무료 한글 글꼴 30종 받기")
     f.set_defaults(func=cmd_fonts)
+
+    sh = sub.add_parser("shortcut", help="바탕화면에 '릴스 만들기' 바로가기 만들기 (윈도우)")
+    sh.set_defaults(func=cmd_shortcut)
 
     d = sub.add_parser("doctor", help="설치 점검")
     d.set_defaults(func=cmd_doctor)

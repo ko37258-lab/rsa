@@ -33,10 +33,11 @@ if errorlevel 1 (
 
 echo [4/4] 무료 한글 글꼴 30종 받기
 "%VPY%" -m reels_autopilot fonts
+"%VPY%" -m reels_autopilot shortcut
 "%VPY%" -m reels_autopilot doctor
 echo.
 echo ============================================================
-echo   설치 완료!  '릴스 만들기' 를 두 번 누르세요.
+echo   설치 완료!  바탕화면의 '릴스 만들기' 를 두 번 누르세요.
 echo   처음 한 번은 받아쓰기 모델 1.6GB 를 받느라 오래 걸려요.
 echo ============================================================
 pause
