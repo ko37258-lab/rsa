@@ -3,6 +3,10 @@
 state.json
 rules.json
 
+# 릴스 오토파일럿 작업폴더(영상·캐시·글꼴·받아쓰기 모델)와 내려받은 도구
+작업폴더/
+tools/
+
 # Python
 __pycache__/
 *.py[cod]

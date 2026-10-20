@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>릴스 오토파일럿</title>
+<style>
+:root{
+  --bg:#121216;--panel:#1b1b21;--panel2:#22222a;--line:#2e2e38;--text:#ececf1;--muted:#9a9aa8;
+  --yellow:#ffd400;--yellow-ink:#191300;--red:#ff4d5e;--green:#3ddc84;--blue:#58a6ff;--radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 "Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:#16161b;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.logo{width:36px;height:36px;border-radius:50%;background:var(--yellow);display:grid;place-items:center;color:var(--yellow-ink);font-weight:900}
+h1{font-size:18px;margin:0;font-weight:800}
+.sub{color:var(--muted);font-size:13px}
+.chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:12.5px;color:var(--muted);background:var(--panel)}
+.chip.on{color:#0c2b18;background:var(--green);border-color:var(--green);font-weight:700}
+nav{display:flex;gap:6px;padding:10px 22px 0}
+nav button{background:none;border:none;color:var(--muted);padding:8px 14px;border-radius:10px 10px 0 0;cursor:pointer;font-weight:700}
+nav button.active{color:var(--text);background:var(--panel)}
+main{padding:0 22px 40px}
+.tab{display:none}.tab.active{display:block}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;background:var(--panel);border-radius:0 var(--radius) var(--radius) var(--radius);padding:18px}
+@media (max-width:980px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.num{width:22px;height:22px;border-radius:50%;background:var(--yellow);color:var(--yellow-ink);display:inline-grid;place-items:center;font-size:12.5px;font-weight:900}
+.hint{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+.drop{border:1.5px dashed #444456;border-radius:12px;padding:14px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s}
+.drop.hover{border-color:var(--yellow);color:var(--text);background:#2a2a1a}
+.picked{margin-top:8px;font-size:13.5px;word-break:break-all}
+.picked b{color:var(--yellow)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+select,input[type=text],input[type=password],input[type=number],textarea{background:#15151a;border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%}
+textarea{min-height:120px;resize:vertical}
+.btn{background:#2c2c36;border:1px solid #3a3a47;border-radius:10px;padding:7px 13px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#5a5a6a}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.go{width:100%;background:var(--yellow);color:var(--yellow-ink);border:none;border-radius:14px;padding:16px;font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.go:disabled{filter:grayscale(1);opacity:.6;cursor:wait}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;margin-top:8px;font-size:13.5px}
+.opts label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.bar{height:12px;background:#15151a;border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.bar>div{height:100%;width:0;background:linear-gradient(90deg,#ffb800,var(--yellow));transition:width .4s}
+.stage{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin:6px 0 10px}
+pre.log{background:#0d0d11;border:1px solid var(--line);border-radius:10px;padding:10px;height:300px;overflow:auto;font:12.5px/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap;margin:0}
+.result video{width:100%;max-height:560px;border-radius:12px;background:#000}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left}
+th{color:var(--muted);font-weight:600}
+.ok{color:var(--green)}.warn{color:var(--yellow)}
+.vtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.vtabs button.active{background:var(--yellow);color:var(--yellow-ink);border-color:var(--yellow)}
+.modal{position:fixed;inset:0;background:#000b;display:none;z-index:20;padding:24px;overflow:auto}
+.modal.open{display:block}
+.modal .box{max-width:1180px;margin:0 auto;background:var(--panel);border-radius:var(--radius);padding:16px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin-top:12px}
+.gallery figure{margin:0;background:#0f0f13;border:2px solid transparent;border-radius:12px;overflow:hidden;cursor:pointer}
+.gallery figure.sel{border-color:var(--yellow)}
+.gallery img{width:100%;display:block;aspect-ratio:1134/714;background:#1d1d24}
+.gallery figcaption{padding:6px 10px;font-size:12.5px;color:var(--muted)}
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-weight:800}
+.switch input{width:46px;height:26px;appearance:none;background:#3a3a47;border-radius:99px;position:relative;cursor:pointer;transition:.2s}
+.switch input:checked{background:var(--green)}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+.switch input:checked::after{left:23px}
+.panel{background:var(--panel);border-radius:0 var(--radius) var(--radius) var(--radius);padding:18px}
+.form2{display:grid;grid-template-columns:180px 1fr;gap:10px 14px;align-items:center;max-width:820px}
+@media (max-width:640px){.form2{grid-template-columns:1fr}}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#000;border:1px solid var(--line);padding:10px 18px;border-radius:99px;opacity:0;transition:.25s;pointer-events:none;z-index:30}
+.toast.show{opacity:1}
+.thumb{width:120px;border-radius:10px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">▶</div>
+  <div>
+    <h1 id="appname">릴스 오토파일럿</h1>
+    <div class="sub">찍은 영상 넣고 버튼 하나 — 자막·장면·효과음·소리·캡션·썸네일·검수까지</div>
+  </div>
+  <div class="chips"><span class="chip" id="chip-ai">AI 연출 확인 중</span><span class="chip" id="chip-watch">자동 모드 꺼짐</span></div>
+</header>
+<nav>
+  <button class="active" data-tab="make">만들기</button>
+  <button data-tab="auto">자동 모드</button>
+  <button data-tab="settings">설정</button>
+</nav>
+<main>
+<!-- ============ 만들기 ============ -->
+<section class="tab active" id="tab-make">
+ <div class="grid">
+  <div>
+   <div class="card">
+    <h2><span class="num">1</span>찍은 영상</h2>
+    <p class="hint">직접 찍은 영상을 끌어다 놓거나 눌러서 고르세요. 최근 영상은 아래에 미리 들어가 있어요.</p>
+    <div class="drop" id="drop-video">여기에 영상을 놓거나 <b>눌러서 찾기</b></div>
+    <input type="file" id="file-video" accept="video/*" hidden>
+    <div class="row" style="margin-top:8px"><select id="recent"><option value="">— 최근 영상 —</option></select></div>
+    <div class="picked" id="picked-video"></div>
+   </div>
+   <div class="card">
+    <h2><span class="num">2</span>대본 <span class="sub">(선택)</span></h2>
+    <p class="hint">찍을 때 읽은 대본이 있으면 붙여넣으세요. 자막 맞춤법을 대본대로 맞춰 줍니다. 실제로 말한 대로 넣어야 정확해요.</p>
+    <textarea id="script" placeholder="대본을 붙여넣으세요 (없으면 비워 두세요)"></textarea>
+    <div class="row" style="margin-top:8px">
+     <button class="btn" id="btn-paste">붙여넣기</button>
+     <button class="btn" id="btn-clear">지우기</button>
+     <input type="text" id="topic" placeholder="주제 한 줄 (예: 토지 투자 전 확인할 3가지)" style="flex:1;min-width:180px">
+     <button class="btn" id="btn-script">대본 만들기</button>
+    </div>
+   </div>
+   <div class="card">
+    <h2><span class="num">3</span>시연 화면 녹화 <span class="sub">(선택)</span></h2>
+    <p class="hint">프로그램·서류 화면을 보여 주는 릴스라면 화면 녹화를 넣으세요. '이렇게·누르고·화면' 같은 말이 나오는 장면에 자동으로 들어가요. 비우면 알아서 처리합니다.</p>
+    <div class="drop" id="drop-demo">시연 녹화를 놓거나 <b>눌러서 찾기</b></div>
+    <input type="file" id="file-demo" accept="video/*" hidden>
+    <div class="picked" id="picked-demo"></div>
+    <p class="hint" style="margin-top:8px">📁 <b>자료 폴더</b>에 '용적률.png'처럼 이름 붙인 그림·영상을 넣어 두면, 그 말이 나오는 장면에 저절로 들어갑니다.</p>
+   </div>
+   <div class="card">
+    <h2><span class="num">4</span>꾸밈 (템플릿)</h2>
+    <p class="hint">'자동'이면 영상 내용(숫자·나열·질문)을 보고 알아서 골라요. 한 번에 여러 개를 뽑아 비교할 수도 있어요.</p>
+    <div class="row">
+     <select id="template" style="flex:1;min-width:200px"></select>
+     <select id="variants" style="width:150px" title="자동일 때 뽑을 개수">
+      <option value="1">1개 뽑기</option><option value="2">2개 비교</option><option value="3">3개 비교</option>
+     </select>
+     <button class="btn" id="btn-gallery">미리보기로 고르기</button>
+    </div>
+    <div class="opts">
+     <label><input type="checkbox" id="o-ai" checked> AI 연출 (문구 다듬기)</label>
+     <label><input type="checkbox" id="o-cut" checked> 빈 곳 자르기</label>
+     <label><input type="checkbox" id="o-filler" checked> 군말 자르기</label>
+     <label><input type="checkbox" id="o-speed" checked> 말 빠르게 (초당 8자)</label>
+    </div>
+    <input type="text" id="headline" placeholder="위에 고정할 제목 (헤드라인형 템플릿, 비우면 자동)" style="margin-top:8px">
+   </div>
+   <button class="go" id="btn-go">▶ 릴스 만들기</button>
+  </div>
+  <div>
+   <div class="card">
+    <h2>진행</h2>
+    <div class="bar"><div id="bar"></div></div>
+    <div class="stage"><span id="stage">준비됐어요. 왼쪽 칸을 채우고 ▶ 릴스 만들기를 누르세요.</span><span id="pct"></span></div>
+    <pre class="log" id="log"></pre>
+    <div class="row" style="margin-top:10px">
+     <button class="btn" id="btn-openvideo" disabled>완성 영상 열기</button>
+     <button class="btn" id="btn-openfolder" disabled>결과 폴더 열기</button>
+     <button class="btn" id="btn-copylog">기록 복사</button>
+     <button class="btn" id="btn-cancel" disabled>멈추기</button>
+    </div>
+   </div>
+   <div class="card result" id="result" hidden>
+    <h2>완성</h2>
+    <div class="vtabs" id="vtabs"></div>
+    <video id="player" controls playsinline></video>
+    <h2 style="margin-top:14px">품질 검수표</h2>
+    <table id="qa"></table>
+    <h2 style="margin-top:14px">업로드 문구</h2>
+    <div class="row" style="align-items:flex-start;flex-wrap:nowrap">
+     <img class="thumb" id="thumb" alt="썸네일" hidden>
+     <textarea id="caption" style="min-height:170px"></textarea>
+    </div>
+    <div class="row" style="margin-top:8px">
+     <button class="btn" id="btn-copycap">캡션+해시태그 복사</button>
+     <button class="btn" id="btn-copycomment">첫 댓글 복사</button>
+    </div>
+   </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============ 자동 모드 ============ -->
+<section class="tab" id="tab-auto">
+ <div class="panel">
+  <label class="switch"><input type="checkbox" id="watch-toggle"> 자동 모드</label>
+  <p class="hint" style="margin-top:10px">켜 두면 아래 폴더에 영상을 넣기만 해도 버튼 없이 편집됩니다. 같은 이름의 <b>.txt</b>를 함께 넣으면 대본으로 씁니다.<br>
+   끝난 원본은 <b>완료</b>, 실패한 원본은 <b>실패</b> 폴더로 옮겨지고 결과는 출력 폴더에 쌓여요.</p>
+  <div class="row"><input type="text" id="inbox" readonly style="flex:1"><button class="btn" id="btn-openinbox">폴더 열기</button></div>
+  <pre class="log" id="watchlog" style="margin-top:12px;height:420px"></pre>
+ </div>
+</section>
+
+<!-- ============ 설정 ============ -->
+<section class="tab" id="tab-settings">
+ <div class="panel">
+  <div class="form2">
+   <label>AI 키 (Claude)</label>
+   <div class="row"><input type="password" id="apikey" placeholder="sk-ant-… (넣으면 AI 연출·대본 만들기 켜짐)" style="flex:1"><button class="btn" id="btn-key">저장</button></div>
+   <label>나는 누구 (말투·분야)</label><textarea id="s-persona" style="min-height:70px"></textarea>
+   <label>내 계정</label><input type="text" id="s-brand_handle" placeholder="@mrhomes">
+   <label>댓글 유도어</label><input type="text" id="s-cta_keyword" placeholder="자료">
+   <label>강조 사전</label><select id="s-domain"><option value="realestate">부동산·공법·토지</option><option value="general">일반 (AI·브랜딩)</option></select>
+   <label>기본 템플릿</label><select id="s-default_template"></select>
+   <label>자동일 때 뽑을 개수</label><input type="number" id="s-variants" min="1" max="5">
+   <label>자동 모드 넣는곳</label><input type="text" id="s-inbox" placeholder="비우면 작업폴더/넣는곳 (클라우드·휴대폰 동기화 폴더 경로도 가능)">
+   <label>받아쓰기 모델</label><select id="s-whisper_model"><option>large-v3-turbo</option><option>large-v3</option><option>medium</option><option>small</option></select>
+   <label>효과음</label><label><input type="checkbox" id="s-sfx"> 장면마다 자동 배치</label>
+   <label>AI 연출</label><label><input type="checkbox" id="s-ai_enabled"> 키가 있으면 사용</label>
+   <label>다 되면 영상 열기</label><label><input type="checkbox" id="s-open_when_done"> 저절로 열기</label>
+   <span></span><div class="row"><button class="btn" id="btn-save" style="width:120px">설정 저장</button>
+   <button class="btn" id="btn-quit">프로그램 끄기</button></div>
+  </div>
+  <h2 style="margin-top:22px;font-size:15px">설계도 숫자 (잘 되는 릴스 68개 가운데값)</h2>
+  <p class="hint">내가 고른 레퍼런스로 바꾸려면: <code>python -m reels_autopilot bench 레퍼런스폴더 --apply</code></p>
+  <table id="targets" style="max-width:640px"></table>
+ </div>
+</section>
+</main>
+
+<div class="modal" id="gallery-modal">
+ <div class="box">
+  <div class="row" style="justify-content:space-between">
+   <h2 style="margin:0;font-size:16px">템플릿 100개 — 실제 장면 세 장씩</h2>
+   <div class="row">
+    <label style="font-size:13px"><input type="checkbox" id="g-me"> 내 영상으로 미리보기</label>
+    <button class="btn" id="btn-gclose">닫기</button>
+   </div>
+  </div>
+  <div class="row" id="g-filter" style="margin-top:10px"></div>
+  <div class="gallery" id="gallery"></div>
+ </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = async (url, body) => {
+  const r = await fetch(url, body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+};
+const toast = msg => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2200); };
+const fileUrl = p => "/files?path=" + encodeURIComponent(p);
+let S = null, video = "", demo = "", job = null, logSince = 0, result = null, watchSince = 0, previewKey = "base";
+
+// ---- 탭 ----
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.id === "tab-" + b.dataset.tab));
+});
+
+// ---- 상태 ----
+async function loadState() {
+  S = await api("/api/state");
+  $("#chip-ai").textContent = S.ai ? "AI 연출 켜짐 (Claude)" : "AI 연출 꺼짐 (규칙 연출)";
+  $("#chip-ai").classList.toggle("on", S.ai);
+  setWatchChip(S.watch.running);
+  const rec = $("#recent");
+  rec.innerHTML = '<option value="">— 최근 영상 —</option>' + S.recent.map(v =>
+    `<option value="${encodeURIComponent(v.path)}">${v.name} · ${(v.size/1048576).toFixed(0)}MB · ${new Date(v.mtime*1000).toLocaleString()}</option>`).join("");
+  if (!video && S.recent.length) pickVideo(S.recent[0].path, S.recent[0].name);
+  const opts = ['<option value="auto">자동 (영상 내용으로 고르기)</option>',
+    '<optgroup label="기본 디자인 10종">' + S.bases.map(b => `<option value="${b.id}">${b.label} — ${b.desc}</option>`).join("") + "</optgroup>",
+    '<optgroup label="전체 100개">' + S.templates.map(t => `<option value="${t.id}">${t.id} ${t.name}</option>`).join("") + "</optgroup>"].join("");
+  $("#template").innerHTML = opts; $("#s-default_template").innerHTML = opts;
+  $("#template").value = S.settings.default_template || "auto";
+  $("#variants").value = String(Math.min(3, S.settings.variants || 1));
+  for (const [k, v] of Object.entries(S.settings)) {
+    const el = $("#s-" + k); if (!el) continue;
+    if (el.type === "checkbox") el.checked = !!v; else el.value = v;
+  }
+  $("#o-ai").checked = S.settings.ai_enabled;
+  $("#inbox").value = S.inbox;
+  const names = {chars_per_sec:"말 속도(글자/초)",cut_interval:"화면 전환 간격(초)",loudness_lufs:"소리 크기(LUFS)",duration_median:"영상 길이 가운데값(초)",subtitle_min_chars:"자막 한 줄 최소 글자",subtitle_max_chars:"자막 한 줄 최대 글자",silence_gap:"이보다 긴 무음은 자름(초)",silence_keep:"잘린 자리에 남기는 틈(초)",speed_min:"최소 배속",speed_max:"최대 배속",chunk_min:"장면 덩어리 최소(초)",chunk_max:"장면 덩어리 최대(초)",width:"가로(px)",height:"세로(px)",fps:"프레임"};
+  $("#targets").innerHTML = "<tr><th>항목</th><th>값</th></tr>" + Object.entries(names).map(([k, n]) => `<tr><td>${n}</td><td>${S.targets[k]}</td></tr>`).join("");
+  $("#appname").textContent = S.app;
+}
+function setWatchChip(on) {
+  $("#chip-watch").textContent = on ? "자동 모드 켜짐" : "자동 모드 꺼짐";
+  $("#chip-watch").classList.toggle("on", on); $("#watch-toggle").checked = on;
+}
+
+// ---- 파일 고르기 / 올리기 ----
+function pickVideo(path, name) { video = path; $("#picked-video").innerHTML = `고른 영상: <b>${name}</b>`; previewKey = "base"; $("#g-me").checked = false; }
+async function upload(file, onDone, label) {
+  label.innerHTML = `올리는 중… ${file.name}`;
+  const r = await fetch("/api/upload?name=" + encodeURIComponent(file.name), {method: "POST", body: file});
+  const j = await r.json();
+  if (!r.ok) { label.textContent = j.error; return; }
+  onDone(j.path, j.name);
+}
+function wireDrop(dropSel, inputSel, onDone, labelSel) {
+  const d = $(dropSel), inp = $(inputSel), lab = $(labelSel);
+  d.onclick = () => inp.click();
+  inp.onchange = () => inp.files[0] && upload(inp.files[0], onDone, lab);
+  d.ondragover = e => { e.preventDefault(); d.classList.add("hover"); };
+  d.ondragleave = () => d.classList.remove("hover");
+  d.ondrop = e => { e.preventDefault(); d.classList.remove("hover"); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0], onDone, lab); };
+}
+wireDrop("#drop-video", "#file-video", pickVideo, "#picked-video");
+wireDrop("#drop-demo", "#file-demo", (p, n) => { demo = p; $("#picked-demo").innerHTML = `시연 녹화: <b>${n}</b> <button class="btn" onclick="demo='';this.parentNode.textContent=''">빼기</button>`; }, "#picked-demo");
+$("#recent").onchange = e => { if (e.target.value) { const p = decodeURIComponent(e.target.value); pickVideo(p, p.split(/[\\/]/).pop()); } };
+
+// ---- 대본 ----
+$("#btn-paste").onclick = async () => { try { $("#script").value = await navigator.clipboard.readText(); } catch { toast("붙여넣기 권한이 없어요. Ctrl+V 로 넣어 주세요."); } };
+$("#btn-clear").onclick = () => $("#script").value = "";
+$("#btn-script").onclick = async () => {
+  const topic = $("#topic").value.trim(); if (!topic) return toast("주제를 한 줄 적어 주세요.");
+  $("#btn-script").disabled = true; $("#btn-script").textContent = "쓰는 중…";
+  try { const j = await api("/api/script", {topic}); $("#script").value = j.script;
+        toast(j.source === "ai" ? "Claude 가 대본을 썼어요. 이대로 읽고 찍으세요!" : "AI 키가 없어 빈칸 대본이에요. 괄호를 채워 읽으세요."); }
+  catch (e) { toast(e.message); }
+  $("#btn-script").disabled = false; $("#btn-script").textContent = "대본 만들기";
+};
+
+// ---- 갤러리 ----
+const bases = () => S.bases;
+function renderGallery(filter) {
+  const list = S.templates.filter(t => !filter || t.base === filter);
+  const cur = $("#template").value;
+  $("#gallery").innerHTML = list.map(t => `<figure data-id="${t.id}" class="${t.id === cur ? "sel" : ""}"><img loading="lazy" src="/api/preview/${t.id}.jpg?k=${previewKey}" alt="${t.name}"><figcaption>${t.id} · ${t.name}</figcaption></figure>`).join("");
+  $("#gallery").querySelectorAll("figure").forEach(f => f.onclick = () => { $("#template").value = f.dataset.id; $("#gallery-modal").classList.remove("open"); toast(f.querySelector("figcaption").textContent + " 선택"); });
+}
+$("#btn-gallery").onclick = () => {
+  $("#g-filter").innerHTML = `<button class="btn" data-b="">전체</button>` + bases().map(b => `<button class="btn" data-b="${b.base}">${b.label}</button>`).join("");
+  $("#g-filter").querySelectorAll("button").forEach(b => b.onclick = () => renderGallery(b.dataset.b));
+  renderGallery(""); $("#gallery-modal").classList.add("open");
+};
+$("#btn-gclose").onclick = () => $("#gallery-modal").classList.remove("open");
+$("#gallery-modal").onclick = e => { if (e.target.id === "gallery-modal") $("#gallery-modal").classList.remove("open"); };
+$("#g-me").onchange = async e => {
+  if (e.target.checked) {
+    if (!video) { e.target.checked = false; return toast("먼저 찍은 영상을 고르세요."); }
+    try { await api("/api/preview-frame", {video}); previewKey = "me&t=" + Date.now(); } catch (err) { toast(err.message); e.target.checked = false; }
+  } else previewKey = "base";
+  renderGallery("");
+};
+
+// ---- 만들기 ----
+$("#btn-go").onclick = async () => {
+  if (!video) return toast("① 찍은 영상을 먼저 골라 주세요.");
+  const body = {video, demo, script: $("#script").value, templates: [$("#template").value], variants: +$("#variants").value,
+    use_ai: $("#o-ai").checked, cut_silence: $("#o-cut").checked, remove_fillers: $("#o-filler").checked,
+    speed_up: $("#o-speed").checked, headline: $("#headline").value.trim()};
+  try {
+    const j = await api("/api/jobs", body);
+    job = j.id; logSince = 0; result = null; $("#log").textContent = ""; $("#result").hidden = true;
+    $("#btn-go").disabled = true; $("#btn-cancel").disabled = false; $("#btn-openvideo").disabled = true; $("#btn-openfolder").disabled = true;
+    poll();
+  } catch (e) { toast(e.message); }
+};
+async function poll() {
+  if (!job) return;
+  const j = await api(`/api/jobs/${job}?since=${logSince}`);
+  if (j.log.length) { const el = $("#log"); el.textContent += j.log.join("\n") + "\n"; el.scrollTop = el.scrollHeight; }
+  logSince = j.log_total;
+  $("#bar").style.width = (j.progress * 100).toFixed(1) + "%"; $("#pct").textContent = Math.round(j.progress * 100) + "%";
+  $("#stage").textContent = j.status === "queued" ? "차례를 기다리는 중…" : j.stage;
+  if (["done", "error", "cancelled"].includes(j.status)) {
+    $("#btn-go").disabled = false; $("#btn-cancel").disabled = true;
+    if (j.status === "done") showResult(j.result);
+    else toast(j.status === "error" ? "오류가 났어요. '기록 복사'로 보내 주세요." : "멈췄습니다.");
+    return;
+  }
+  setTimeout(poll, 700);
+}
+function showResult(r) {
+  result = r; $("#result").hidden = false;
+  $("#btn-openvideo").disabled = false; $("#btn-openfolder").disabled = false;
+  const tabs = $("#vtabs");
+  tabs.innerHTML = r.videos.length > 1 ? r.videos.map((v, i) => `<button class="btn ${i ? "" : "active"}" data-i="${i}">${r.reports[i].template}</button>`).join("") : "";
+  const show = i => {
+    $("#player").src = fileUrl(r.videos[i]);
+    tabs.querySelectorAll("button").forEach(b => b.classList.toggle("active", +b.dataset.i === i));
+    const rep = r.reports[i];
+    $("#qa").innerHTML = "<tr><th>항목</th><th>측정</th><th>기준</th><th></th></tr>" + rep.rows.map(x =>
+      `<tr><td>${x.name}</td><td>${x.value}</td><td>${x.target}</td><td class="${x.ok ? "ok" : "warn"}">${x.ok ? "✔" : (x.warn_only ? "ℹ" : "⚠")}</td></tr>`).join("");
+  };
+  tabs.querySelectorAll("button").forEach(b => b.onclick = () => show(+b.dataset.i));
+  show(0);
+  $("#thumb").hidden = !r.thumbnail;
+  if (r.thumbnail) { $("#thumb").src = fileUrl(r.thumbnail); $("#player").poster = fileUrl(r.thumbnail); }
+  $("#caption").value = r.caption + "\n\n" + r.hashtags.map(h => "#" + h).join(" ");
+  const m = Math.floor(r.elapsed / 60), s = Math.round(r.elapsed % 60);
+  $("#stage").textContent = `완성! ${m}분 ${s}초 걸렸어요.`;
+}
+$("#btn-cancel").onclick = () => job && api(`/api/jobs/${job}/cancel`, {});
+$("#btn-openvideo").onclick = () => result && api("/api/open", {path: result.videos[0]});
+$("#btn-openfolder").onclick = () => result && api("/api/open", {path: result.out_dir});
+$("#btn-copylog").onclick = () => { navigator.clipboard.writeText($("#log").textContent).then(() => toast("기록을 복사했어요. 그대로 보내 주시면 어디서 막혔는지 바로 알 수 있어요.")); };
+$("#btn-copycap").onclick = () => navigator.clipboard.writeText($("#caption").value).then(() => toast("캡션을 복사했어요."));
+$("#btn-copycomment").onclick = () => result && navigator.clipboard.writeText(result.first_comment).then(() => toast("첫 댓글을 복사했어요."));
+
+// ---- 자동 모드 ----
+$("#watch-toggle").onchange = async e => { const j = await api("/api/watch", {on: e.target.checked}); setWatchChip(j.running); };
+$("#btn-openinbox").onclick = () => api("/api/open", {path: $("#inbox").value});
+async function pollWatch() {
+  try {
+    const j = await api(`/api/watch?since=${watchSince}`);
+    if (j.log.length) { const el = $("#watchlog"); el.textContent += j.log.join("\n") + "\n"; el.scrollTop = el.scrollHeight; }
+    watchSince = j.total; setWatchChip(j.running);
+  } catch {}
+  setTimeout(pollWatch, 2000);
+}
+
+// ---- 설정 ----
+$("#btn-save").onclick = async () => {
+  const body = {};
+  for (const k of Object.keys(S.settings)) { const el = $("#s-" + k); if (!el) continue; body[k] = el.type === "checkbox" ? el.checked : (el.type === "number" ? +el.value : el.value); }
+  await api("/api/settings", body); toast("설정을 저장했어요."); loadState();
+};
+$("#btn-key").onclick = async () => { const j = await api("/api/apikey", {key: $("#apikey").value}); $("#apikey").value = ""; toast(j.ai ? "AI 연출이 켜졌어요." : "키를 지웠어요."); loadState(); };
+
+$("#btn-quit").onclick = async () => {
+  if (!confirm("프로그램을 끌까요? 진행 중인 편집도 멈춥니다.")) return;
+  await api("/api/quit", {}).catch(() => {});
+  document.body.innerHTML = '<p style="padding:40px;text-align:center">프로그램을 껐습니다. 다시 쓰려면 \'릴스 만들기\'를 두 번 누르세요.</p>';
+};
+loadState().catch(e => toast(e.message)); pollWatch();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "persona": "부동산공법 28년 강의, '공법의 신' 고상철 교수(㈜미스터홈즈 FC 대표, 도시계획 박사). 어렵고 복잡한 공법을 쉽고 재미있게, 숫자와 체계도로 설명한다. 말투는 친근하고 확신 있게.",
+  "brand_handle": "@mrhomes",
+  "cta_keyword": "공법",
+  "domain": "realestate",
+  "default_template": "auto",
+  "variants": 2,
+  "sfx": true,
+  "ai_enabled": true,
+  "ai_model": "claude-opus-5-5",
+  "whisper_model": "large-v3-turbo",
+  "open_when_done": true
+}
