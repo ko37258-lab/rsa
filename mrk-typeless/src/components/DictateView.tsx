@@ -6,6 +6,7 @@ import { copyText } from "../lib/clipboard";
 import { applyReplacements, type Dictionary } from "../lib/dictionary";
 import { newId, type HistoryItem } from "../lib/history";
 import { localCleanup } from "../lib/localCleanup";
+import { sanitizeDictation } from "../lib/sanitize";
 import { MODES, getMode, type ModeId } from "../lib/modes";
 import { buildPolishPrompt } from "../lib/prompts";
 import type { EngineId, Settings } from "../lib/settings";
@@ -101,8 +102,10 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
 
   const polish = useCallback(
     async (fresh = false, spokenMs?: number) => {
-      const source = rawRef.current.trim();
+      // Win+H가 끼워 넣은 깨진 문자는 원문 칸에서도 지웁니다.
+      const source = sanitizeDictation(rawRef.current).trim();
       if (!source) return;
+      if (source !== rawRef.current.trim()) updateRaw(source);
       leaveExample();
       setNote(null);
       setCopyNote(null);
@@ -150,7 +153,7 @@ export function DictateView({ active, settings, onSettings, dictionary, engine, 
         setCopyNote(ok ? "클립보드에 복사했습니다. 쓰던 곳에 붙여넣기만 하세요." : null);
       }
     },
-    [ai, dictionary, engine, leaveExample, onSave, settings],
+    [ai, dictionary, engine, leaveExample, onSave, settings, updateRaw],
   );
 
   const spokenRef = useRef<number | undefined>(undefined);

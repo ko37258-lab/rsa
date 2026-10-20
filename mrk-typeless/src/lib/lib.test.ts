@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyReplacements, DEFAULT_DICTIONARY } from "./dictionary";
 import { addToHistory, type HistoryItem } from "./history";
 import { localCleanup } from "./localCleanup";
+import { sanitizeDictation } from "./sanitize";
 import { getMode } from "./modes";
 import { buildEditPrompt, buildPolishPrompt, toSingleInput } from "./prompts";
 import { DEFAULT_SETTINGS, resolveEngine } from "./settings";
@@ -111,5 +112,21 @@ describe("addToHistory", () => {
   it("다른 내용이거나 시간이 많이 지났으면 새 기록으로 쌓는다", () => {
     expect(addToHistory([item("가", 0)], item("나", 1_000))).toHaveLength(2);
     expect(addToHistory([item("가", 0)], item("가 나", 11 * 60_000))).toHaveLength(2);
+  });
+});
+
+describe("sanitizeDictation", () => {
+  it("Win+H가 글자 사이에 끼워 넣은 줄 모양 문자를 지운다", () => {
+    expect(sanitizeDictation("캐슬─ ─앤칸─ ─타─ ─빌 아파트")).toBe("캐슬앤칸타빌 아파트");
+    expect(sanitizeDictation("클로ㅡ ㅡ드를 열면 입력─ ─창")).toBe("클로드를 열면 입력창");
+  });
+
+  it("보이지 않는 채움 문자를 지우고 낱자를 글자로 합친다", () => {
+    expect(sanitizeDictation("건\u200B폐율")).toBe("건폐율");
+    expect(sanitizeDictation("\u1100\u1161")).toBe("가");
+  });
+
+  it("평범한 문장과 줄표는 그대로 둔다", () => {
+    expect(sanitizeDictation("서울 — 부산 노선, 2021–2025년")).toBe("서울 — 부산 노선, 2021–2025년");
   });
 });

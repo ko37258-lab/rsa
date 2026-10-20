@@ -4,6 +4,7 @@ import { useDictation } from "../hooks/useDictation";
 import type { Dictionary } from "../lib/dictionary";
 import { newId, type HistoryItem } from "../lib/history";
 import { buildEditPrompt } from "../lib/prompts";
+import { sanitizeDictation } from "../lib/sanitize";
 import type { EngineId, Settings } from "../lib/settings";
 import { MicButton } from "./MicButton";
 import { ResultPanel } from "./ResultPanel";
@@ -44,8 +45,8 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
 
   const apply = useCallback(
     async (instruction: string) => {
-      const text = source.trim();
-      const cmd = instruction.trim();
+      const text = sanitizeDictation(source).trim();
+      const cmd = sanitizeDictation(instruction).trim();
       if (!text || !cmd || engine === "local") return;
       const req = buildEditPrompt(text, cmd, {
         dictionary,
