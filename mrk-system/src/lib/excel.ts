@@ -1,5 +1,3 @@
-import readXlsxFile from "read-excel-file/browser";
-import writeXlsxFile from "write-excel-file/browser";
 import { format } from "date-fns";
 
 /**
@@ -74,6 +72,8 @@ export async function readTable(file: File): Promise<Table> {
     if (text.trimStart().startsWith("<")) return parseHtmlTable(text);
     throw new Error("옛 엑셀(.xls) 형식은 읽지 못한다. 엑셀에서 .xlsx 나 .csv 로 다시 저장해 올린다");
   }
+  // 엑셀 라이브러리는 쓸 때만 내려받는다(첫 화면을 가볍게)
+  const { default: readXlsxFile } = await import("read-excel-file/browser");
   const sheets = await readXlsxFile(file);
   const first = sheets[0];
   if (!first) throw new Error("시트가 없는 파일이다");
@@ -85,6 +85,7 @@ export type XlsxCell = string | number | Date | null;
 /** 표를 .xlsx 로 내려받기. 첫 줄은 굵게(머리글) */
 export async function downloadXlsx(filename: string, rows: XlsxCell[][], opts: { sheet?: string; widths?: number[] } = {}): Promise<void> {
   const data = rows.map((r, i) => r.map((v) => (v === null ? null : i === 0 ? { value: v, fontWeight: "bold" as const } : { value: v })));
+  const { default: writeXlsxFile } = await import("write-excel-file/browser");
   await writeXlsxFile(data, { sheet: opts.sheet ?? "Sheet1", columns: opts.widths?.map((w) => ({ width: w })) }).toFile(filename);
 }
 

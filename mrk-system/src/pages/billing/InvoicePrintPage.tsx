@@ -31,6 +31,9 @@ export default function InvoicePrintPage() {
 
   return (
     <PrintSheet title={`청구서 ${d.invoice_no} · ${d.payer?.name ?? ""}`} actions={<CopyTextButton text={text} />}>
+      {/* 좁은 화면에서는 A4 모양을 지키고 문서 안에서 옆으로 넘긴다 */}
+      <div className="overflow-x-auto print:overflow-visible">
+      <div className="min-w-[600px] print:min-w-0">
       <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-[#111] pb-4">
         <div>
           <div className="text-[11px] font-semibold tracking-[0.2em] text-[#666]">INVOICE</div>
@@ -143,6 +146,8 @@ export default function InvoicePrintPage() {
           {d.branch?.name_en} · MR.K 관리 시스템에서 발행 · {timeLabel(d.confirmed_at)} 확인
         </p>
       </section>
+      </div>
+      </div>
     </PrintSheet>
   );
 }

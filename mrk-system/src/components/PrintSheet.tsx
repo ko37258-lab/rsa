@@ -18,7 +18,7 @@ export function PrintSheet({ title, actions, children }: { title: string; action
         <button type="button" onClick={() => nav(-1)} className="inline-flex items-center gap-1 rounded px-2 py-1.5 text-sm text-ink2 hover:bg-sunken">
           <ArrowLeft className="size-4" /> 돌아가기
         </button>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</span>
+        <span className="order-first w-full truncate text-sm font-semibold sm:order-none sm:w-auto sm:min-w-0 sm:flex-1">{title}</span>
         {actions}
         <button type="button" onClick={() => window.print()} className="inline-flex h-8 items-center gap-1.5 rounded bg-navy px-3 text-[13px] font-medium text-navy-fg hover:bg-navy/90">
           <Printer className="size-4" /> 인쇄 · PDF 저장

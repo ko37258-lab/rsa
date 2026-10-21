@@ -56,10 +56,11 @@ function flush(db: DB): number {
 }
 
 function markSent(db: DB, inv: InvoiceX, at: string, kind: Send["kind"]): void {
+  const prev = sendsOf(inv);
   inv.state = "sent";
   inv.sent_at = at;
   inv.fail_reason = null;
-  inv.sends = [...sendsOf(inv), { at, via: inv.via, to: inv.via === "email" ? inv.recipient_email : null, kind }];
+  inv.sends = [...prev, { at, via: inv.via, to: inv.via === "email" ? inv.recipient_email : null, kind }];
   for (const c of db.charges) {
     if (!inv.charge_ids.includes(c.id) || c.status === "cancelled") continue;
     c.status = "sent";

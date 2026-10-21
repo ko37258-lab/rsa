@@ -194,7 +194,8 @@ export function payerBalances(db: DB, ix: Index, branchId: string | null, today:
     const b = get(p.payer_id);
     b.received += p.amount;
     const used = db.allocations.filter((a) => a.payment_id === p.id).reduce((s, a) => s + a.amount, 0);
-    b.credit += p.amount - used;
+    // 플랫폼 수수료는 현금은 아니지만 월세를 채우고, 홈즈 몫 아닌 돈은 배분 대상이 아니다
+    b.credit += p.amount + (p.platform_fee ?? 0) - (p.pass_through ?? 0) - used;
   }
   return [...map.values()];
 }

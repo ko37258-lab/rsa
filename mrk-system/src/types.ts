@@ -340,6 +340,9 @@ export interface Invoice {
   send_after: string | null; // 메일 예약 시각
   sent_at: string | null;
   cancelled_at: string | null;
+  /** 보낸 기록(첫 발송·재발송·직접 보냄) */
+  sends?: Array<{ at: string; via: Invoice["via"]; to: string | null; kind: string }>;
+  fail_reason?: string | null;
 }
 
 /** 은행 입금 · 직접 기록한 입금 */
