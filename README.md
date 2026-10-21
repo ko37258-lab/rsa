@@ -1,5 +1,7 @@
 # 스레드(Threads) 자동화 봇 🧵
 
+> 이 저장소에는 **MR.K 관리 시스템**(임대관리 웹앱)도 함께 있습니다 → [mrk-system/README.md](mrk-system/README.md)
+
 메타 **공식 Threads API**로 글 발행과 댓글 자동답글을 돌립니다.
 n8n·Make 같은 **월 구독 툴 없이**, 구독료 0원으로 동작합니다.
 
