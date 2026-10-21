@@ -134,7 +134,7 @@ function Line({ label, hint, value }: { label: string; hint: string; value: numb
         <div className="text-sm font-medium">{label}</div>
         <div className="text-xs text-ink3">{hint}</div>
       </div>
-      <span className={cx("num whitespace-nowrap text-sm font-semibold", value < 0 && "text-bad")}>{value < 0 ? `−${(-value).toLocaleString("ko-KR")}` : value.toLocaleString("ko-KR")}</span>
+      <span className={cx("num whitespace-nowrap text-sm font-semibold", value < 0 && "text-bad")}>{value < 0 ? `−${(-value).toLocaleString("ko-KR")}` : Math.abs(value).toLocaleString("ko-KR")}</span>
     </div>
   );
 }

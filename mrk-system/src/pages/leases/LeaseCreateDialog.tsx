@@ -138,7 +138,16 @@ export function LeaseCreateDialog({
     .sort((a, b) => (a.branch_id + a.code).localeCompare(b.branch_id + b.code, "ko", { numeric: true }))
     .map((u) => {
       const st = u.today?.state;
-      const extra = st === "vacant" ? "빈 방" : st === "occupied" || st === "reserved" ? `${STATE_LABEL[st]}${u.today?.free_from ? ` · ${u.today.free_from.slice(5).replace("-", ".")}부터 빔` : ""}` : st ? STATE_LABEL[st] ?? st : "";
+      const md = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`;
+      const until = u.today?.free_until ? ` · ${md(u.today.free_until)}까지` : "";
+      const extra =
+        st === "vacant" || st === "hold"
+          ? `${STATE_LABEL[st]}${until}`
+          : st === "occupied" || st === "reserved"
+            ? `${STATE_LABEL[st]}${u.today?.free_from ? ` · ${md(u.today.free_from)}부터 빔` : ""}${until}`
+            : st
+              ? STATE_LABEL[st] ?? st
+              : "";
       return { value: u.id, label: `${branchId === "all" ? `${u.branch_id.replace("b_", "").toUpperCase()} · ` : ""}${u.code}호${u.type_name ? ` · ${u.type_name}` : ""}${extra ? ` — ${extra}` : ""}` };
     });
 
@@ -180,6 +189,15 @@ export function LeaseCreateDialog({
   };
 
   const months = form.start_date && form.end_date >= form.start_date ? termLabel(form.start_date, form.end_date) : "—";
+  // 고른 호실이 언제부터 언제까지 비는지(겹치면 미리 알려 준다)
+  const freeFrom = unit?.today?.free_from ?? null;
+  const freeUntil = unit?.today?.free_until ?? null;
+  const clash =
+    unit && freeUntil && form.end_date > freeUntil
+      ? `${freeUntil.slice(5).replace("-", ".")}까지만 비어 있다. 다음 계약이 그다음 날 시작한다`
+      : unit && freeFrom && form.start_date < freeFrom
+        ? `${freeFrom.slice(5).replace("-", ".")}부터 비는 방이다. 시작일을 늦춘다`
+        : null;
   const firstBill = (form.rent ?? 0) + (form.mgmt_fee ?? 0);
 
   return (
@@ -223,7 +241,7 @@ export function LeaseCreateDialog({
                 }}
               />
             </Field>
-            <Field label="만료일" htmlFor="lc-end" hint={`기간 ${months}`}>
+            <Field label="만료일" htmlFor="lc-end" hint={`기간 ${months}`} error={clash}>
               <Input id="lc-end" type="date" value={form.end_date} min={form.start_date} onChange={(e) => set("end_date", e.target.value)} />
             </Field>
             <Field label="기간 빨리 고르기">

@@ -10,7 +10,7 @@ import type {
 import { daysBetween, plusDays, plusMonths, ym } from "@/lib/dates";
 import { SOURCES, LOST_REASONS } from "@/lib/codes";
 
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 function mulberry32(seed: number) {
   let a = seed;
@@ -345,6 +345,19 @@ export function buildSeed(today: string): DB {
     }
   }
 
+  // 재계약으로 이어진 계약은 퇴실이 없었다: 퇴실일·퇴실 이력을 지우고 "끝남" 으로 둔다
+  const renewedIds = new Set(leases.filter((l) => l.renewal_of).map((l) => l.renewal_of as string));
+  for (const l of leases) {
+    if (!renewedIds.has(l.id)) continue;
+    l.move_out_date = null;
+    if (l.status === "closing") {
+      l.status = "closed";
+      l.closed_at = iso(plusDays(l.end_date, 1));
+    }
+  }
+  for (let i = history.length - 1; i >= 0; i--)
+    if (renewedIds.has(history[i].target_id) && history[i].text === "퇴실 처리") history.splice(i, 1);
+
   // 결렬된 문의 · 진행 중 문의
   for (let i = 0; i < 260; i++) {
     const b = pick(branches);
@@ -464,7 +477,7 @@ export function buildSeed(today: string): DB {
         addCharge(l, "usage", "전기·가스 사용료", int(12, 48) * 1000, pFrom, plusMonths(pFrom, -1), plusDays(pFrom, -1));
       k++;
     }
-    if ((l.status === "closing" || l.status === "closed") && daysBetween(l.end_date, today) >= 0)
+    if ((l.status === "closing" || l.status === "closed") && !renewedIds.has(l.id) && daysBetween(l.end_date, today) >= 0)
       addCharge(l, "cleaning", "퇴실청소비", l.cleaning_fee, l.end_date, null, null);
   }
 
@@ -483,9 +496,9 @@ export function buildSeed(today: string): DB {
     const late = lateBias.has(payerId);
     if (late && age < 75) continue; // 연체
     if (!late && age < 4 && chance(0.6)) continue; // 납기 직후라 아직
-    if (age < 60 && chance(0.02)) continue;
+    if (age < 60 && chance(0.008)) continue;
     const total = cs.reduce((s, c) => s + c.amount, 0);
-    const partial = age < 60 && chance(0.03);
+    const partial = age < 60 && chance(0.012);
     const paidAmt = partial ? Math.round(total * 0.6 / 1000) * 1000 : total;
     const payer = parties.find((x) => x.id === payerId)!;
     const rcv = plusDays(due, Math.min(int(-3, 6), age));
@@ -530,10 +543,30 @@ export function buildSeed(today: string): DB {
 
   // ── 정산 ────────────────────────────────────────────────
   const settlements: Settlement[] = [];
-  for (const l of leases.filter((x) => x.status === "closed")) {
-    const deposit = l.renewal_of ? 0 : l.deposit + l.mgmt_deposit;
-    if (!deposit) continue;
+  for (const l of leases.filter((x) => x.status === "closed" && !renewedIds.has(x.id))) {
+    // 재계약 사슬이면 처음 계약에서 받은 보증금을 이어서 돌려준다
+    let root = l;
+    while (root.renewal_of) root = leases.find((x) => x.id === root.renewal_of) ?? root;
+    const deposit = root.deposit + root.mgmt_deposit;
     const deds = [{ label: "퇴실청소비", amount: l.cleaning_fee }];
+    // 청소비 청구는 보증금에서 차감해 다 받은 것으로 맞춘다
+    const clean = charges.find((c) => c.lease_id === l.id && c.kind === "cleaning");
+    if (clean) {
+      const pay: Payment = {
+        id: id("pay"),
+        branch_id: l.branch_id,
+        payer_id: l.payer_id,
+        depositor_name: "보증금 차감",
+        amount: clean.amount,
+        received_at: l.closed_at ?? iso(l.end_date),
+        account: "",
+        method: "direct",
+        status: "matched",
+        memo: "퇴실 정산 · 보증금에서 차감",
+      };
+      payments.push(pay);
+      allocations.push({ id: id("al"), payment_id: pay.id, charge_id: clean.id, amount: clean.amount, at: pay.received_at });
+    }
     if (chance(0.15)) deds.push({ label: "원상복구(벽지 오염)", amount: pick([50000, 80000, 120000]) });
     const ded = deds.reduce((s, d) => s + d.amount, 0);
     settlements.push({

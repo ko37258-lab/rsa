@@ -10,6 +10,7 @@ import {
 } from "../logic";
 import { logHistory } from "./common";
 import { LOST_REASONS } from "@/lib/codes";
+import { man } from "@/lib/format";
 import { daysBetween, monthDays, monthEnd, monthStart, overlapDays, plusDays, plusMonth, thisMonth } from "@/lib/dates";
 import type { DB, Inquiry, Lease, Policy, PreparedFile, QaItem, ReplyTemplate, Signature, Unit } from "@/types";
 import type {
@@ -425,8 +426,8 @@ function insights(db: DB, b: string | null): Insight[] {
       id: "type_loss",
       tone: worst.loss_next_30 >= 1_500_000 ? "bad" : "warn",
       title: `앞으로 30일 공실 손실이 가장 큰 룸타입은 ${(!b || b === "all") && worst.branch_name ? `${worst.branch_name.replace("MR.K ", "")} ` : ""}${worst.name}`,
-      body: `${worst.units}실 중 지금 빈 방 ${worst.vacant_now}실. 이대로면 30일 동안 약 ${won(worst.loss_next_30)}을 못 번다. 모집가를 낮추거나 단기 계약을 열어 본다.`,
-      metric: won(worst.loss_next_30),
+      body: `${worst.units}실 중 지금 빈 방 ${worst.vacant_now}실. 이대로면 30일 동안 약 ${man(worst.loss_next_30)}원을 못 번다. 모집가를 낮추거나 단기 계약을 열어 본다.`,
+      metric: `30일 ${man(worst.loss_next_30)}`,
       to: "/units",
     });
   }
@@ -448,7 +449,7 @@ function insights(db: DB, b: string | null): Insight[] {
       tone: over24 ? "bad" : "warn",
       title: over24 ? `24시간 넘게 답장 못 한 상담 ${over24}건` : `답장 기다리는 상담 ${awaiting.length}건`,
       body: `가장 오래 기다린 고객은 ${longest >= 24 ? `${Math.floor(longest / 24)}일` : `${Math.max(1, Math.round(longest))}시간`}째다.${speedNote}`,
-      metric: `${awaiting.length}건`,
+      metric: `대기 ${awaiting.length}건`,
       to: "/inquiries?status=awaiting",
     });
   }
@@ -462,8 +463,8 @@ function insights(db: DB, b: string | null): Insight[] {
       id: "overdue",
       tone: risky.length ? "bad" : "warn",
       title: risky.length ? `보증금보다 미납이 많은 납부자 ${risky.length}명` : `30일 넘게 연체한 납부자 ${long.length}명`,
-      body: `30일 넘은 연체 ${long.length}명, 미납 합계 ${won(long.reduce((s, x) => s + x.unpaid, 0))}. 보증금으로 덮지 못하는 금액은 ${won(risky.reduce((s, x) => s + x.unpaid - x.deposit_held, 0))}이다.`,
-      metric: won(bal.reduce((s, x) => s + x.unpaid, 0)),
+      body: `30일 넘은 연체 ${long.length}명, 그 미납 합계 ${man(long.reduce((s, x) => s + x.unpaid, 0))}원. 보증금으로 덮지 못하는 금액은 ${man(risky.reduce((s, x) => s + x.unpaid - x.deposit_held, 0))}원이다.`,
+      metric: `미납 ${man(bal.reduce((s, x) => s + x.unpaid, 0))}`,
       to: "/collections?filter=overdue",
     });
   }
@@ -510,8 +511,8 @@ function insights(db: DB, b: string | null): Insight[] {
       id: "source",
       tone: "good",
       title: `문의 1건의 값이 가장 높은 유입경로는 ${best.group}`,
-      body: `최근 6개월 문의 ${best.inquiries}건에서 체결 ${best.concluded}건, 문의 1건당 ${won(best.per_inquiry ?? 0)}. 광고·노출 예산을 이 경로에 더 싣는 것을 검토한다.`,
-      metric: won(best.per_inquiry ?? 0),
+      body: `최근 6개월 문의 ${best.inquiries}건에서 체결 ${best.concluded}건, 문의 1건당 ${man(best.per_inquiry ?? 0)}원. 광고·노출 예산을 이 경로에 더 싣는 것을 검토한다.`,
+      metric: `1건당 ${man(best.per_inquiry ?? 0)}`,
     });
   }
 

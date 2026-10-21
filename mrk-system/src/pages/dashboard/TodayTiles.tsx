@@ -74,10 +74,13 @@ export function TodayTiles({ data }: { data: DashboardRes }) {
             <g.icon className="size-3.5 text-ink3" />
             <h3 className="text-[13px] font-semibold text-ink2">{g.title}</h3>
           </div>
-          {g.tiles.map((t) => {
-            const v = data.tiles[t.id];
-            return <StatTile key={t.id} label={t.label} value={v.value.toLocaleString("ko-KR")} unit={t.unit} note={v.note} tone={v.value > 0 ? t.alert : undefined} to={t.to} />;
-          })}
+          {/* 휴대폰에서는 한 그룹을 가로 3칸으로 놓아 스크롤을 줄인다 */}
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-col">
+            {g.tiles.map((t) => {
+              const v = data.tiles[t.id];
+              return <StatTile key={t.id} className="max-sm:px-3" label={t.label} value={v.value.toLocaleString("ko-KR")} unit={t.unit} note={v.note} tone={v.value > 0 ? t.alert : undefined} to={t.to} />;
+            })}
+          </div>
         </div>
       ))}
     </div>

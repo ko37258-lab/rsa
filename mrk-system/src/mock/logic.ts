@@ -179,6 +179,8 @@ export function payerBalances(db: DB, ix: Index, branchId: string | null, today:
     const paid = chargePaid(ix, c);
     const left = c.amount - paid;
     if (NON_REVENUE.includes(c.kind) && c.kind !== "contract_fee") b.deposit_held += paid;
+    // 퇴실청소비·원상복구는 정산 때 보증금에서 빼므로 연체로 세지 않는다
+    if (c.kind === "cleaning" || c.kind === "damage") continue;
     if (c.due_date <= today) {
       b.charged += c.amount;
       b.unpaid += left;

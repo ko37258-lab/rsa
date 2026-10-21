@@ -105,7 +105,7 @@ export function DataTable<T>({
                   )}
                 >
                   {columns.map((c) => (
-                    <td key={c.id} className={cx(pad, "num align-middle text-ink", alignCls(c.align), c.hideOnMobile && "max-sm:hidden", c.className)}>
+                    <td key={c.id} className={cx(pad, "num whitespace-nowrap align-middle text-ink", alignCls(c.align), c.hideOnMobile && "max-sm:hidden", c.className)}>
                       {c.cell(r)}
                     </td>
                   ))}

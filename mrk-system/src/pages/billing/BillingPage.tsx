@@ -230,11 +230,11 @@ export default function BillingPage() {
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-1.5">
                           {isOpen ? <ChevronDown className="size-4 text-ink3" /> : <ChevronRight className="size-4 text-ink3" />}
-                          <span className="font-medium">{inv.payer?.name ?? "—"}</span>
+                          <span className="whitespace-nowrap font-medium">{inv.payer?.name ?? "—"}</span>
                           {inv.payer?.kind === "corporation" && <Badge tone="navy" dot={false}>법인</Badge>}
                         </div>
                       </td>
-                      <td className="num px-3 py-2.5">{inv.unit_codes.map((c) => `${c}호`).join(", ")}</td>
+                      <td className="num whitespace-nowrap px-3 py-2.5">{inv.unit_codes.map((c) => `${c}호`).join(", ")}</td>
                       <td className="num whitespace-nowrap px-3 py-2.5">{fmt(inv.due_date, "M.d (EEE)")}</td>
                       <td className="num px-3 py-2.5 text-right font-semibold">{inv.total.toLocaleString("ko-KR")}</td>
                       <td className="num px-3 py-2.5 text-right text-ink2">{inv.paid ? inv.paid.toLocaleString("ko-KR") : "—"}</td>

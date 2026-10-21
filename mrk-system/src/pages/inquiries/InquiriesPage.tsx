@@ -58,7 +58,7 @@ export default function InquiriesPage() {
             {x.party?.name ?? "—"}
             {x.party?.kind === "corporation" && <Badge tone="navy" dot={false}>법인</Badge>}
           </span>
-          <span className="truncate text-xs text-ink3">{x.party?.contact_name ? `담당 ${x.party.contact_name}` : x.last_message ?? ""}</span>
+          <span className="block max-w-[30ch] truncate text-xs text-ink3">{x.party?.contact_name ? `담당 ${x.party.contact_name}` : x.last_message ?? ""}</span>
         </div>
       ),
     },
