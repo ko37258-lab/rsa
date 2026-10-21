@@ -58,3 +58,41 @@ export const UNIT_STATE: Record<UnitState, { label: string; tone: Tone }> = {
 };
 
 export const UNIT_STATE_ORDER: UnitState[] = ["vacant", "occupied", "reserved", "hold", "suspended", "off_sale"];
+
+/** GET /api/leases/sales-board — 기간(on~until) 동안 호실별 판매 가능 여부 */
+export interface SalesBoardRow {
+  unit_id: string;
+  code: string;
+  branch_id: string;
+  /** on 날짜 기준 상태 */
+  state: UnitState;
+  /** on~until 내내 비어 판매할 수 있나 */
+  fits: boolean;
+  free_from: string | null; // 이날부터 비어 판매 가능
+  next_from: string | null; // 이날부터 다음 일정(계약·운영중지)
+  hold: { block_id: string; expires_at: string | null; inquiry_id: string | null } | null;
+  suspend: { until: string | null; reason: string } | null;
+  note: string; // "기간 안 맞음 · 11.3부터 일정", "10.31까지 빔", "11.3부터 판매", "11.3까지 운영중지", "10.22 18:00까지 홀드"
+}
+
+export interface SalesBoard {
+  on: string;
+  until: string;
+  rows: SalesBoardRow[];
+}
+
+/** GET /api/branches/:id/unit-views — 배치도 칸 */
+export interface UnitView {
+  unit_id: string;
+  code: string;
+  floor: number | null;
+  col: number;
+  span: number;
+}
+
+/** GET /api/units/:id/asking-prices */
+export interface AskingPrices {
+  asking_price: { rent: number; mgmt: number } | null;
+  list_price: { rent: number; mgmt: number } | null;
+  history: Array<{ at: string; rent: number; mgmt: number; by: string }>;
+}

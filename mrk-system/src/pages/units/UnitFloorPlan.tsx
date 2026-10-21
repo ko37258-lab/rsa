@@ -1,12 +1,13 @@
 import { cx, man } from "@/lib/format";
-import { UNIT_STATE, type UnitRow } from "./model";
+import { UNIT_STATE, type SalesBoardRow, type UnitRow } from "./model";
 import { STATE_TILE, stateNote } from "./shared";
 
 /**
  * 배치도 — 층을 줄로, 호실을 칸으로. 칸 위치·넓이는 호실의 layout(col, span)을 따른다.
  * 맨 위층이 위에 오게 그린다(건물 단면처럼).
  */
-export function UnitFloorPlan({ units, onPick, selected }: { units: UnitRow[]; onPick: (u: UnitRow) => void; selected?: string | null }) {
+/** board 를 주면(판매 기간을 고른 경우) 기간 내내 빈 방을 강조하고 원본 문구로 상태를 적는다 */
+export function UnitFloorPlan({ units, onPick, selected, board }: { units: UnitRow[]; onPick: (u: UnitRow) => void; selected?: string | null; board?: Map<string, SalesBoardRow> | null }) {
   const byBranch = new Map<string, UnitRow[]>();
   for (const u of units) byBranch.set(u.branch_id, [...(byBranch.get(u.branch_id) ?? []), u]);
 
@@ -29,16 +30,18 @@ export function UnitFloorPlan({ units, onPick, selected }: { units: UnitRow[]; o
                   <div key={f} className="flex items-stretch gap-2">
                     <div className="num flex w-10 shrink-0 items-center justify-end text-xs font-semibold text-ink3">{f === "미정" ? "층 미정" : `${f}층`}</div>
                     <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, 112px)` }}>
-                      {floors.get(f)!.map((u) => (
+                      {floors.get(f)!.map((u) => {
+                        const b = board?.get(u.id);
+                        return (
                         <button
                           key={u.id}
                           type="button"
                           onClick={() => onPick(u)}
-                          title={`${u.code}호 · ${UNIT_STATE[u.today.state].label} · ${stateNote(u)}`}
+                          title={`${u.code}호 · ${b ? b.note : `${UNIT_STATE[u.today.state].label} · ${stateNote(u)}`}`}
                           style={{ gridColumn: `${u.layout.col} / span ${u.layout.span}` }}
                           className={cx(
                             "flex min-h-[64px] flex-col items-start justify-between rounded border px-2 py-1.5 text-left transition-shadow hover:shadow-md",
-                            STATE_TILE[u.today.state],
+                            b ? (b.fits ? STATE_TILE.vacant : "border-line bg-sunken/60 opacity-70") : STATE_TILE[u.today.state],
                             selected === u.id && "ring-2 ring-brass",
                           )}
                         >
@@ -46,12 +49,13 @@ export function UnitFloorPlan({ units, onPick, selected }: { units: UnitRow[]; o
                             <span className="num text-sm font-semibold">{u.code}</span>
                             <span className="truncate text-[10px] text-ink3">{u.type_name ?? "룸타입 미정"}</span>
                           </span>
-                          <span className="w-full truncate text-[11px] text-ink2">{u.current ? u.current.contractor_name : UNIT_STATE[u.today.state].label}</span>
+                          <span className="w-full truncate text-[11px] text-ink2">{b ? b.note : u.current ? u.current.contractor_name : UNIT_STATE[u.today.state].label}</span>
                           <span className="num flex w-full justify-between text-[11px]">
                             <span className="text-ink3">{u.asking_price ? `월 ${man(u.asking_price.rent)}` : "모집가 없음"}</span>
                           </span>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

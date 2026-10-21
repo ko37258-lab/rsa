@@ -1,7 +1,6 @@
 /**
  * 재무 영역 공통 도우미 — leases.ts(계약·정산)와 billing.ts(청구·수납·장부)가 같이 쓴다.
  */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { HttpError, } from "../router";
 import { newId, nowIso, today } from "../db";
 import {
@@ -10,6 +9,7 @@ import {
 } from "../logic";
 import { NON_REVENUE, } from "@/lib/codes";
 import { daysBetween, overlapDays, plusDays, plusMonths, ym, monthStart, monthEnd, } from "@/lib/dates";
+import { linesBilledIn, type ScheduleLine } from "../schedule";
 import type {
   Allocation, Charge, ChargeKind, DB, Deduction, Lease, Party, PartyCard, Payment, Settlement, VatMode,
 } from "@/types";
@@ -54,7 +54,7 @@ export function vatSplit(base: number, vat: VatMode) {
 }
 
 /** 월세·관리비·사용료만 계약의 부가세 방식을 따른다 */
-export const VAT_KINDS: ChargeKind[] = ["rent", "mgmt", "usage"];
+export const VAT_KINDS: ChargeKind[] = ["rent", "mgmt", "usage", "discount"];
 
 export function newCharge(
   l: Lease,
@@ -105,28 +105,33 @@ export function period(l: Lease, k: number) {
   return { from, to, fullTo };
 }
 
-/** 그 달에 시작하는 청구 기간의 월세·관리비(없을 때만) 만든다. 만든 개수 */
+/** 청구 일정 줄과 같은 청구가 이미 있나 — (계약, 종류, 기간 시작) 이 같으면 같은 줄. 할인은 이름까지 본다 */
+export function lineExists(db: DB, l: Lease, x: Pick<ScheduleLine, "kind" | "period_from" | "label">): boolean {
+  return db.charges.some(
+    (c) => c.lease_id === l.id && c.status !== "cancelled" && c.kind === x.kind && c.period_from === x.period_from && (x.kind !== "discount" || c.label === x.label),
+  );
+}
+
+/** 청구 일정 한 줄을 발송 대기 청구로 */
+export function chargeFromLine(l: Lease, x: ScheduleLine): Charge {
+  return newCharge(l, x.kind, x.label, x.amount, x.due_date, {
+    from: x.period_from,
+    to: x.period_to,
+    bill: x.bill_date,
+    days: x.days,
+    month_days: x.month_days,
+    needs_amount: x.needs_amount,
+    status: "draft",
+  });
+}
+
+/** 청구일이 그 달인 청구 일정 줄 중 아직 없는 것을 발송 대기로 만든다. 만든 개수 */
 export function ensurePeriodCharges(db: DB, l: Lease, month: string): number {
   let created = 0;
-  const last = leaseLastDay(l);
-  for (let k = 0; k < 240; k++) {
-    const p = period(l, k);
-    if (p.from > last) break;
-    const pm = ym(p.from);
-    if (pm < month) continue;
-    if (pm > month) break;
-    const exists = db.charges.some((c) => c.lease_id === l.id && c.status !== "cancelled" && (c.kind === "rent" || c.kind === "mgmt") && c.period_from === p.from);
-    if (exists) continue;
-    const full = daysBetween(p.from, p.fullTo) + 1;
-    const used = daysBetween(p.from, p.to) + 1;
-    const ratio = used >= full ? 1 : used / full;
-    const mo = Number(p.from.slice(5, 7));
-    const rent = Math.round((l.rent * ratio) / 10) * 10;
-    const mgmt = Math.round((l.mgmt_fee * ratio) / 10) * 10;
-    const sfx = ratio < 1 ? ` (${used}일)` : "";
-    db.charges.push(newCharge(l, "rent", `${mo}월 월세${sfx}`, rent, p.from, { from: p.from, to: p.to }));
-    if (mgmt > 0) db.charges.push(newCharge(l, "mgmt", `${mo}월 관리비${sfx}`, mgmt, p.from, { from: p.from, to: p.to }));
-    created += mgmt > 0 ? 2 : 1;
+  for (const x of linesBilledIn(l, month)) {
+    if (lineExists(db, l, x)) continue;
+    db.charges.push(chargeFromLine(l, x));
+    created++;
   }
   return created;
 }
@@ -135,25 +140,60 @@ export function allocatedOf(db: DB, paymentId: string): number {
   return db.allocations.filter((a) => a.payment_id === paymentId).reduce((s, a) => s + a.amount, 0);
 }
 
-/** 입금을 납부자의 미납 청구에 납기 순서(오래된 것부터)로 채운다 */
-export function allocateFIFO(db: DB, pay: Payment, onlyLeaseId?: string): number {
+/** 입금 중 청구에 채울 수 있는 돈 = 입금 + 플랫폼 수수료(현금 아님, 월세 채움) − 홈즈 몫 아님 */
+export function allocatable(p: Payment): number {
+  return p.amount + (p.platform_fee ?? 0) - (p.pass_through ?? 0);
+}
+
+/**
+ * 입금을 납부자의 미납 청구에 납기 순서(오래된 것부터)로 채운다.
+ * 할인(음수 청구)은 같은 차례에 그 금액 그대로 상쇄한다 — 양수 청구에 음수 배분은 만들지 않는다.
+ * includeDraft: 아직 안 보낸(발송 대기) 청구까지 채운다(입금 잔액을 다음 청구에 채우기).
+ */
+export function allocateFIFO(db: DB, pay: Payment, onlyLeaseId?: string, opts: { includeDraft?: boolean } = {}): number {
   if (!pay.payer_id) return 0;
   const ix = indexDB(db);
-  let left = pay.amount - allocatedOf(db, pay.id);
+  let left = allocatable(pay) - allocatedOf(db, pay.id);
   if (left <= 0) return 0;
   const targets = db.charges
-    .filter((c) => c.payer_id === pay.payer_id && isBilled(c) && (!onlyLeaseId || c.lease_id === onlyLeaseId))
+    .filter((c) => c.payer_id === pay.payer_id && (isBilled(c) || (opts.includeDraft && c.status === "draft" && !c.needs_amount)) && (!onlyLeaseId || c.lease_id === onlyLeaseId))
     .map((c) => ({ c, left: c.amount - chargePaid(ix, c) }))
-    .filter((x) => x.left > 0)
-    .sort((a, b) => a.c.due_date.localeCompare(b.c.due_date) || a.c.created_at.localeCompare(b.c.created_at));
-  let total = 0;
+    .filter((x) => x.left !== 0 && Math.sign(x.left) === Math.sign(x.c.amount))
+    .sort(
+      (a, b) =>
+        a.c.due_date.localeCompare(b.c.due_date) ||
+        (a.c.status === "draft" ? 1 : 0) - (b.c.status === "draft" ? 1 : 0) ||
+        a.left - b.left || // 같은 납기면 할인(음수)부터
+        a.c.created_at.localeCompare(b.c.created_at),
+    );
+  // 먼저 계획을 세운다: 할인은 그만큼 채울 돈을 늘리고, 양수 청구는 남은 돈만큼 채운다
+  const initial = left;
+  const plan: Array<{ charge: Charge; amt: number }> = [];
   for (const x of targets) {
-    if (left <= 0) break;
+    if (x.left < 0) {
+      plan.push({ charge: x.c, amt: x.left });
+      left -= x.left;
+      continue;
+    }
+    if (left <= 0) continue;
     const amt = Math.min(left, x.left);
-    const al: Allocation = { id: newId("al"), payment_id: pay.id, charge_id: x.c.id, amount: amt, at: pay.received_at };
-    db.allocations.push(al);
+    plan.push({ charge: x.c, amt });
     left -= amt;
-    total += amt;
+  }
+  // 상쇄한 할인을 다 쓰지 못했으면(채울 양수 청구가 모자람) 뒤에서부터 상쇄를 줄인다
+  let extra = left - initial;
+  for (let i = plan.length - 1; i >= 0 && extra > 0; i--) {
+    if (plan[i].amt >= 0) continue;
+    const cut = Math.min(extra, -plan[i].amt);
+    plan[i].amt += cut;
+    extra -= cut;
+  }
+  let total = 0;
+  for (const p of plan) {
+    if (!p.amt) continue;
+    const al: Allocation = { id: newId("al"), payment_id: pay.id, charge_id: p.charge.id, amount: p.amt, at: pay.received_at };
+    db.allocations.push(al);
+    total += p.amt;
   }
   return total;
 }
@@ -347,7 +387,8 @@ export function revenueOf(db: DB, branchId: string, months: string[]) {
   const last = months[months.length - 1];
   for (const c of db.charges) {
     if (c.branch_id !== branchId || !isBilled(c) || NON_REVENUE.includes(c.kind)) continue;
-    const key = c.kind === "rent" ? "rent" : c.kind === "mgmt" ? "mgmt" : c.kind === "usage" ? "usage" : "other";
+    // 할인은 월세에서 깎은 돈으로 본다
+    const key = c.kind === "rent" || c.kind === "discount" ? "rent" : c.kind === "mgmt" ? "mgmt" : c.kind === "usage" ? "usage" : "other";
     if (c.period_from && c.period_to) {
       if (ym(c.period_to) < first || ym(c.period_from) > last) continue;
       const total = daysBetween(c.period_from, c.period_to) + 1;
@@ -356,7 +397,7 @@ export function revenueOf(db: DB, branchId: string, months: string[]) {
         if (d) out.get(m)![key] += (c.supply * d) / total;
       }
     } else {
-      const m = ym(c.due_date);
+      const m = ym(c.bill_date ?? c.due_date);
       if (out.has(m)) out.get(m)![key] += c.supply;
     }
   }

@@ -21,14 +21,16 @@ export function SettlementPanel({ leaseId, leaseStatus }: { leaseId: string; lea
   const [rows, setRows] = useState<Deduction[]>([]);
   const [account, setAccount] = useState("");
   const [askRefund, setAskRefund] = useState(false);
+  const [saveAccount, setSaveAccount] = useState(true);
+  const acc = useApi<{ account: string; holder: string; source: "settlement" | "contractor" | "none"; contractor_account: string | null }>(["settle", "refund-account", leaseId], `/api/leases/${leaseId}/settlement/refund-account`);
   useEffect(() => {
     if (!q.data) return;
     setRows(q.data.deductions);
-    setAccount(q.data.refund_account ?? "");
-  }, [q.data]);
+    setAccount(q.data.refund_account || acc.data?.account || "");
+  }, [q.data, acc.data]);
 
   const save = useApiMutation({
-    invalidate: MONEY_KEYS,
+    invalidate: [...MONEY_KEYS, ["settle", "refund-account", leaseId]],
     success: (r: unknown) => {
       const s = r as SettlementView;
       return s.status === "refunded" ? "보증금 반환을 기록했다" : s.status === "confirmed" ? "정산을 확정했다 · 반환 대기" : "정산을 임시 저장했다";
@@ -44,7 +46,7 @@ export function SettlementPanel({ leaseId, leaseStatus }: { leaseId: string; lea
   const refund = s.deposit_total - s.unpaid - ded;
   const canConfirm = leaseStatus === "closing" || leaseStatus === "closed";
   const submit = (status: SettlementView["status"]) =>
-    save.mutate({ path: `/api/leases/${leaseId}/settlement`, method: "PUT", body: { deductions: rows.filter((r) => r.amount), refund_account: account, status } });
+    save.mutate({ path: `/api/leases/${leaseId}/settlement`, method: "PUT", body: { deductions: rows.filter((r) => r.amount), refund_account: account, status, save_account: saveAccount && account.trim() !== (acc.data?.contractor_account ?? "") } });
 
   return (
     <div className="flex flex-col gap-5">
@@ -93,9 +95,27 @@ export function SettlementPanel({ leaseId, leaseStatus }: { leaseId: string; lea
       </div>
       {refund < 0 && !done && <p className="text-xs text-bad">보증금보다 받을 돈이 {won(-refund)} 많다. 반환 대신 남은 금액을 직접 청구한다.</p>}
 
-      <Field label="반환 계좌" htmlFor={`refund-acc-${leaseId}`} hint={s.refund_account && !done ? "계약자가 남긴 계좌. 다르면 고친다" : undefined}>
+      <Field
+        label="반환 계좌"
+        htmlFor={`refund-acc-${leaseId}`}
+        hint={
+          done
+            ? undefined
+            : acc.data?.source === "contractor"
+              ? `계약자(${acc.data.holder})가 남긴 계좌. 다르면 고친다`
+              : acc.data?.source === "none"
+                ? "계약자 계좌가 없다. 받아서 적는다"
+                : undefined
+        }
+      >
         <Input id={`refund-acc-${leaseId}`} value={account} disabled={done} onChange={(e) => setAccount(e.target.value)} placeholder="은행 계좌번호 예금주" />
       </Field>
+      {!done && account.trim() && account.trim() !== (acc.data?.contractor_account ?? "") && (
+        <label className="-mt-3 flex items-center gap-2 text-xs text-ink2">
+          <input id={`refund-acc-save-${leaseId}`} type="checkbox" checked={saveAccount} onChange={(e) => setSaveAccount(e.target.checked)} className="size-3.5" />
+          계약자 고객 정보의 계좌도 이것으로 바꾼다
+        </label>
+      )}
 
       {!done && (
         <div className="flex flex-wrap items-center justify-end gap-2">

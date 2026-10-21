@@ -1,26 +1,29 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, ClipboardPaste } from "lucide-react";
 import { useBranch } from "@/lib/branch";
 import { useApi } from "@/lib/hooks";
 import { CHANNEL, INQUIRY_STAGE } from "@/lib/codes";
 import { fmt, man, minutes, timeLabel } from "@/lib/format";
 import { Badge, Button, DataTable, EmptyState, ErrorBox, Loading, PageHeader, SearchBox, Segmented, type Column } from "@/components/ui";
 import { useParam } from "@/pages/units/shared";
-import type { InquiryRow } from "./model";
+import type { ConversationRow, InquiryRow } from "./model";
+import { InboxView } from "./InboxView";
 import { InquiryCreateDialog } from "./InquiryCreateDialog";
 
-type Kind = "inquiry" | "life";
+type Kind = "inquiry" | "life" | "inbox";
 type Status = "awaiting" | "active" | "done" | "all";
 
 export default function InquiriesPage() {
   const { branchId } = useBranch();
   const nav = useNavigate();
   const [sp, set] = useParam();
-  const kind: Kind = sp.get("kind") === "life" ? "life" : "inquiry";
+  const kind: Kind = sp.get("kind") === "life" ? "life" : sp.get("kind") === "inbox" ? "inbox" : "inquiry";
   const status = ((sp.get("status") as Status) || "active") as Status;
   const [q, setQ] = useState("");
-  const data = useApi<InquiryRow[]>(["inquiries", branchId, kind], `/api/inquiries?branch_id=${branchId}&kind=${kind}&include_unplaced=true`);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const data = useApi<InquiryRow[]>(["inquiries", branchId, kind], kind === "inbox" ? null : `/api/inquiries?branch_id=${branchId}&kind=${kind}&include_unplaced=true`);
+  const inbox = useApi<ConversationRow[]>(["inquiries", "unlinked", branchId], `/api/conversations/unlinked?branch_id=${branchId}`);
   const all = data.data ?? [];
 
   const counts = useMemo(
@@ -111,11 +114,24 @@ export default function InquiriesPage() {
     <>
       <PageHeader
         title="상담"
-        subtitle={data.data ? `진행 중 ${counts.active}건 · 답장 대기 ${counts.awaiting}건` : undefined}
+        subtitle={
+          kind === "inbox"
+            ? inbox.data
+              ? `붙이지 않은 대화 ${inbox.data.length}건 · 맞는 상담이나 계약에 붙이거나 새 문의로 만든다`
+              : undefined
+            : data.data
+              ? `진행 중 ${counts.active}건 · 답장 대기 ${counts.awaiting}건`
+              : undefined
+        }
         actions={
-          <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => set("new", "1")}>
-            입주문의 접수
-          </Button>
+          <>
+            <Button icon={<ClipboardPaste className="size-4" />} onClick={() => (kind === "inbox" ? setPasteOpen(true) : (set("kind", "inbox"), setPasteOpen(true)))}>
+              대화 붙여넣기
+            </Button>
+            <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => set("new", "1")}>
+              입주문의 접수
+            </Button>
+          </>
         }
       >
         <Segmented<Kind>
@@ -124,8 +140,11 @@ export default function InquiriesPage() {
           options={[
             { value: "inquiry", label: "입주문의" },
             { value: "life", label: "생활문의" },
+            { value: "inbox", label: "미연결 대화", count: inbox.data?.length },
           ]}
         />
+        {kind !== "inbox" && (
+          <>
         <Segmented<Status>
           size="sm"
           value={status}
@@ -138,9 +157,13 @@ export default function InquiriesPage() {
           ]}
         />
         <SearchBox id="inquiry-search" value={q} onChange={setQ} placeholder="이름, 이메일, 전화" />
+          </>
+        )}
       </PageHeader>
 
-      {data.isLoading ? (
+      {kind === "inbox" ? (
+        <InboxView rows={inbox.data ?? []} loading={inbox.isLoading} error={inbox.error} pasteOpen={pasteOpen} setPasteOpen={setPasteOpen} />
+      ) : data.isLoading ? (
         <Loading />
       ) : data.error ? (
         <ErrorBox error={data.error} />

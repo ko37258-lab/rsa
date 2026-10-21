@@ -3,12 +3,12 @@ import { useSearchParams } from "react-router-dom";
 import { useApi, useApiMutation } from "@/lib/hooks";
 import { useBranch } from "@/lib/branch";
 import { dDay, fmt, won } from "@/lib/format";
-import { plusDays } from "@/lib/dates";
 import type { Tone } from "@/lib/codes";
 import { Badge, Button, DataTable, EmptyState, ErrorBox, Field, Input, KeyValue, LinkButton, Loading, Money, PageHeader, SearchBox, Segmented, Sheet, StatTile, type Column } from "@/components/ui";
 import { MONEY_KEYS, type MoveOutRow } from "@/pages/leases/types";
 import { LeaseStatusBadge, PartyName } from "@/pages/leases/parts";
 import { SettlementPanel } from "@/pages/leases/SettlementPanel";
+import { LeaseCreateDialog } from "@/pages/leases/LeaseCreateDialog";
 
 const STAGE: Record<MoveOutRow["stage"], { label: string; tone: Tone }> = {
   upcoming: { label: "퇴실 예정", tone: "info" },
@@ -123,6 +123,7 @@ export default function SettlePage() {
 function SettleSheet({ row }: { row: MoveOutRow }) {
   const { today } = useBranch();
   const [outDate, setOutDate] = useState(row.end_date < today ? row.end_date : today);
+  const [renewing, setRenewing] = useState(false);
   const go = useApiMutation({ invalidate: MONEY_KEYS, success: "계약 상태를 바꿨다" });
   return (
     <div className="flex flex-col gap-5">
@@ -148,11 +149,16 @@ function SettleSheet({ row }: { row: MoveOutRow }) {
             <Button variant="primary" loading={go.isPending} onClick={() => go.mutate({ path: `/api/leases/${row.id}/transition`, body: { to: "closing", date: outDate } })}>
               퇴실 처리
             </Button>
-            <LinkButton to={`/leases?new=1&unit=${row.unit_id}&start=${plusDays(row.end_date, 1)}`}>연장 계약 작성</LinkButton>
+            {row.renewal_id ? (
+              <LinkButton to={`/leases/${row.renewal_id}`}>재계약 보기</LinkButton>
+            ) : (
+              <Button onClick={() => setRenewing(true)}>연장 계약 작성</Button>
+            )}
           </div>
           {go.error && <p className="text-xs text-bad">{go.error.message}</p>}
         </div>
       )}
+      {renewing && <LeaseCreateDialog open onClose={() => setRenewing(false)} initial={{ renewOf: row.id }} />}
       <SettlementPanel leaseId={row.id} leaseStatus={row.status} />
       {row.status === "closing" && (row.settlement_status === "confirmed" || row.settlement_status === "refunded") && (
         <div className="flex items-center justify-between gap-2 rounded-md border border-line p-3">

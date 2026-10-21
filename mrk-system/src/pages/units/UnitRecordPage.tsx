@@ -3,13 +3,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { useBranch } from "@/lib/branch";
 import { useApi, useApiMutation } from "@/lib/hooks";
-import { fmt, won } from "@/lib/format";
+import { fmt, timeLabel, won } from "@/lib/format";
 import { LEASE_STATUS } from "@/lib/codes";
 import { plusDays } from "@/lib/dates";
 import { Badge, Button, DataTable, Dialog, ErrorBox, Field, FormGrid, Input, KeyValue, LinkButton, Loading, MoneyInput, Segmented, Tabs, Textarea, type Column } from "@/components/ui";
 import { MemosSection, HistoryList } from "@/components/RecordParts";
 import type { UnitBlock } from "@/types";
-import type { UnitDetail, UnitLeaseSummary } from "./model";
+import type { AskingPrices, UnitDetail, UnitLeaseSummary } from "./model";
 import { earliestStart, newLeaseUrl, pyeong, stateNote, UnitStateBadge, useParam } from "./shared";
 
 type Tab = "info" | "leases" | "blocks" | "memos" | "history";
@@ -90,6 +90,7 @@ export default function UnitRecordPage() {
 
       {tab === "info" && (
         <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+          <div className="flex min-w-0 flex-col gap-5">
           <div className="rounded-md border border-line bg-surface p-4">
             <KeyValue
               items={[
@@ -105,6 +106,8 @@ export default function UnitRecordPage() {
                 ["등록일", fmt(u.created_at)],
               ]}
             />
+          </div>
+          <AskingHistory unitId={u.id} onEdit={() => setPriceOpen(true)} />
           </div>
           <div className="flex flex-col gap-2">
             <div className="label-caps">지금 · 다음 계약</div>
@@ -307,5 +310,42 @@ function BlockDialog({ open, onClose, unitId, code, today }: { open: boolean; on
         </Field>
       </div>
     </Dialog>
+  );
+}
+
+/** 모집가 기록 — 원본 /api/units/:id/asking-prices */
+function AskingHistory({ unitId, onEdit }: { unitId: string; onEdit: () => void }) {
+  const q = useApi<AskingPrices>(["units", "asking", unitId], `/api/units/${unitId}/asking-prices`);
+  const rows = q.data?.history ?? [];
+  return (
+    <div className="rounded-md border border-line bg-surface">
+      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+        <h2 className="text-sm font-semibold">모집가 기록</h2>
+        <Button size="sm" variant="ghost" onClick={onEdit}>
+          모집가 고치기
+        </Button>
+      </div>
+      {q.isLoading ? (
+        <Loading />
+      ) : rows.length === 0 ? (
+        <p className="px-4 py-3 text-sm text-ink3">모집가를 바꾼 기록이 없다</p>
+      ) : (
+        <ol className="divide-y divide-line">
+          {rows.map((h, i) => {
+            const prev = rows[i + 1];
+            const diff = prev ? h.rent - prev.rent : 0;
+            return (
+              <li key={`${h.at}-${i}`} className="flex items-center gap-3 px-4 py-2 text-sm">
+                <span className="num w-28 shrink-0 text-xs text-ink3">{timeLabel(h.at)}</span>
+                <span className="num font-medium">월 {won(h.rent)}</span>
+                <span className="num text-xs text-ink3">관리비 {won(h.mgmt)}</span>
+                {diff !== 0 && <span className={diff > 0 ? "num text-xs text-bad" : "num text-xs text-good"}>{diff > 0 ? "▲" : "▼"} {won(Math.abs(diff))}</span>}
+                <span className="ml-auto text-xs text-ink3">{h.by}</span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
   );
 }

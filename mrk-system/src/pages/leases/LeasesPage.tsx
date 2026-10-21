@@ -1,15 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Download, Plus } from "lucide-react";
+import { Download, FileSpreadsheet, Plus } from "lucide-react";
 import { useApi } from "@/lib/hooks";
 import { useBranch } from "@/lib/branch";
-import { dDay, downloadCsv, fmt, maskName, won } from "@/lib/format";
+import { dDay, downloadCsv, fmt, won } from "@/lib/format";
+import { downloadXlsx } from "@/lib/excel";
 import { NATIONALITY, LEASE_STATUS } from "@/lib/codes";
 import {
   Button, DataTable, EmptyState, ErrorBox, KeyValue, LinkButton, Loading, Money, PageHeader, SearchBox, Segmented, Sheet, StatTile, type Column,
 } from "@/components/ui";
 import type { LeaseRow, RentRollRow } from "./types";
-import { LEASE_FILTERS, LeaseStatusBadge, PartyName, filterOf, leaseNote, matchesFilter, termLabel, type LeaseFilter } from "./parts";
+import { LEASE_FILTERS, LeaseStatusBadge, PartyName, billingSummary, filterOf, leaseNote, matchesFilter, termLabel, type LeaseFilter } from "./parts";
 import { LeaseCreateDialog } from "./LeaseCreateDialog";
 
 export default function LeasesPage() {
@@ -119,7 +120,7 @@ export default function LeasesPage() {
         subtitle={`${branch?.name ?? "전 지점"} · 진행 중 ${counts.open ?? 0}건 · 이번 달 시작 ${(rows.data ?? []).filter((r) => r.start_date.slice(0, 7) === today.slice(0, 7) && r.status !== "cancelled").length}건`}
         actions={
           <>
-            {view === "rent-roll" && <RentRollDownload branchName={branch?.name ?? "전 지점"} />}
+            {view === "rent-roll" && <RentRollDownload branchName={branch?.name ?? "전 지점"} masked={sp.get("masked") === "1"} />}
             <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => update({ new: "1" })}>
               계약 작성
             </Button>
@@ -137,7 +138,7 @@ export default function LeasesPage() {
       </PageHeader>
 
       {view === "rent-roll" ? (
-        <RentRoll />
+        <RentRoll masked={sp.get("masked") === "1"} onMasked={(v) => update({ masked: v ? "1" : null })} />
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -182,11 +183,12 @@ export default function LeasesPage() {
         {peek && <LeasePeek lease={peek} today={today} />}
       </Sheet>
 
-      {sp.get("new") === "1" && (
+      {(sp.get("new") === "1" || !!sp.get("renew")) && (
         <LeaseCreateDialog
           open
-          onClose={() => update({ new: null, unit: null, inquiry: null, start: null })}
-          initial={{ unitId: sp.get("unit"), inquiryId: sp.get("inquiry"), start: sp.get("start") }}
+          key={sp.get("renew") ?? "new"}
+          onClose={() => update({ new: null, unit: null, inquiry: null, start: null, renew: null })}
+          initial={{ unitId: sp.get("unit"), inquiryId: sp.get("inquiry"), start: sp.get("start"), renewOf: sp.get("renew") }}
         />
       )}
     </>
@@ -214,7 +216,7 @@ function LeasePeek({ lease: l, today }: { lease: LeaseRow; today: string }) {
           ["월세", won(l.rent)],
           ["관리비", won(l.mgmt_fee)],
           ["보증금", won(l.deposit + l.mgmt_deposit)],
-          ["납기일", `매월 ${l.due_day}일`],
+          ["청구 방식", billingSummary(l)],
           ["유입경로", l.source_group || "—"],
           ["구분", l.renewal_of ? "재계약" : "신규"],
         ]}
@@ -245,37 +247,41 @@ const rollColumns: Array<{ id: keyof RentRollRow | "no"; header: string; money?:
   { id: "unpaid", header: "미납", money: true },
 ];
 
-function useRentRoll() {
+function useRentRoll(masked: boolean) {
   const { branchId } = useBranch();
-  return useApi<{ today: string; rows: RentRollRow[] }>(["leases", branchId, "rent-roll"], `/api/leases/rent-roll?branch_id=${branchId}`);
+  return useApi<{ today: string; rows: RentRollRow[] }>(["leases", branchId, "rent-roll", masked], `/api/leases/rent-roll?branch_id=${branchId}${masked ? "&masked=true" : ""}`);
 }
 
-function RentRollDownload({ branchName }: { branchName: string }) {
-  const q = useRentRoll();
+function rollCell(r: RentRollRow, id: (typeof rollColumns)[number]["id"]): string | number | null {
+  if (id === "no") return "";
+  const v = r[id];
+  if (id === "nationality") return NATIONALITY[String(v)] ?? String(v ?? "");
+  if (id === "gender") return v === "M" ? "남" : v === "F" ? "여" : "";
+  return v as string | number | null;
+}
+
+function RentRollDownload({ branchName, masked }: { branchName: string; masked: boolean }) {
+  const q = useRentRoll(masked);
+  const name = `렌트롤_${branchName.replace(/\s/g, "")}_${q.data?.today ?? ""}${masked ? "_가림" : ""}`;
+  const rows = () => [[...rollColumns.map((c) => c.header), "청구 방식"], ...(q.data?.rows ?? []).map((r) => [...rollColumns.map((c) => rollCell(r, c.id)), r.billing ?? ""])];
   return (
-    <Button
-      icon={<Download className="size-4" />}
-      disabled={!q.data?.rows.length}
-      onClick={() => {
-        if (!q.data) return;
-        const cell = (r: RentRollRow, id: (typeof rollColumns)[number]["id"]) => {
-          if (id === "no") return "";
-          const v = r[id];
-          if (id === "nationality") return NATIONALITY[String(v)] ?? String(v ?? "");
-          if (id === "gender") return v === "M" ? "남" : v === "F" ? "여" : "";
-          return v as string | number | null;
-        };
-        downloadCsv(`렌트롤_${branchName.replace(/\s/g, "")}_${q.data.today}.csv`, [rollColumns.map((c) => c.header), ...q.data.rows.map((r) => rollColumns.map((c) => cell(r, c.id)))]);
-      }}
-    >
-      엑셀로 내려받기
-    </Button>
+    <>
+      <Button
+        icon={<FileSpreadsheet className="size-4" />}
+        disabled={!q.data?.rows.length}
+        onClick={() => void downloadXlsx(`${name}.xlsx`, rows(), { sheet: "렌트롤", widths: [8, 8, 11, 11, 12, 8, 6, 15, 12, 12, 12, 11, 10, 12, 12, 13, 13, 11, 40] })}
+      >
+        엑셀(xlsx)
+      </Button>
+      <Button icon={<Download className="size-4" />} disabled={!q.data?.rows.length} onClick={() => downloadCsv(`${name}.csv`, rows())}>
+        CSV
+      </Button>
+    </>
   );
 }
 
-function RentRoll() {
-  const q = useRentRoll();
-  const [masked, setMasked] = useState(false);
+function RentRoll({ masked, onMasked }: { masked: boolean; onMasked: (v: boolean) => void }) {
+  const q = useRentRoll(masked);
   if (q.isLoading) return <Loading />;
   if (q.isError) return <ErrorBox error={q.error} />;
   const rows = q.data?.rows ?? [];
@@ -291,8 +297,8 @@ function RentRoll() {
       const v = r[c.id];
       if (c.money) return c.id === "unpaid" && Number(v) > 0 ? <span className="font-semibold text-bad">{Number(v).toLocaleString("ko-KR")}</span> : <Money value={Number(v)} muted={!v} />;
       if (c.id === "unit_code") return <span className="font-semibold">{String(v)}호</span>;
-      if (c.id === "contractor_name") return masked ? maskName(String(v)) : String(v);
-      if (c.id === "phone") return <span className="whitespace-nowrap">{masked ? String(v).replace(/(\d{2,3})-(\d{3,4})-(\d{4})/, "$1-****-$3") : String(v)}</span>;
+      if (c.id === "contractor_name") return String(v);
+      if (c.id === "phone") return <span className="whitespace-nowrap">{String(v)}</span>;
       if (c.id === "nationality") return NATIONALITY[String(v)] ?? String(v);
       if (c.id === "gender") return v === "M" ? "남" : v === "F" ? "여" : "—";
       if (c.id === "start_date" || c.id === "end_date") return <span className="whitespace-nowrap">{fmt(String(v), "yy.M.d")}</span>;
@@ -308,8 +314,8 @@ function RentRoll() {
         <StatTile label="미납" value={sum("unpaid").toLocaleString("ko-KR")} unit="원" tone={sum("unpaid") > 0 ? "bad" : undefined} />
       </div>
       <label className="flex items-center gap-2 self-end text-xs text-ink2">
-        <input id="rr-mask" type="checkbox" checked={masked} onChange={(e) => setMasked(e.target.checked)} className="size-3.5" />
-        이름·전화 가리기(밖으로 공유할 때)
+        <input id="rr-mask" type="checkbox" checked={masked} onChange={(e) => onMasked(e.target.checked)} className="size-3.5" />
+        이름·전화·메일 가리기(밖으로 공유할 때 · 내려받기에도 적용)
       </label>
       <DataTable
         rows={rows}

@@ -5,14 +5,14 @@ import { CHARGE_KIND, VAT_MODE } from "@/lib/codes";
 import { won } from "@/lib/format";
 import { Button, Dialog, Field, FormGrid, Input, MoneyInput, Select } from "@/components/ui";
 import type { Charge, ChargeKind, VatMode } from "@/types";
-import { MONEY_KEYS, type LeaseRow } from "@/pages/leases/types";
+import { MONEY_KEYS, type LeaseOption } from "./api";
 
-const KINDS: ChargeKind[] = ["usage", "damage", "penalty", "cleaning", "rent", "mgmt", "other"];
+const KINDS: ChargeKind[] = ["usage", "damage", "penalty", "cleaning", "rent", "mgmt", "discount", "other"];
 
 /** 계약에 청구 한 줄을 직접 더한다(발송 대기로 들어간다) */
 export function DirectChargeDialog({ open, onClose, leaseId }: { open: boolean; onClose: () => void; leaseId?: string | null }) {
   const { branchId, today } = useBranch();
-  const leases = useApi<LeaseRow[]>(["leases", branchId, "open"], open && !leaseId ? `/api/leases?branch_id=${branchId}&open_only=true` : null);
+  const leases = useApi<LeaseOption[]>(["leases", branchId, "open"], open && !leaseId ? `/api/leases?branch_id=${branchId}&open_only=true` : null);
   const [lease, setLease] = useState(leaseId ?? "");
   const [kind, setKind] = useState<ChargeKind>("usage");
   const [label, setLabel] = useState("");
@@ -25,11 +25,11 @@ export function DirectChargeDialog({ open, onClose, leaseId }: { open: boolean; 
   const submit = () => {
     setErr(null);
     if (!lease) return setErr("계약을 고른다");
-    if (!amount || amount <= 0) return setErr("금액을 적는다");
+    if (!amount || amount <= 0) return setErr(kind === "discount" ? "할인액을 적는다(양수로 적으면 깎는 줄이 된다)" : "금액을 적는다");
     save.mutate({ path: "/api/billing/charges", body: { lease_id: lease, kind, label: label.trim() || CHARGE_KIND[kind], amount, due_date: due, vat } });
   };
 
-  const total = amount ? (vat === "excluded" ? Math.round(amount * 1.1) : amount) : 0;
+  const total = (amount ? (vat === "excluded" ? Math.round(amount * 1.1) : amount) : 0) * (kind === "discount" ? -1 : 1);
 
   return (
     <Dialog
@@ -69,13 +69,13 @@ export function DirectChargeDialog({ open, onClose, leaseId }: { open: boolean; 
           <Field label="항목 이름" htmlFor="dc-label">
             <Input id="dc-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={CHARGE_KIND[kind]} />
           </Field>
-          <Field label="금액(공급가)" htmlFor="dc-amount">
+          <Field label={kind === "discount" ? "할인액" : vat === "included" ? "금액(부가세 포함)" : "금액(공급가)"} htmlFor="dc-amount">
             <MoneyInput id="dc-amount" value={amount} onChange={setAmount} />
           </Field>
           <Field label="부가세" htmlFor="dc-vat">
             <Select id="dc-vat" value={vat} onChange={(e) => setVat(e.target.value as VatMode)} options={Object.entries(VAT_MODE).map(([value, l]) => ({ value, label: l }))} />
           </Field>
-          <Field label="납기일" htmlFor="dc-due">
+          <Field label="납기일" htmlFor="dc-due" hint="청구일도 이날로 둔다">
             <Input id="dc-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
           </Field>
           <Field label="청구 금액">

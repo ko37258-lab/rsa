@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil, ShieldOff } from "lucide-react";
 import { useApi, useApiMutation } from "@/lib/hooks";
 import { useBranch } from "@/lib/branch";
 import { INQUIRY_STAGE, LEASE_STATUS, NATIONALITY } from "@/lib/codes";
 import { fmt, timeLabel, won } from "@/lib/format";
-import { Badge, Button, DataTable, Dialog, ErrorBox, Field, FormGrid, Input, KeyValue, Loading, Section, Select, type Column } from "@/components/ui";
+import { Badge, Button, DataTable, Dialog, ErrorBox, Field, FormGrid, Input, KeyValue, Loading, Section, Select, Textarea, type Column } from "@/components/ui";
 import { MemosSection, HistoryList } from "@/components/RecordParts";
 import { STAGE_TONE, type CustomerDetail, type CustomerInquirySummary, type CustomerLeaseSummary } from "./model";
 
@@ -89,6 +89,7 @@ export default function CustomerRecordPage() {
           </Section>
         </div>
         <aside className="flex min-w-0 flex-col gap-5">
+          <PrivacySection c={c} today={today} />
           <Section title="메모" hint="팀만 본다">
             <MemosSection kinds="customers" id={c.id} />
           </Section>
@@ -156,5 +157,94 @@ function EditDialog({ open, onClose, c }: { open: boolean; onClose: () => void; 
         </FormGrid>
       </form>
     </Dialog>
+  );
+}
+
+/**
+ * 개인정보 — 보존 기한을 정하고, 기한이 지나면 파기한다.
+ * 진행 중인 계약·상담이 있으면 파기할 수 없고, 기한 전에 파기하려면 사유를 적는다.
+ */
+function PrivacySection({ c, today }: { c: CustomerDetail; today: string }) {
+  const [until, setUntil] = useState(c.retention_until ?? c.retention.until ?? "");
+  const [confirming, setConfirming] = useState(false);
+  const [reason, setReason] = useState("");
+  useEffect(() => setUntil(c.retention_until ?? c.retention.until ?? ""), [c.retention_until, c.retention.until]);
+  const inv = [["customers"], ["inquiries"]];
+  const save = useApiMutation({ invalidate: inv, success: "보존 기한을 정했다" });
+  const wipe = useApiMutation({
+    invalidate: inv,
+    success: "개인정보를 파기했다",
+    onSuccess: () => {
+      setConfirming(false);
+      setReason("");
+    },
+  });
+  const wiped = c.name.startsWith("파기된 고객");
+  const busy = c.stage === "거주 중" || c.stage === "계약 중" || c.stage === "문의 중";
+  const due = !!c.retention.until && c.retention.until <= today;
+  return (
+    <Section title="개인정보" hint="보존 기한이 지나면 이름·연락처·계좌를 지운다. 계약·청구 기록(금액)은 남는다">
+      {wiped ? (
+        <p className="text-sm text-ink3">이미 파기한 고객이다</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="text-sm">
+            <span className="text-xs text-ink3">보존 기한 </span>
+            {c.retention.until ? (
+              <b className={due ? "text-bad" : undefined}>
+                {fmt(c.retention.until)}
+                {due && " · 지남"}
+              </b>
+            ) : (
+              <b>없음</b>
+            )}
+            <span className="ml-1 text-xs text-ink3">({c.retention.reason})</span>
+          </div>
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save.mutate({ path: `/api/customers/${c.id}`, method: "PATCH", body: { retention_until: until || null } });
+            }}
+          >
+            <Field label="보존 기한 정하기" htmlFor="retention-until" className="w-44">
+              <Input id="retention-until" type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
+            </Field>
+            <Button type="submit" size="sm" loading={save.isPending}>
+              저장
+            </Button>
+          </form>
+          {!confirming ? (
+            <Button variant="danger" size="sm" icon={<ShieldOff className="size-3.5" />} disabled={busy} title={busy ? `${c.stage}인 고객은 파기할 수 없다` : undefined} onClick={() => setConfirming(true)}>
+              개인정보 파기
+            </Button>
+          ) : (
+            <div className="flex flex-col gap-2 rounded-md border border-bad/40 bg-bad/5 p-3">
+              <p className="text-sm font-medium text-bad">이름·전화·메일·계좌를 지우고 되돌릴 수 없다</p>
+              <p className="text-xs text-ink2">대화 내용 속 연락처도 가린다. 계약·청구 금액 기록은 남는다.</p>
+              {!due && (
+                <Field label="기한 전에 파기하는 사유" htmlFor="wipe-reason" hint="예: 본인 요청(10/21 전화)">
+                  <Textarea id="wipe-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
+                </Field>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button size="sm" onClick={() => setConfirming(false)}>
+                  취소
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={!due && reason.trim().length < 2}
+                  loading={wipe.isPending}
+                  onClick={() => wipe.mutate({ path: `/api/customers/${c.id}/anonymize`, body: due ? {} : { force: true, reason: reason.trim() } })}
+                >
+                  파기 확정
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Section>
   );
 }

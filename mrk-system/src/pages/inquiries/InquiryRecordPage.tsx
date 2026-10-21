@@ -2,24 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Check, Send, StickyNote, CalendarPlus } from "lucide-react";
+import { ArrowLeft, Check, StickyNote, CalendarPlus, Lock, Trash2, UserPlus, Wand2 } from "lucide-react";
 import { useBranch } from "@/lib/branch";
 import { useApi, useApiMutation } from "@/lib/hooks";
 import { CHANNEL, INQUIRY_FUNNEL, INQUIRY_STAGE, LEASE_STATUS, LOST_REASONS, NATIONALITY } from "@/lib/codes";
 import { cx, fmt, man, minutes, timeLabel, won } from "@/lib/format";
 import { plusDays } from "@/lib/dates";
-import { Badge, Button, Dialog, ErrorBox, Field, Input, KeyValue, LinkButton, Loading, Section, Segmented, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Dialog, ErrorBox, Field, Input, KeyValue, LinkButton, Loading, Section, Select } from "@/components/ui";
 import { MemosSection, HistoryList } from "@/components/RecordParts";
-import type { InquiryStage, Message, Staff, Tour } from "@/types";
-import type { InquiryDetail, UnitMatch } from "./model";
+import type { InquiryStage, Staff, Tour } from "@/types";
+import type { InquiryDetail, InquiryDrafts, InquiryHold, InquiryParty, PartyMatch, UnitMatch } from "./model";
+import { AttachmentChips, ReplyComposer } from "./ReplyComposer";
+import { ExtractChips } from "./InboxView";
 import { newLeaseUrl } from "@/pages/units/shared";
-
-interface Template {
-  id: string;
-  title: string;
-  shortcut: string;
-  body: string;
-}
 
 export default function InquiryRecordPage() {
   const { inquiryId = "" } = useParams();
@@ -116,6 +111,8 @@ export default function InquiryRecordPage() {
             )}
           </Section>
 
+          {!life && <DraftsSection iq={iq} />}
+
           <Section title={life ? "문의" : "문의 조건"}>
             <div className="flex flex-col gap-4">
               <Field label="담당" htmlFor="iq-assignee">
@@ -146,7 +143,9 @@ export default function InquiryRecordPage() {
             </div>
           </Section>
 
+          {!life && <PartiesSection iq={iq} />}
           {!life && <Tours iq={iq} onAdd={() => setTourOpen(true)} />}
+          <HoldsSection iq={iq} />
           {!life && iq.stage !== "concluded" && iq.stage !== "lost" && <Matches iq={iq} today={today} />}
 
           {iq.leases.length > 0 && (
@@ -223,23 +222,9 @@ function StageStepper({ stage, lostReason, busy, onPick, onLost, onReopen }: { s
 }
 
 function Conversation({ iq }: { iq: InquiryDetail }) {
-  const [mode, setMode] = useState<"outbound" | "note">("outbound");
-  const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
-  const tpl = useApi<Template[]>(["materials", "templates", iq.branch_id ?? "all"], `/api/reply-templates?branch_id=${iq.branch_id ?? "all"}`);
-  const send = useApiMutation<Message>({
-    invalidate: [["inquiries"], ["customers"]],
-    success: (m) => (m.direction === "note" ? "내부 메모를 남겼다" : "답장을 보냈다"),
-    onSuccess: () => setText(""),
-  });
   useEffect(() => endRef.current?.scrollIntoView({ block: "nearest" }), [iq.messages.length]);
-
-  const fill = (body: string) =>
-    body
-      .replace(/\{이름\}/g, iq.party?.name ?? "고객")
-      .replace(/\{지점명\}/g, iq.branch_name ?? "MR.K")
-      .replace(/\{입주일\}/g, iq.desired_move_in ? fmt(iq.desired_move_in, "M월 d일") : "희망하신 날짜");
-
+  const nextTour = [...iq.tours].filter((t) => t.status === "scheduled").sort((a, b) => a.at.localeCompare(b.at))[0];
   return (
     <Section title="대화" hint={`${iq.messages.length}개 메시지 · 고객 메시지가 마지막이면 답장 대기다`} bodyClassName="p-0">
       <div className="flex max-h-[520px] flex-col gap-3 overflow-y-auto px-4 py-4">
@@ -254,7 +239,11 @@ function Conversation({ iq }: { iq: InquiryDetail }) {
             </div>
           ) : (
             <div key={m.id} className={cx("flex flex-col", m.direction === "outbound" ? "items-end" : "items-start")}>
-              <div className={cx("max-w-[85%] whitespace-pre-wrap rounded-lg px-3.5 py-2 text-sm", m.direction === "outbound" ? "rounded-br-sm bg-navy text-navy-fg" : "rounded-bl-sm bg-sunken text-ink")}>{m.body}</div>
+              <div className={cx("max-w-[85%] whitespace-pre-wrap rounded-lg px-3.5 py-2 text-sm", m.direction === "outbound" ? "rounded-br-sm bg-navy text-navy-fg" : "rounded-bl-sm bg-sunken text-ink")}>
+                {m.subject && <div className="mb-1 text-xs font-semibold opacity-80">{m.subject}</div>}
+                {m.body}
+                <AttachmentChips files={m.attachments} inverted={m.direction === "outbound"} />
+              </div>
               <span className="mt-1 text-[11px] text-ink3">
                 {m.author} · {CHANNEL[m.via] ?? m.via} · {timeLabel(m.at)}
               </span>
@@ -263,56 +252,18 @@ function Conversation({ iq }: { iq: InquiryDetail }) {
         )}
         <div ref={endRef} />
       </div>
-      <form
-        className="flex flex-col gap-2 border-t border-line px-4 py-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (text.trim()) send.mutate({ path: `/api/inquiries/${iq.id}/conversations`, body: { direction: mode, body: text, via: "email" } });
+      <ReplyComposer
+        postPath={`/api/inquiries/${iq.id}/conversations`}
+        invalidate={[["inquiries"], ["customers"]]}
+        branchId={iq.branch_id}
+        to={{ name: iq.party?.name ?? "고객", email: iq.party?.email || null }}
+        vars={{
+          이름: iq.party?.name ?? "고객",
+          입주일: iq.desired_move_in ? fmt(iq.desired_move_in, "M월 d일") : "희망하신 날짜",
+          투어일시: nextTour ? fmt(nextTour.at, "M월 d일 (EEE) HH:mm") : "",
         }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Segmented<"outbound" | "note">
-            size="sm"
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: "outbound", label: "답장 · 메일" },
-              { value: "note", label: "내부 메모" },
-            ]}
-          />
-          {mode === "outbound" && (tpl.data ?? []).length > 0 && (
-            <select
-              aria-label="정형 답변 넣기"
-              className="field h-8 w-auto max-w-[220px] text-[13px]"
-              value=""
-              onChange={(e) => {
-                const t = tpl.data?.find((x) => x.id === e.target.value);
-                if (t) setText((prev) => (prev ? `${prev}\n\n` : "") + fill(t.body));
-              }}
-            >
-              <option value="">정형 답변 넣기</option>
-              {tpl.data!.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <Textarea
-          id="iq-compose"
-          rows={3}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={mode === "note" ? "팀만 보는 메모" : `${iq.party?.name ?? "고객"}에게 보낼 답장`}
-          className={mode === "note" ? "border-brass/50" : undefined}
-        />
-        <div className="flex justify-end">
-          <Button type="submit" variant={mode === "note" ? "brass" : "primary"} size="sm" icon={mode === "note" ? <StickyNote className="size-3.5" /> : <Send className="size-3.5" />} loading={send.isPending} disabled={!text.trim()}>
-            {mode === "note" ? "메모 남기기" : "보내기"}
-          </Button>
-        </div>
-      </form>
+        defaultSubject={`${iq.branch_name ?? "MR.K"} 입주 문의 답변`}
+      />
     </Section>
   );
 }
@@ -381,6 +332,9 @@ function useMatches(iq: InquiryDetail, today: string) {
 /** 추천 방 — 희망 기간 내내 비어 있고 예산에 맞는 호실 */
 function Matches({ iq, today }: { iq: InquiryDetail; today: string }) {
   const { rows, err, start } = useMatches(iq, today);
+  const holds = useApi<InquiryHold[]>(["units", "holds", iq.id], `/api/inquiries/holds?branch_id=all&inquiry_id=${iq.id}`);
+  const held = new Set((holds.data ?? []).filter((h) => !h.expired).map((h) => h.unit_id));
+  const hold = useApiMutation({ invalidate: [["units"], ["inquiries"]], success: "방을 잡았다 · 내일 18시까지 홀드" });
   return (
     <Section title="추천 방" hint={`${fmt(start, "M.d")}부터 ${iq.stay_months ?? 1}개월 내내 비고${iq.monthly_budget ? ` 월 ${man(iq.monthly_budget)} 안팎인` : ""} 방`}>
       {err ? (
@@ -404,9 +358,28 @@ function Matches({ iq, today }: { iq: InquiryDetail; today: string }) {
                   {m.reason}
                   {m.free_until && ` · ${fmt(m.free_until, "M.d")}까지 빔`}
                 </span>
-                <LinkButton size="sm" to={newLeaseUrl(m.unit_id, start, iq.id)}>
-                  이 방으로 계약 작성
-                </LinkButton>
+                <span className="flex gap-1.5">
+                  {held.has(m.unit_id) ? (
+                    <Badge tone="warn">홀드 중</Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      icon={<Lock className="size-3.5" />}
+                      loading={hold.isPending}
+                      onClick={() =>
+                        hold.mutate({
+                          path: `/api/units/${m.unit_id}/blocks`,
+                          body: { kind: "hold", from: today, until: null, reason: `${iq.party?.name ?? "고객"} 문의 홀드`, inquiry_id: iq.id, hold_expires_at: `${plusDays(today, 1)}T18:00:00+09:00` },
+                        })
+                      }
+                    >
+                      방 잡기
+                    </Button>
+                  )}
+                  <LinkButton size="sm" to={newLeaseUrl(m.unit_id, start, iq.id)}>
+                    이 방으로 계약 작성
+                  </LinkButton>
+                </span>
               </div>
             </li>
           ))}
@@ -512,3 +485,177 @@ function TourDialog({ open, onClose, iq, today }: { open: boolean; onClose: () =
   );
 }
 
+/** 고객 메시지에서 읽은 조건 — 원본 «고객 메일에서 읽은 …». 다르면 「반영」 */
+function DraftsSection({ iq }: { iq: InquiryDetail }) {
+  const q = useApi<InquiryDrafts>(["inquiries", "drafts", iq.id], `/api/inquiries/${iq.id}/drafts`);
+  const patch = useApiMutation({ invalidate: [["inquiries"], ["units"]], success: "문의 조건에 반영했다" });
+  const patchParty = useApiMutation({ invalidate: [["inquiries"], ["customers"]], success: "고객 정보에 넣었다" });
+  const d = q.data;
+  if (!d?.source) return null;
+  const ex = d.extracted;
+  const needPhone = ex.phone && iq.party && !iq.party.phone;
+  const needMail = ex.email && iq.party && !iq.party.email;
+  return (
+    <Section title="메시지에서 읽은 조건" hint={`${timeLabel(d.source.at)} 고객 메시지에서 읽었다. 맞으면 반영한다`} actions={<Wand2 className="size-4 text-brass" />}>
+      <div className="flex flex-col gap-3">
+        {ex.first_sentence && <p className="border-l-2 border-brass/50 pl-2 text-sm text-ink2">«{ex.first_sentence}»</p>}
+        <ExtractChips ex={ex} />
+        {d.suggestions.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {d.suggestions.map((g) => (
+              <li key={g.field} className="flex flex-wrap items-center justify-between gap-2 rounded border border-line px-3 py-2 text-sm">
+                <span className="min-w-0">
+                  <span className="text-xs text-ink3">{g.label}</span>{" "}
+                  <span className="text-ink3 line-through">{g.current_display}</span> → <b className="num">{g.display}</b>
+                  <span className="ml-1 text-xs text-ink3">«{g.text}»</span>
+                </span>
+                <Button size="sm" loading={patch.isPending} onClick={() => patch.mutate({ path: `/api/inquiries/${iq.id}`, method: "PATCH", body: { [g.field]: g.value } })}>
+                  반영
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-ink3">읽은 값이 지금 문의 조건과 같다</p>
+        )}
+        {(needPhone || needMail) && (
+          <div className="flex flex-wrap gap-2">
+            {needPhone && (
+              <Button size="sm" onClick={() => patchParty.mutate({ path: `/api/customers/${iq.party!.id}`, method: "PATCH", body: { phone: ex.phone!.value } })}>
+                전화 {ex.phone!.value} 넣기
+              </Button>
+            )}
+            {needMail && (
+              <Button size="sm" onClick={() => patchParty.mutate({ path: `/api/customers/${iq.party!.id}`, method: "PATCH", body: { email: ex.email!.value } })}>
+                메일 {ex.email!.value} 넣기
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+/** 이 상담에서 잡은 홀드 — 기한이 지나면 저절로 풀린다 */
+function HoldsSection({ iq }: { iq: InquiryDetail }) {
+  const q = useApi<InquiryHold[]>(["units", "holds", iq.id], `/api/inquiries/holds?branch_id=all&inquiry_id=${iq.id}`);
+  const del = useApiMutation({ invalidate: [["units"], ["inquiries"]], success: "홀드를 풀었다" });
+  const rows = q.data ?? [];
+  if (!rows.length) return null;
+  return (
+    <Section title={`잡아 둔 방 ${rows.filter((h) => !h.expired).length}`} hint="홀드한 방은 다른 문의의 추천 방·판매 가능에서 빠진다">
+      <ul className="flex flex-col gap-2">
+        {rows.map((h) => (
+          <li key={h.block_id} className={cx("flex items-center gap-2 rounded border px-3 py-2 text-sm", h.expired ? "border-dashed border-line text-ink3" : "border-warn/50 bg-warn/5")}>
+            <Lock className="size-3.5 shrink-0" />
+            <Link to={`/units/${h.unit_id}`} className="font-semibold hover:text-brass">
+              {h.unit_code}호
+            </Link>
+            <span className="min-w-0 flex-1 truncate text-xs text-ink3">
+              {h.branch_name} · {h.expires_at ? `${fmt(h.expires_at, "M.d HH:mm")}${h.expired ? " 만료됨" : "까지"}` : "기한 없음"}
+            </span>
+            <button type="button" aria-label={`${h.unit_code}호 홀드 풀기`} className="rounded p-1 text-ink3 hover:bg-sunken hover:text-bad" onClick={() => del.mutate({ path: `/api/units/${h.unit_id}/blocks/${h.block_id}`, method: "DELETE" })}>
+              <Trash2 className="size-3.5" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+/** 함께 입주할 사람 — 원본 /api/inquiries/:id/parties. 법인 문의면 실제로 살 사람을 적는다 */
+function PartiesSection({ iq }: { iq: InquiryDetail }) {
+  const q = useApi<InquiryParty[]>(["inquiries", "parties", iq.id], `/api/inquiries/${iq.id}/parties`);
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [found, setFound] = useState<PartyMatch[] | null>(null);
+  const inv = [["inquiries"], ["customers"]];
+  const add = useApiMutation({
+    invalidate: inv,
+    success: "입주 예정자를 더했다",
+    onSuccess: () => {
+      setName("");
+      setPhone("");
+      setFound(null);
+      setAdding(false);
+    },
+  });
+  const del = useApiMutation({ invalidate: inv, success: "입주 예정자를 뺐다" });
+  const search = async () => {
+    if (name.trim().length < 2) return setFound([]);
+    setFound(await api<PartyMatch[]>("/api/parties/search", { method: "POST", body: { field: "name", value: name.trim() } }));
+  };
+  const rows = q.data ?? [];
+  const others = rows.filter((p) => p.role === "입주 예정");
+  return (
+    <Section
+      title={`함께 입주할 사람${others.length ? ` ${others.length}` : ""}`}
+      hint={iq.party?.kind === "corporation" ? "법인 문의다. 실제로 살 사람을 적어 두면 계약 작성 때 쓴다" : "같이 살 사람이 있으면 적어 둔다"}
+      actions={
+        !adding && (
+          <Button size="sm" icon={<UserPlus className="size-3.5" />} onClick={() => setAdding(true)}>
+            더하기
+          </Button>
+        )
+      }
+    >
+      <div className="flex flex-col gap-2">
+        {others.length === 0 && !adding && <p className="text-sm text-ink3">문의자 말고 적어 둔 사람이 없다</p>}
+        {others.map((p) => (
+          <div key={p.id} className="flex items-center justify-between gap-2 rounded border border-line px-3 py-2 text-sm">
+            <Link to={`/customers/${p.id}`} className="min-w-0 hover:text-brass">
+              <span className="font-medium">{p.name}</span>
+              <span className="ml-2 text-xs text-ink3">{[p.phone, p.email].filter(Boolean).join(" · ") || "연락처 없음"}</span>
+            </Link>
+            <button type="button" aria-label={`${p.name} 빼기`} className="rounded p-1 text-ink3 hover:bg-sunken hover:text-bad" onClick={() => del.mutate({ path: `/api/inquiries/${iq.id}/parties/${p.id}`, method: "DELETE" })}>
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        ))}
+        {adding && (
+          <form
+            className="flex flex-col gap-2 rounded-md border border-dashed border-line p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (name.trim()) add.mutate({ path: `/api/inquiries/${iq.id}/parties`, body: { name: name.trim(), phone } });
+            }}
+          >
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Input id={`party-name-${iq.id}`} value={name} onChange={(e) => (setName(e.target.value), setFound(null))} placeholder="이름" />
+              <Input id={`party-phone-${iq.id}`} inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="전화(선택)" />
+            </div>
+            {found && found.length > 0 && (
+              <ul className="flex flex-col gap-1">
+                {found.slice(0, 5).map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 rounded bg-sunken px-2.5 py-1.5 text-sm">
+                    <span className="min-w-0 truncate">
+                      {p.name} <span className="text-xs text-ink3">{p.phone} · 문의 {p.inquiry_count} · 계약 {p.lease_count}</span>
+                    </span>
+                    <Button size="sm" onClick={() => add.mutate({ path: `/api/inquiries/${iq.id}/parties`, body: { party_id: p.id } })}>
+                      이 고객으로
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {found && found.length === 0 && <p className="text-xs text-ink3">같은 이름의 고객이 없다 · 새로 더한다</p>}
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => (setAdding(false), setFound(null))}>
+                취소
+              </Button>
+              <Button size="sm" disabled={name.trim().length < 2} onClick={() => void search()}>
+                기존 고객 찾기
+              </Button>
+              <Button type="submit" size="sm" variant="primary" disabled={!name.trim()} loading={add.isPending}>
+                새로 더하기
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+    </Section>
+  );
+}
