@@ -374,7 +374,7 @@ export function ConversationsTab({ lease: l }: { lease: LeaseDetail }) {
           <div className="p-4"><ErrorBox error={q.error} /></div>
         ) : messages.length === 0 ? (
           <div className="p-4">
-            <EmptyState title="아직 대화가 없다" body="오른쪽에서 받은 메시지를 붙이거나 보낸 메시지를 기록한다" />
+            <EmptyState title="아직 대화가 없다" body="「남기기」에서 받은 메시지를 붙이거나 보낸 메시지를 기록한다" />
           </div>
         ) : (
           <ol className="flex max-h-[560px] flex-col gap-3 overflow-y-auto p-4">

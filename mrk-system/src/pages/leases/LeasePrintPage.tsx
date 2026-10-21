@@ -26,6 +26,9 @@ export default function LeasePrintPage() {
   const balanceDay = l.start_date;
   const accounts = l.branch?.accounts?.length ? l.branch.accounts.map((a) => `${a.bank} ${a.number} (예금주 ${a.holder})`).join(", ") : l.branch?.bank_account ?? "—";
   const unitName = [l.branch?.address, l.building?.name, `${l.unit_code}호`].filter(Boolean).join(" ");
+  // 지점 이름에 회사 이름이 이미 들어 있으면("MR.K 판교") 한 번만 쓴다
+  const branchName = l.branch?.name ?? l.branch_name;
+  const lessor = branchName.startsWith(l.company_name) ? branchName : `${l.company_name} ${branchName}`;
   const docNo = `${l.start_date.replace(/-/g, "").slice(2)}-${l.unit_code}-${l.id.slice(-4).toUpperCase()}`;
 
   return (
@@ -121,7 +124,7 @@ export default function LeasePrintPage() {
       <DocTable
         head={["구분", "이름", "연락처", "주소 · 국적"]}
         rows={[
-          ["임대인", `${l.company_name} (${l.branch?.name ?? l.branch_name})`, [l.branch?.phone, l.branch?.email].filter(Boolean).join(" · "), l.branch?.address ?? ""],
+          ["임대인", lessor, [l.branch?.phone, l.branch?.email].filter(Boolean).join(" · "), l.branch?.address ?? ""],
           ...l.parties
             .filter((p) => !p.roles.includes("occupant"))
             .map((p) => [p.roles.map((r) => (r === "contractor" ? "임차인" : ROLE_LABEL[r])).join(" · "), p.name, [p.phone, p.email].filter(Boolean).join(" · "), NATIONALITY[p.nationality] ?? p.nationality]),
@@ -132,7 +135,7 @@ export default function LeasePrintPage() {
       <p className="mt-8 text-center">이 계약을 증명하기 위해 계약서를 작성하고 임대인과 임차인이 서명한다.</p>
       <p className="mt-3 text-center font-semibold">{fmt(l.signed_at ?? l.created_at, "yyyy년 M월 d일")}</p>
       <div className="mt-8 grid grid-cols-2 gap-8">
-        <Sign who="임대인" name={`${l.company_name} ${l.branch?.name ?? ""}`} />
+        <Sign who="임대인" name={lessor} />
         <Sign who="임차인" name={l.contractor?.name ?? ""} />
       </div>
     </PrintSheet>

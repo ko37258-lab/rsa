@@ -218,7 +218,9 @@ function PrivacySection({ c, today }: { c: CustomerDetail; today: string }) {
             <Button variant="danger" size="sm" icon={<ShieldOff className="size-3.5" />} disabled={busy} title={busy ? `${c.stage}인 고객은 파기할 수 없다` : undefined} onClick={() => setConfirming(true)}>
               개인정보 파기
             </Button>
-          ) : (
+          ) : null}
+          {busy && !confirming && <p className="text-xs text-ink3">{c.stage}인 고객이라 지금은 파기할 수 없다</p>}
+          {!confirming ? null : (
             <div className="flex flex-col gap-2 rounded-md border border-bad/40 bg-bad/5 p-3">
               <p className="text-sm font-medium text-bad">이름·전화·메일·계좌를 지우고 되돌릴 수 없다</p>
               <p className="text-xs text-ink2">대화 내용 속 연락처도 가린다. 계약·청구 금액 기록은 남는다.</p>

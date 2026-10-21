@@ -25,6 +25,12 @@ type Send = { at: string; via: Invoice["via"]; to: string | null; kind: "send" |
 type InvoiceX = Invoice & { sends?: Send[]; fail_reason?: string | null };
 
 const OPEN: Lease["status"][] = ["concluded", "move_in_confirmed", "occupied", "closing"];
+
+/** 발송 기록 — 예전(시연) 청구서는 기록이 없으니 보낸 시각으로 한 줄 만든다 */
+function sendsOf(inv: InvoiceX): Send[] {
+  if (inv.sends?.length) return inv.sends;
+  return inv.state === "sent" && inv.sent_at ? [{ at: inv.sent_at, via: inv.via, to: inv.via === "email" ? inv.recipient_email : null, kind: "send" }] : [];
+}
 const iso = (d: string, h: number) => `${d}T${String(h).padStart(2, "0")}:00:00+09:00`;
 
 function unitCodeOf(ix: Index, leaseId: string | null): string | null {
@@ -53,7 +59,7 @@ function markSent(db: DB, inv: InvoiceX, at: string, kind: Send["kind"]): void {
   inv.state = "sent";
   inv.sent_at = at;
   inv.fail_reason = null;
-  inv.sends = [...(inv.sends ?? []), { at, via: inv.via, to: inv.via === "email" ? inv.recipient_email : null, kind }];
+  inv.sends = [...sendsOf(inv), { at, via: inv.via, to: inv.via === "email" ? inv.recipient_email : null, kind }];
   for (const c of db.charges) {
     if (!inv.charge_ids.includes(c.id) || c.status === "cancelled") continue;
     c.status = "sent";
@@ -108,7 +114,7 @@ function invoiceView(db: DB, ix: Index, inv: InvoiceX) {
   const paid = lines.reduce((s, l) => s + l.paid, 0);
   return {
     ...inv,
-    sends: inv.sends ?? [],
+    sends: sendsOf(inv),
     fail_reason: inv.fail_reason ?? null,
     total,
     paid,
@@ -314,7 +320,7 @@ function monthGroups(db: DB, ix: Index, branchId: string | null, m: string) {
         send_state,
         money_state,
         invoice: inv
-          ? { id: inv.id, invoice_no: inv.invoice_no, state: inv.state, via: inv.via, send_after: inv.send_after, sent_at: inv.sent_at, confirmed_at: inv.confirmed_at, fail_reason: inv.fail_reason ?? null, sends: inv.sends ?? [] }
+          ? { id: inv.id, invoice_no: inv.invoice_no, state: inv.state, via: inv.via, send_after: inv.send_after, sent_at: inv.sent_at, confirmed_at: inv.confirmed_at, fail_reason: inv.fail_reason ?? null, sends: sendsOf(inv) }
           : null,
         invoice_count: invoices.length,
       };
@@ -425,7 +431,7 @@ export const billingRoutes: Route[] = [
       .filter((i) => (!pid || i.payer_id === pid) && (!m || ym(i.bill_date) === m))
       .sort((a, b) => b.bill_date.localeCompare(a.bill_date) || b.confirmed_at.localeCompare(a.confirmed_at))
       .slice(0, 200)
-      .map((i) => ({ ...i, sends: i.sends ?? [], fail_reason: i.fail_reason ?? null, payer: partyCard(ix.party.get(i.payer_id)), unit_codes: [...new Set(i.charge_ids.map((id) => unitCodeOf(ix, db.charges.find((c) => c.id === id)?.lease_id ?? null)).filter(Boolean))] }));
+      .map((i) => ({ ...i, sends: sendsOf(i), fail_reason: i.fail_reason ?? null, payer: partyCard(ix.party.get(i.payer_id)), unit_codes: [...new Set(i.charge_ids.map((id) => unitCodeOf(ix, db.charges.find((c) => c.id === id)?.lease_id ?? null)).filter(Boolean))] }));
   }),
 
   route("GET /api/billing/invoices/:id", ({ params }) => {
@@ -497,7 +503,7 @@ export const billingRoutes: Route[] = [
     const payer = db.parties.find((p) => p.id === inv.payer_id);
     if (via === "email" && !payer?.email) throw new HttpError(409, "계약자 메일이 없다");
     const at = nowIso();
-    inv.sends = [...(inv.sends ?? []), { at, via, to: via === "email" ? payer?.email ?? null : null, kind: "resend" }];
+    inv.sends = [...sendsOf(inv), { at, via, to: via === "email" ? payer?.email ?? null : null, kind: "resend" }];
     inv.sent_at = at;
     return invoiceView(db, indexDB(db), inv);
   }),
@@ -506,8 +512,9 @@ export const billingRoutes: Route[] = [
     const db = getDB();
     const inv = must(db.invoices.find((i) => i.id === params.id), "청구서") as InvoiceX;
     if (inv.state === "cancelled") throw new HttpError(409, "확인 취소한 청구서다");
+    const prev = sendsOf(inv);
     inv.via = body?.via === "kakao" ? "kakao" : "manual";
-    if (inv.state === "sent") inv.sends = [...(inv.sends ?? []), { at: nowIso(), via: inv.via, to: null, kind: "manual" }];
+    if (inv.state === "sent") inv.sends = [...prev, { at: nowIso(), via: inv.via, to: null, kind: "manual" }];
     else markSent(db, inv, nowIso(), "manual");
     return invoiceView(db, indexDB(db), inv);
   }),

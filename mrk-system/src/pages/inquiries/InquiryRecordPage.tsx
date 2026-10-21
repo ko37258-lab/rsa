@@ -499,8 +499,10 @@ function DraftsSection({ iq }: { iq: InquiryDetail }) {
     <Section title="메시지에서 읽은 조건" hint={`${timeLabel(d.source.at)} 고객 메시지에서 읽었다. 맞으면 반영한다`} actions={<Wand2 className="size-4 text-brass" />}>
       <div className="flex flex-col gap-3">
         {ex.first_sentence && <p className="border-l-2 border-brass/50 pl-2 text-sm text-ink2">«{ex.first_sentence}»</p>}
-        <ExtractChips ex={ex} />
-        {d.suggestions.length > 0 ? (
+        {(ex.move_in || ex.months || ex.budget || ex.people || ex.phone || ex.email) && <ExtractChips ex={ex} />}
+        {!ex.move_in && !ex.months && !ex.budget && !ex.people ? (
+          <p className="text-xs text-ink3">이 메시지에서는 입주일·기간·예산·인원을 읽지 못했다</p>
+        ) : d.suggestions.length > 0 ? (
           <ul className="flex flex-col gap-1.5">
             {d.suggestions.map((g) => (
               <li key={g.field} className="flex flex-wrap items-center justify-between gap-2 rounded border border-line px-3 py-2 text-sm">

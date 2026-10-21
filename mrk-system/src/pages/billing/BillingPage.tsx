@@ -178,7 +178,38 @@ export default function BillingPage() {
           }
         />
       ) : (
-        <div className="scroll-x rounded-md border border-line bg-surface">
+        <>
+        {/* 휴대폰: 카드 목록 */}
+        <ul className="flex flex-col gap-2 sm:hidden">
+          {visible.length === 0 && <li className="rounded-md border border-line bg-surface px-3 py-10 text-center text-sm text-ink3">조건에 맞는 청구가 없다</li>}
+          {visible.map((g) => {
+            const st = SEND_STATE[g.send_state];
+            const ms = MONEY_STATE[g.money_state];
+            return (
+              <li key={g.key} className={cx("flex items-start gap-3 rounded-md border border-line bg-surface px-3 py-3", openKey === g.key && "border-brass")}>
+                <input id={`mpick-${g.key}`} type="checkbox" className="mt-1 size-4" aria-label={`${g.payer?.name ?? ""} 청구서 선택`} disabled={!selectable(g)} checked={picked.has(g.key)} onChange={() => toggle(g.key)} />
+                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => update({ invoice: g.key })}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate font-medium">{g.payer?.name ?? "—"}</span>
+                    <span className="num shrink-0 font-semibold">{g.needs_amount && g.needs_amount === g.lines.length ? "—" : g.total.toLocaleString("ko-KR")}</span>
+                  </div>
+                  <div className="num mt-0.5 flex justify-between gap-2 text-xs text-ink3">
+                    <span className="truncate">
+                      {g.unit_codes.map((c) => `${c}호`).join(", ")} · 청구 {fmt(g.bill_date, "M.d")} · 납기 {fmt(g.due_date, "M.d")}
+                    </span>
+                    {g.left > 0 && <span className={cx("shrink-0", g.money_state === "overdue" && "font-semibold text-bad")}>남음 {g.left.toLocaleString("ko-KR")}</span>}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    <Badge tone={st.tone}>{g.send_state === "needs_amount" ? `고지서 금액 필요 ${g.needs_amount}건` : st.label}</Badge>
+                    {(g.money_state === "overdue" || g.money_state === "paid") && <Badge tone={ms.tone}>{ms.label}</Badge>}
+                    <span className="text-[11px] text-ink3">{stateNote(g)}</span>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="scroll-x hidden rounded-md border border-line bg-surface sm:block">
           <table className="w-full min-w-[760px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line bg-sunken/60 text-xs font-semibold text-ink3">
@@ -261,6 +292,7 @@ export default function BillingPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
       <p className="mt-3 text-xs text-ink3">
         청구일·납기는 계약마다 정한 청구 방식(입주일 기준이면 기간 첫날, 달력 월이면 지점 청구일)을 따른다. 행을 누르면 청구서를 열어 확인·발송·확인 취소를 한다.

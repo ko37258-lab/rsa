@@ -14,7 +14,7 @@ import { AttachmentChips, ReplyComposer } from "./ReplyComposer";
 /** 읽은 조건을 짧은 칩으로 */
 export function ExtractChips({ ex, compact }: { ex: ExtractedFields; compact?: boolean }) {
   const chips = [
-    ex.move_in && `입주 ${fmt(ex.move_in.value, "M.d")}`,
+    ex.move_in && `입주 ${fmt(ex.move_in.value, ex.move_in.value.slice(0, 4) === String(new Date().getFullYear()) ? "M.d" : "yy.M.d")}`,
     ex.months && `${ex.months.value}개월`,
     ex.budget && `월 ${man(ex.budget.value)}`,
     ex.people && `${ex.people.value}명`,

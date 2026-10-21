@@ -10,6 +10,7 @@ import type { ChargeKind } from "@/types";
 import type { PayerRow } from "@/pages/billing/api";
 import { Receipts } from "./Receipts";
 import { PaymentDialog } from "./ReceiptDialogs";
+import { usePayers, type Upd } from "./hooks";
 
 interface HistoryRow {
   id: string;
@@ -73,12 +74,7 @@ const IS = {
   credit: (r: PayerRow) => r.credit > 0,
 };
 
-export function usePayers() {
-  const { branchId } = useBranch();
-  return useApi<PayerRow[]>(["collections", "payers", branchId], `/api/billing/payers?branch_id=${branchId}`);
-}
 
-export type Upd = (patch: Record<string, string | null>) => void;
 
 function Payers({ sp, update }: { sp: URLSearchParams; update: Upd }) {
   const q = usePayers();

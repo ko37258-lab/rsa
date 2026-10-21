@@ -50,7 +50,43 @@ export function FloorPlanEditor({ branchId, units, onDone }: { branchId: string;
       for (const id of ids) n.set(id, fn(n.get(id)!));
       return n;
     });
-  const targets = (id: string) => (sel.has(id) ? [...sel] : [id]);
+  const floorOf = (id: string) => units.find((u) => u.id === id)?.floor ?? null;
+  const sameFloor = (id: string) => units.filter((u) => u.id !== id && u.floor === floorOf(id)).map((u) => u.id);
+
+  /** 한 칸 옮기기 — 옆에 호실이 붙어 있으면 자리를 바꾼다(겹치지 않게) */
+  const step = (id: string, dir: -1 | 1) =>
+    setLay((prev) => {
+      const n = new Map(prev);
+      const me = n.get(id)!;
+      const others = sameFloor(id);
+      if (dir === 1) {
+        const nb = others.find((o) => n.get(o)!.col === me.col + me.span);
+        if (nb) {
+          const b = n.get(nb)!;
+          n.set(nb, { ...b, col: me.col });
+          n.set(id, { ...me, col: me.col + b.span });
+        } else n.set(id, { ...me, col: me.col + 1 });
+      } else {
+        const nb = others.find((o) => n.get(o)!.col + n.get(o)!.span - 1 === me.col - 1);
+        if (nb) {
+          const b = n.get(nb)!;
+          n.set(id, { ...me, col: b.col });
+          n.set(nb, { ...b, col: b.col + me.span });
+        } else n.set(id, { ...me, col: Math.max(1, me.col - 1) });
+      }
+      return n;
+    });
+
+  /** 넓히기 — 오른쪽 호실들을 한 칸씩 밀어 자리를 낸다 */
+  const widen = (id: string) =>
+    setLay((prev) => {
+      const n = new Map(prev);
+      const me = n.get(id)!;
+      const edge = me.col + me.span;
+      if (sameFloor(id).some((o) => n.get(o)!.col === edge)) for (const o of sameFloor(id)) if (n.get(o)!.col >= edge) n.set(o, { ...n.get(o)!, col: n.get(o)!.col + 1 });
+      n.set(id, { ...me, span: me.span + 1 });
+      return n;
+    });
 
   /** 번호순으로 왼쪽부터 빈틈 없이 다시 채운다 */
   const repack = (list: UnitRow[]) =>
@@ -109,16 +145,19 @@ export function FloorPlanEditor({ branchId, units, onDone }: { branchId: string;
         <div className="flex min-w-max flex-col gap-1.5">
           {floors.map(([f, list]) => (
             <div key={f} className="flex items-stretch gap-2">
-              <div className="flex w-[74px] shrink-0 flex-col items-end justify-center gap-1">
+              <div className="flex w-[96px] shrink-0 flex-col items-end justify-center gap-0.5">
                 <span className="num text-xs font-semibold text-ink3">{f === "미정" ? "층 미정" : `${f}층`}</span>
-                <button type="button" className="text-[11px] text-brass hover:underline" onClick={() => repack(list)}>
-                  열 비우기(번호순)
+                <button type="button" className="whitespace-nowrap text-right text-[11px] leading-tight text-brass hover:underline" onClick={() => repack(list)} title="번호순으로 왼쪽부터 빈틈 없이 다시 놓는다">
+                  열 비우기
+                  <br />
+                  (번호순)
                 </button>
               </div>
               <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${maxCol}, 120px)` }}>
                 {list.map((u) => {
                   const l = lay.get(u.id)!;
-                  const ids = targets(u.id);
+                  // 여러 개 고른 상태에서 고른 칸의 화살표를 누르면 고른 것을 함께 옮긴다
+                  const move = (dir: -1 | 1) => (sel.has(u.id) && sel.size > 1 ? change([...sel], (x) => ({ ...x, col: Math.max(1, x.col + dir) })) : step(u.id, dir));
                   return (
                     <div
                       key={u.id}
@@ -142,16 +181,16 @@ export function FloorPlanEditor({ branchId, units, onDone }: { branchId: string;
                           {l.col}열{l.span > 1 ? ` · ${l.span}칸` : ""}
                         </span>
                         <span className="flex">
-                          <EditBtn label={`${u.code}호 왼쪽으로`} disabled={l.col <= 1} onClick={() => change(ids, (x) => ({ ...x, col: Math.max(1, x.col - 1) }))}>
+                          <EditBtn label={`${u.code}호 왼쪽으로`} disabled={l.col <= 1} onClick={() => move(-1)}>
                             <ChevronLeft className="size-3.5" />
                           </EditBtn>
-                          <EditBtn label={`${u.code}호 오른쪽으로`} disabled={l.col + l.span > maxCol} onClick={() => change(ids, (x) => ({ ...x, col: x.col + 1 }))}>
+                          <EditBtn label={`${u.code}호 오른쪽으로`} disabled={l.col + l.span > maxCol} onClick={() => move(1)}>
                             <ChevronRight className="size-3.5" />
                           </EditBtn>
                           <EditBtn label={`${u.code}호 좁게`} disabled={l.span <= 1} onClick={() => change([u.id], (x) => ({ ...x, span: x.span - 1 }))}>
                             <Minus className="size-3.5" />
                           </EditBtn>
-                          <EditBtn label={`${u.code}호 넓게`} disabled={l.span >= 4} onClick={() => change([u.id], (x) => ({ ...x, span: x.span + 1 }))}>
+                          <EditBtn label={`${u.code}호 넓게`} disabled={l.span >= 4} onClick={() => widen(u.id)}>
                             <Plus className="size-3.5" />
                           </EditBtn>
                         </span>
