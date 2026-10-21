@@ -12,7 +12,7 @@ export function man(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
   const v = n / 10000;
   if (Math.abs(v) >= 10000) return `${(v / 10000).toFixed(2).replace(/\.?0+$/, "")}억`;
-  return `${Number.isInteger(v) ? v.toLocaleString("ko-KR") : v.toFixed(1)}만`;
+  return `${v.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}만`;
 }
 
 /** 숫자에 천 단위 쉼표 */

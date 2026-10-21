@@ -10,7 +10,7 @@ import type {
 import { daysBetween, plusDays, plusMonths, ym } from "@/lib/dates";
 import { SOURCES, LOST_REASONS } from "@/lib/codes";
 
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 function mulberry32(seed: number) {
   let a = seed;
@@ -255,6 +255,8 @@ export function buildSeed(today: string): DB {
   };
 
   const historyStart = plusDays(today, -380);
+  /** 오늘을 넘는 날짜는 오늘에서 back 일 전으로 당긴다 */
+  const upToToday = (d: string, back = 0) => (d > today ? plusDays(today, -back) : d);
   for (const unit of units) {
     if (unit.sale_status === "off_sale") continue;
     const branchId = unit.branch_id;
@@ -277,7 +279,7 @@ export function buildSeed(today: string): DB {
       if (!future && start <= today && end >= today && chance(0.07)) break;
 
       const corp = chance(0.1);
-      const contractor: Party = isRenewal && prevParty ? prevParty : newPerson(branchId, plusDays(start, -int(10, 45)));
+      const contractor: Party = isRenewal && prevParty ? prevParty : newPerson(branchId, upToToday(plusDays(start, -int(10, 45))));
       const payer = corp ? pick(corpParties) : contractor;
       const discount = term >= 12 ? 30000 : term <= 1 ? -50000 : 0;
       const rent = Math.max(ut.list_rent - discount - (chance(0.15) ? 20000 : 0), 400000);
@@ -287,8 +289,9 @@ export function buildSeed(today: string): DB {
       else status = daysBetween(end, today) <= 12 && chance(0.7) ? "closing" : "closed";
       if (status === "move_in_confirmed" && daysBetween(today, start) > 25) status = "concluded";
 
-      const createdDay = plusDays(start, -int(5, 35));
-      const signedDay = status === "awaiting_signature" ? null : plusDays(createdDay, int(0, 3));
+      // 앞날 계약도 작성·서명은 오늘 이전에 일어났다
+      const createdDay = upToToday(plusDays(start, -int(5, 35)), int(1, 6));
+      const signedDay = status === "awaiting_signature" ? null : upToToday(plusDays(createdDay, int(0, 3)));
       const src = sourcePick();
       const lease: Lease = {
         id: id("ls"),

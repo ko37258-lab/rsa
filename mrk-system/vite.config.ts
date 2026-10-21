@@ -7,4 +7,6 @@ export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@": "/src" } },
   server: { port: 5173, host: true },
+  // 전체 앱이 한 덩어리여도 gzip 200KB 수준이라 경고 기준만 올린다
+  build: { chunkSizeWarningLimit: 800 },
 });
