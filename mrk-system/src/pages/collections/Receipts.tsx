@@ -4,7 +4,7 @@ import { Sparkles, Upload } from "lucide-react";
 import { api } from "@/api/client";
 import { useApi, useApiMutation } from "@/lib/hooks";
 import { useBranch } from "@/lib/branch";
-import { timeLabel, won } from "@/lib/format";
+import { cx, timeLabel, won } from "@/lib/format";
 import { Badge, Button, DataTable, ErrorBox, Loading, Money, SearchBox, Segmented, useToast, type Column } from "@/components/ui";
 import { MONEY_KEYS, type Receipt, type ReceiptPage, type Suggestion } from "@/pages/billing/api";
 import { BankUploadDialog } from "./BankUploadDialog";
@@ -188,6 +188,50 @@ export function Receipts({ sp, update }: { sp: URLSearchParams; update: Upd }) {
         <ErrorBox error={q.error} />
       ) : (
         <>
+          {/* 휴대폰: 카드 목록 */}
+          <ul className="flex flex-col gap-2 sm:hidden">
+            {rows.length === 0 && <li className="rounded-md border border-line bg-surface px-3 py-10 text-center text-sm text-ink3">{q.data?.counts.all ? "조건에 맞는 입금이 없다" : "입금 기록이 없다"}</li>}
+            {rows.map((r) => {
+              const top = r.status === "unmatched" ? byPayment.get(r.id)?.candidates[0] : undefined;
+              return (
+                <li key={r.id} className={cx("rounded-md border border-line bg-surface px-3 py-2.5", r.status === "unmatched" && "border-warn/40 bg-warn/5", openId === r.id && "border-brass")}>
+                  <button type="button" className="w-full text-left" onClick={() => update({ receipt: r.id })}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate font-medium">{r.depositor_name}</span>
+                      <span className="num shrink-0 font-semibold">{r.amount.toLocaleString("ko-KR")}</span>
+                    </div>
+                    <div className="num flex justify-between gap-2 text-xs text-ink3">
+                      <span>{timeLabel(r.received_at)}</span>
+                      <span className="truncate">
+                        {r.status === "matched" ? `${r.payer?.name ?? ""} ${r.unit_codes.map((c) => `${c}호`).join(", ")}` : r.status === "skipped" ? "수납 아님" : "안 맞춘 입금"}
+                        {r.status === "matched" && r.left > 0 ? ` · 잔액 ${r.left.toLocaleString("ko-KR")}` : ""}
+                      </span>
+                    </div>
+                  </button>
+                  {r.status === "unmatched" && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {top ? (
+                        <>
+                          <span className="min-w-0 flex-1 truncate text-xs text-ink2">
+                            추천 <b>{top.payer?.name}</b> · {top.reasons[0]}
+                          </span>
+                          <Button size="sm" variant="primary" onClick={() => quick.mutate({ path: `/api/billing/receipts/${r.id}/match`, body: { payer_id: top.payer_id } })}>
+                            맞추기
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="flex-1 text-xs text-ink3">추천 없음</span>
+                      )}
+                      <Button size="sm" onClick={() => setMatch(r)}>
+                        {top ? "다른" : "납부자 고르기"}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden sm:block">
           <DataTable
             rows={rows}
             columns={columns}
@@ -197,6 +241,7 @@ export function Receipts({ sp, update }: { sp: URLSearchParams; update: Upd }) {
             rowClassName={(r) => (r.status === "unmatched" ? "bg-warn/5" : r.status === "skipped" ? "text-ink3" : undefined)}
             empty={q.data?.counts.all ? "조건에 맞는 입금이 없다" : "입금 기록이 없다. 은행 엑셀을 올리면 여기에 모인다"}
           />
+          </div>
           {q.data?.next_offset !== null && q.data?.next_offset !== undefined && (
             <div className="flex justify-center">
               <Button onClick={() => setLimit((l) => l + PAGE)} loading={q.isFetching}>
