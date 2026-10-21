@@ -67,7 +67,9 @@ export function LineChart({
   const n = labels.length;
   const x = (i: number) => padL + (n <= 1 ? 0 : (i * (W - padL - padR)) / (n - 1));
   const y = (v: number) => padT + (1 - (v - min) / (top - min || 1)) * (H - padT - padB);
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => min + t * (top - min));
+  // 값이 모두 0 이면 눈금을 0 하나만 둔다(같은 글자 "0만" 이 반복되지 않게)
+  const flat = all.length === 0 || all.every((v) => v === min);
+  const ticks = flat && max === undefined ? [min] : [0, 0.25, 0.5, 0.75, 1].map((t) => min + t * (top - min));
   const labelEvery = Math.ceil(n / 8);
   return (
     <div className="relative w-full">
@@ -159,7 +161,7 @@ export function BarChart({
   const top = niceMax(Math.max(...totals, 0) * 1.05);
   const band = (W - padL - padR) / Math.max(n, 1);
   const y = (v: number) => padT + (1 - v / top) * (H - padT - padB);
-  const ticks = [0, 0.5, 1].map((t) => t * top);
+  const ticks = totals.every((t) => t === 0) ? [0] : [0, 0.5, 1].map((t) => t * top);
   const labelEvery = Math.ceil(n / 12);
   return (
     <div className="relative w-full">

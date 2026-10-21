@@ -6,9 +6,9 @@ import { useApi, useApiMutation } from "@/lib/hooks";
 import { useBranch } from "@/lib/branch";
 import { fmt } from "@/lib/format";
 import type { QaItem } from "@/types";
-import type { QaRes, QaRow } from "@/pages/dashboard/ops-api";
+import type { QaContractRow, QaContractsRes, QaRes, QaRow } from "@/pages/dashboard/ops-api";
 
-type View = "open" | "answered" | "resolved";
+type View = "open" | "answered" | "resolved" | "contracts";
 const TOPICS = ["청구", "수납", "계약", "정산", "운영"];
 const ANSWER_HINT = "번호를 붙여 한 번에 답해 주세요. 예: ① 다음 달에서 뺌 ② 부가세 포함";
 
@@ -94,11 +94,88 @@ function QaCard({ row, showBranch }: { row: QaRow; showBranch: boolean }) {
   );
 }
 
+const CONTRACT_STATE: Record<QaContractRow["state"], { label: string; tone: "warn" | "info" | "good" }> = {
+  open: { label: "답 기다리는 계약", tone: "warn" },
+  answered: { label: "답 있음 · 확정 기다리는 계약", tone: "info" },
+  resolved: { label: "해결된 계약", tone: "good" },
+};
+
+/** 계약별 보기 — 계약 하나에 걸린 질문을 묶어 확정 n/m 을 본다 */
+function ContractsView({ branchId, search }: { branchId: string; search: string }) {
+  const q = useApi<QaContractsRes>(["qa", "contracts", branchId], `/api/qa/contracts?branch_id=${branchId}`);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  if (q.isLoading) return <Loading />;
+  if (q.error) return <ErrorBox error={q.error} />;
+  const s = search.trim().toLowerCase();
+  const rows = (q.data?.rows ?? []).filter(
+    (r) => !s || (r.unit_code ?? "").includes(s) || (r.contractor_name ?? "").toLowerCase().includes(s) || r.items.some((i) => i.question.toLowerCase().includes(s) || (i.answer ?? "").toLowerCase().includes(s)),
+  );
+  if (!rows.length) return <EmptyState title={s ? "맞는 계약이 없다" : "확인할 계약이 없다"} body="계약에 걸린 질문이 생기면 계약별로 모인다" />;
+  const groups = (["open", "answered", "resolved"] as const).map((st) => ({ st, list: rows.filter((r) => r.state === st) })).filter((g) => g.list.length);
+  return (
+    <div className="flex flex-col gap-5">
+      {groups.map((g) => (
+        <section key={g.st} className="flex flex-col gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink2">
+            {CONTRACT_STATE[g.st].label}
+            <span className="num text-xs font-normal text-ink3">{g.list.length}</span>
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {g.list.map((r) => {
+              const expanded = open.has(r.lease_id) || g.st !== "resolved";
+              return (
+                <li key={r.lease_id} className="rounded-md border border-line bg-surface">
+                  <button
+                    type="button"
+                    className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left"
+                    onClick={() =>
+                      setOpen((prev) => {
+                        const n = new Set(prev);
+                        if (n.has(r.lease_id)) n.delete(r.lease_id);
+                        else n.add(r.lease_id);
+                        return n;
+                      })
+                    }
+                    aria-expanded={expanded}
+                  >
+                    <span className="num font-semibold">{r.unit_code ? `${r.unit_code}호 계약` : "계약"}</span>
+                    {r.contractor_name && <span className="text-sm text-ink2">{r.contractor_name}</span>}
+                    {branchId === "all" && <span className="text-xs text-ink3">{r.branch_name}</span>}
+                    {r.blocks_invoice && <Badge tone="bad">청구서 안 나감</Badge>}
+                    <span className="ml-auto flex items-center gap-2">
+                      <Badge tone={CONTRACT_STATE[r.state].tone}>
+                        확정 {r.confirmed}/{r.total}
+                      </Badge>
+                      <Link to={`/leases/${r.lease_id}`} onClick={(e) => e.stopPropagation()} className="text-xs font-medium text-brass hover:underline">
+                        계약 보기
+                      </Link>
+                    </span>
+                  </button>
+                  {expanded && (
+                    <ul className="flex flex-col gap-2 border-t border-line p-3">
+                      {r.items.map((it) => (
+                        <QaCard key={`${it.id}-${it.state}-${it.answer ?? ""}`} row={it} showBranch={false} />
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export default function QaPage() {
   const { branchId, branches } = useBranch();
   const [view, setView] = useState<View>("open");
   const [search, setSearch] = useState("");
-  const q = useApi<QaRes>(["qa", branchId, view], `/api/qa?branch_id=${branchId}&state=${view}`);
+  // 계약별 보기에서도 위 칸의 건수를 보이려고 목록 조회는 계속한다
+  const listView = view === "contracts" ? "open" : view;
+  const q = useApi<QaRes>(["qa", branchId, listView], `/api/qa?branch_id=${branchId}&state=${listView}`);
+  const contracts = useApi<QaContractsRes>(["qa", "contracts", branchId], `/api/qa/contracts?branch_id=${branchId}`);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ branch_id: "", topic: "청구", question: "", blocks_invoice: false });
   const create = useApiMutation({
@@ -136,12 +213,15 @@ export default function QaPage() {
             { value: "open", label: "답 기다리는", count: c?.open },
             { value: "answered", label: "답 있음 · 확정 기다리는", count: c?.answered },
             { value: "resolved", label: "해결된", count: c?.resolved },
+            { value: "contracts", label: "계약별", count: contracts.data ? contracts.data.counts.open + contracts.data.counts.answered : undefined },
           ]}
         />
         <SearchBox id="qa-search" value={search} onChange={setSearch} placeholder="질문·답·호실" />
       </PageHeader>
 
-      {q.isLoading ? (
+      {view === "contracts" ? (
+        <ContractsView branchId={branchId} search={search} />
+      ) : q.isLoading ? (
         <Loading />
       ) : q.error ? (
         <ErrorBox error={q.error} />

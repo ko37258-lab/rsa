@@ -2,14 +2,15 @@ import { route, must, HttpError, type Route } from "../router";
 import { getDB, newId, nowIso, resetDB, today } from "../db";
 import { indexDB, inBranch, payerBalances, unitToday } from "../logic";
 import { LEASE_STATUS, INQUIRY_STAGE, CHARGE_KIND, CHANNEL, SOURCES, LOST_REASONS, VAT_MODE, NATIONALITY } from "@/lib/codes";
-import { daysBetween, plusDays } from "@/lib/dates";
+import { daysBetween, plusDays, plusMonth } from "@/lib/dates";
 import type { Memo } from "@/types";
 
 /** 모든 화면이 같이 쓰는 API: 로그인 사용자 · 지점 · 코드 · 알림 · 메모 */
 export const commonRoutes: Route[] = [
-  route("GET /api/me", () => ({ ...getDB().me, today: today() })),
-
-  route("GET /api/staff", () => getDB().staff),
+  route("GET /api/me", () => {
+    const db = getDB();
+    return { ...db.me, today: today(), mode: db.mode ?? "demo", company_name: db.company_name ?? "MR.K" };
+  }),
 
   route("GET /api/branches", () => {
     const db = getDB();
@@ -49,6 +50,15 @@ export const commonRoutes: Route[] = [
     const holds = db.blocks.filter((k) => k.kind === "hold" && k.hold_expires_at && k.hold_expires_at.slice(0, 10) <= plusDays(t, 1));
     const holdUnits = holds.map((h) => ix.unit.get(h.unit_id)).filter((u) => u && inBranch(b)(u));
     if (holdUnits.length) alerts.push({ id: "hold", tone: "info", text: `내일까지 끝나는 홀드 ${holdUnits.length}건`, to: "/units" });
+    // 관리비 고지서 금액이 아직 안 들어온 청구(이번 달·다음 달 청구일)
+    const thisM = t.slice(0, 7);
+    const nextM = plusMonth(thisM, 1);
+    const needs = db.charges.filter(inBranch(b)).filter((c) => c.status === "draft" && c.needs_amount && (c.month === thisM || c.month === nextM));
+    if (needs.length) alerts.push({ id: "bill_amount", tone: "warn", text: `고지서 금액 필요 ${needs.length}건`, to: "/billing" });
+    const failed = (db.invoices ?? []).filter(inBranch(b)).filter((i) => i.state === "failed");
+    if (failed.length) alerts.push({ id: "mail_failed", tone: "bad", text: `메일 못 보낸 청구서 ${failed.length}장`, to: "/billing" });
+    const unlinked = (db.conversations ?? []).filter((c) => !c.inquiry_id && !c.lease_id).filter((c) => !b || b === "all" || c.branch_id === b || c.branch_id === null);
+    if (unlinked.length) alerts.push({ id: "inbox", tone: "info", text: `미연결 대화 ${unlinked.length}건`, to: "/inquiries?kind=inbox" });
     const free = db.units.filter(inBranch(b)).filter((u) => unitToday(db, ix, u, t).state === "vacant").length;
     return { alerts, units_free: free };
   }),

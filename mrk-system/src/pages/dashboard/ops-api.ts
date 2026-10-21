@@ -67,7 +67,7 @@ export interface MonthStat {
   other_revenue: number;
   revpar: number | null;
   amr: number | null;
-  vacancy_loss: number;
+  vacancy_loss: number | null; // 실사용 시작 전 달은 null
   inquiries: number;
   concluded: number;
   move_ins: number;
@@ -222,6 +222,28 @@ export interface QaRow extends QaItem {
 
 export interface QaRes {
   rows: QaRow[];
+  counts: { open: number; answered: number; resolved: number };
+}
+
+/** 계약별 Q&A 묶음 */
+export interface QaContractRow {
+  lease_id: string;
+  unit_id: string | null;
+  unit_code: string | null;
+  contractor_name: string | null;
+  lease_status: Lease["status"] | null;
+  branch_name: string;
+  total: number;
+  confirmed: number;
+  open: number;
+  blocks_invoice: boolean;
+  state: "open" | "answered" | "resolved";
+  last_at: string;
+  items: QaRow[];
+}
+
+export interface QaContractsRes {
+  rows: QaContractRow[];
   counts: { open: number; answered: number; resolved: number };
 }
 

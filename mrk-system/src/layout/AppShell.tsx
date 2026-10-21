@@ -4,14 +4,17 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard, DoorOpen, MessagesSquare, FileSignature, Users, Receipt, Wallet, Scale, BookOpen,
   ClipboardCheck, ShieldCheck, HelpCircle, ScrollText, FolderOpen, Bell, Menu, X, Plus, Sun, Moon, Monitor, RotateCcw,
+  Settings, Search, Download,
 } from "lucide-react";
+import { CommandPalette } from "@/components/CommandPalette";
 import { useBranch } from "@/lib/branch";
 import { useApi } from "@/lib/hooks";
 import { api, API_MODE } from "@/api/client";
 import { cx, fmt } from "@/lib/format";
 import { useToast } from "@/components/ui";
 
-const NAV: Array<{ group: string; items: Array<{ to: string; label: string; icon: typeof LayoutDashboard }> }> = [
+/** permission 이 있는 메뉴는 그 권한이 있는 사람에게만 보인다(원본: 정합성 → integrity_read) */
+const NAV: Array<{ group: string; items: Array<{ to: string; label: string; icon: typeof LayoutDashboard; permission?: string }> }> = [
   {
     group: "영업",
     items: [
@@ -35,10 +38,11 @@ const NAV: Array<{ group: string; items: Array<{ to: string; label: string; icon
     group: "관리",
     items: [
       { to: "/readiness", label: "운영 준비", icon: ClipboardCheck },
-      { to: "/integrity", label: "정합성", icon: ShieldCheck },
+      { to: "/integrity", label: "정합성", icon: ShieldCheck, permission: "integrity_read" },
       { to: "/qa", label: "Q&A", icon: HelpCircle },
       { to: "/policies", label: "운영정책", icon: ScrollText },
       { to: "/materials", label: "응대 자료", icon: FolderOpen },
+      { to: "/settings", label: "설정", icon: Settings },
     ],
   },
 ];
@@ -55,12 +59,14 @@ function Logo() {
 }
 
 function SideNav({ onNavigate }: { onNavigate?: () => void }) {
+  const { me } = useBranch();
+  const allowed = (perm?: string) => !perm || !me || me.permissions.includes(perm);
   return (
     <nav className="flex flex-col gap-5" aria-label="주 메뉴">
       {NAV.map((g) => (
         <div key={g.group} className="flex flex-col gap-0.5">
           <div className="label-caps px-3 pb-1">{g.group}</div>
-          {g.items.map((it) => (
+          {g.items.filter((it) => allowed(it.permission)).map((it) => (
             <NavLink
               key={it.to}
               to={it.to}
@@ -161,11 +167,27 @@ export function AppShell() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
+  const [palette, setPalette] = useState(false);
+  const real = (me as { mode?: string } | null)?.mode === "real";
+  const company = (me as { company_name?: string } | null)?.company_name;
   useEffect(() => setDrawer(false), [loc.pathname]);
+
+  // Ctrl·⌘ + K 로 찾기
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPalette((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
 
   const reset = async () => {
     await api("/api/demo/reset", { method: "POST" });
-    await qc.invalidateQueries();
+    setBranchId("all");
+    await qc.resetQueries();
     toast.show("시연 데이터를 오늘 기준으로 다시 만들었다", "good");
   };
 
@@ -179,7 +201,10 @@ export function AppShell() {
         </div>
         <div className="border-t border-line px-2 pt-3 text-xs text-ink3">
           <div className="font-medium text-ink2">{me?.name ?? "—"}</div>
-          <div>{me?.role === "owner" ? "대표 · 전체 권한" : "직원"}</div>
+          <div className="truncate">
+            {company ? `${company} · ` : ""}
+            {me?.role === "owner" ? "대표" : "직원"}
+          </div>
         </div>
       </aside>
 
@@ -200,19 +225,19 @@ export function AppShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header
-          className="sticky z-20 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface/95 backdrop-blur"
+          className="sticky z-20 flex h-14 shrink-0 items-center gap-1.5 border-b sm:gap-2 border-line bg-surface/95 backdrop-blur"
           style={{ top: "env(safe-area-inset-top, 0px)", paddingLeft: "max(16px, env(safe-area-inset-left, 0px))", paddingRight: "max(16px, env(safe-area-inset-right, 0px))" }}
         >
           <button type="button" aria-label="메뉴 열기" className="rounded p-1.5 text-ink2 hover:bg-sunken lg:hidden" onClick={() => setDrawer(true)}>
             <Menu className="size-5" />
           </button>
-          <span className="font-display text-lg font-bold lg:hidden">
+          <span className="hidden font-display text-lg font-bold sm:inline lg:hidden">
             MR<span className="text-brass">.</span>K
           </span>
           <label htmlFor="branch-select" className="sr-only">
             지점
           </label>
-          <select id="branch-select" value={branchId} onChange={(e) => setBranchId(e.target.value)} className="field h-8 w-auto max-w-[180px] font-medium">
+          <select id="branch-select" value={branchId} onChange={(e) => setBranchId(e.target.value)} className="field h-8 w-auto max-w-[150px] font-medium sm:max-w-[180px]">
             <option value="all">전 지점</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -220,9 +245,28 @@ export function AppShell() {
               </option>
             ))}
           </select>
-          <span className="num hidden text-sm text-ink3 md:inline">{fmt(today, "yyyy년 M월 d일 (EEE)")}</span>
+          <span className="num hidden text-sm text-ink3 xl:inline">{fmt(today, "yyyy년 M월 d일 (EEE)")}</span>
+          <button
+            type="button"
+            onClick={() => setPalette(true)}
+            aria-label="찾기 (Ctrl+K)"
+            className="inline-flex h-8 shrink-0 items-center gap-2 rounded border border-line bg-surface px-2 text-sm text-ink3 hover:border-ink3 hover:text-ink md:w-56 md:px-2.5"
+          >
+            <Search className="size-4 shrink-0" />
+            <span className="hidden flex-1 text-left md:inline">찾기</span>
+            <kbd className="hidden rounded border border-line px-1 font-sans text-[10px] md:inline">Ctrl K</kbd>
+          </button>
           <div className="flex-1" />
-          {API_MODE === "mock" && <span className="hidden rounded-full border border-brass/40 px-2 py-0.5 text-[11px] font-medium text-brass sm:inline">시연 데이터</span>}
+          {API_MODE === "mock" &&
+            (real ? (
+              <Link to="/settings" className="hidden rounded-full border border-good/40 px-2 py-0.5 text-[11px] font-medium text-good sm:inline">
+                실사용
+              </Link>
+            ) : (
+              <Link to="/settings" className="hidden rounded-full border border-brass/40 px-2 py-0.5 text-[11px] font-medium text-brass sm:inline">
+                시연 데이터
+              </Link>
+            ))}
           <Popover
             button={(_, toggle) => (
               <button type="button" onClick={toggle} className="inline-flex h-8 items-center gap-1 rounded bg-navy px-2.5 text-[13px] font-medium text-navy-fg hover:bg-navy/90">
@@ -258,7 +302,7 @@ export function AppShell() {
           <Alerts />
           <Popover
             button={(_, toggle) => (
-              <button type="button" onClick={toggle} aria-label="화면 설정" className="rounded p-2 text-ink2 hover:bg-sunken hover:text-ink">
+              <button type="button" onClick={toggle} aria-label="화면 · 설정" className="rounded p-2 text-ink2 hover:bg-sunken hover:text-ink">
                 {theme === "dark" ? <Moon className="size-[18px]" /> : theme === "light" ? <Sun className="size-[18px]" /> : <Monitor className="size-[18px]" />}
               </button>
             )}
@@ -278,26 +322,49 @@ export function AppShell() {
                     {label}
                   </button>
                 ))}
+                <div className="my-1 border-t border-line" />
+                <button
+                  type="button"
+                  className={menuItem}
+                  onClick={() => {
+                    close();
+                    nav("/settings");
+                  }}
+                >
+                  <Settings className="size-4 text-ink3" />
+                  설정
+                </button>
                 {API_MODE === "mock" && (
-                  <>
-                    <div className="my-1 border-t border-line" />
-                    <button
-                      type="button"
-                      className={menuItem}
-                      onClick={() => {
-                        close();
-                        void reset();
-                      }}
-                    >
-                      <RotateCcw className="size-4 text-ink3" />
-                      시연 데이터 다시 만들기
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    className={menuItem}
+                    onClick={() => {
+                      close();
+                      nav("/settings?tab=backup");
+                    }}
+                  >
+                    <Download className="size-4 text-ink3" />
+                    백업
+                  </button>
+                )}
+                {API_MODE === "mock" && !real && (
+                  <button
+                    type="button"
+                    className={menuItem}
+                    onClick={() => {
+                      close();
+                      void reset();
+                    }}
+                  >
+                    <RotateCcw className="size-4 text-ink3" />
+                    시연 데이터 다시 만들기
+                  </button>
                 )}
               </>
             )}
           </Popover>
         </header>
+        <CommandPalette open={palette} onClose={() => setPalette(false)} />
         <main className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1440px] py-6" style={{ paddingLeft: "max(16px, env(safe-area-inset-left, 0px))", paddingRight: "max(16px, env(safe-area-inset-right, 0px))" }}>
             <Outlet />

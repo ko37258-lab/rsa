@@ -15,7 +15,7 @@ import { daysBetween, monthDays, monthEnd, monthStart, overlapDays, plusDays, pl
 import type { DB, Inquiry, Lease, Policy, PreparedFile, QaItem, ReplyTemplate, Signature, Unit } from "@/types";
 import type {
   AnalyticsRes, BranchCompare, DashboardRes, FunnelStep, HeatCell, Insight, IntegrityCheck, IntegrityRes, IntegrityRun, MonthStat,
-  MoveRow, PolicyRow, QaRes, QaRow, ReadinessRes, ReadinessRow, ReplyBucket, SourceRow, TileId, Tile, TypeLoss,
+  MoveRow, PolicyRow, QaContractRow, QaContractsRes, QaRes, QaRow, ReadinessRes, ReadinessRow, ReplyBucket, SourceRow, TileId, Tile, TypeLoss,
 } from "@/pages/dashboard/ops-api";
 
 // ── 공통 도우미 ──────────────────────────────────────────
@@ -169,6 +169,9 @@ function dashboard(db: DB, b: string | null): DashboardRes {
 }
 
 // ── 분석 ──────────────────────────────────────────────
+/** 실사용 데이터는 시작한 날 전에는 기록이 없다 — 그 전 기간은 비워 둔다(공실 손실이 부풀지 않게) */
+const dataStart = (db: DB): string | null => (db.mode === "real" ? db.seeded_on : null);
+
 function monthStats(db: DB, ix: Index, b: string | null, t: string): MonthStat[] {
   const cur = thisMonth(t);
   const months = Array.from({ length: 12 }, (_, i) => plusMonth(cur, i - 11));
@@ -182,9 +185,11 @@ function monthStats(db: DB, ix: Index, b: string | null, t: string): MonthStat[]
   const leaseIdsInBranch = new Set(leases.map((l) => l.id));
   const settlements = db.settlements.filter((s) => leaseIdsInBranch.has(s.lease_id));
 
+  const start = dataStart(db);
   return months.map((m) => {
-    const from = monthStart(m);
     const to = monthEnd(m);
+    const before = !!start && to < start;
+    const from = start && start > monthStart(m) && !before ? start : monthStart(m);
     const realizedTo = to < t ? to : t;
     const occ = occupancy(db, b, from, to, t);
     const r = rev.get(m) ?? { rent: 0, other: 0 };
@@ -224,13 +229,13 @@ function monthStats(db: DB, ix: Index, b: string | null, t: string): MonthStat[]
     return {
       month: m,
       operated_units: operated.length,
-      occupancy: occ.occupancy,
-      contract_rate: occ.contract_rate,
+      occupancy: before ? null : occ.occupancy,
+      contract_rate: before ? null : occ.contract_rate,
       rent_revenue: r.rent,
       other_revenue: r.other,
-      revpar: operated.length ? r.rent / operated.length : null,
+      revpar: before ? null : operated.length ? r.rent / operated.length : null,
       amr: amrDen ? amrNum / amrDen : null,
-      vacancy_loss: Math.round(loss),
+      vacancy_loss: before ? null : Math.round(loss),
       inquiries: inqMonth.length,
       concluded: inqMonth.filter((q) => reached(ix, q).concluded).length,
       move_ins: leases.filter((l) => !l.renewal_of && l.start_date.slice(0, 7) === m && l.start_date <= t && (l.status === "occupied" || l.status === "closing" || l.status === "closed")).length,
@@ -267,8 +272,10 @@ function typeLoss(db: DB, ix: Index, b: string | null, t: string): TypeLoss[] {
     const k = u.unit_type_id ?? "none";
     groups.set(k, [...(groups.get(k) ?? []), u]);
   }
-  const past1 = plusDays(t, -90);
+  const start = dataStart(db);
+  const past1 = start && start > plusDays(t, -90) ? start : plusDays(t, -90);
   const past2 = plusDays(t, -1);
+  const pastDays = past1 > past2 ? 0 : daysBetween(past1, past2) + 1;
   const next2 = plusDays(t, 29);
   const anyHold = (l: Lease) => l.status !== "cancelled" && l.status !== "draft";
   const rows: TypeLoss[] = [];
@@ -280,7 +287,7 @@ function typeLoss(db: DB, ix: Index, b: string | null, t: string): TypeLoss[] {
     let next = 0;
     let vacantNow = 0;
     for (const u of us) {
-      past += 90 - coveredDays(ix, u.id, past1, past2, isSigned);
+      if (pastDays) past += pastDays - coveredDays(ix, u.id, past1, past2, isSigned);
       next += 30 - coveredDays(ix, u.id, t, next2, anyHold);
       const s = unitToday(db, ix, u, t).state;
       if (s === "vacant" || s === "hold") vacantNow++;
@@ -940,6 +947,49 @@ export const opsRoutes: Route[] = [
     if (body?.confirm) q.blocks_invoice = false;
     if (q.lease_id && body?.confirm) logHistory("lease", q.lease_id, `Q&A 답 확정: ${answer.slice(0, 40)}`);
     return q;
+  }),
+  // 계약별 Q&A(원본 /api/qa/contracts): 계약 하나에 걸린 질문을 묶어 확정 n/m 을 본다
+  route("GET /api/qa/contracts", ({ query }) => {
+    const db = getDB();
+    const ix = indexDB(db);
+    const b = query.get("branch_id");
+    const groups = new Map<string, QaRow[]>();
+    for (const q of db.qa.filter(inBranch(b))) {
+      if (!q.lease_id) continue;
+      groups.set(q.lease_id, [...(groups.get(q.lease_id) ?? []), qaRow(db, ix, q)]);
+    }
+    const rows: QaContractRow[] = [...groups.entries()].map(([leaseId, items]) => {
+      const l = ix.lease.get(leaseId);
+      const confirmed = items.filter((x) => x.state === "confirmed" || x.state === "auto_closed").length;
+      const open = items.filter((x) => x.state === "open").length;
+      const state: QaContractRow["state"] = open > 0 ? "open" : confirmed === items.length ? "resolved" : "answered";
+      return {
+        lease_id: leaseId,
+        unit_id: l?.unit_id ?? null,
+        unit_code: items[0].unit_code ?? (l ? ix.unit.get(l.unit_id)?.code ?? null : null),
+        contractor_name: l ? ix.party.get(l.contractor_id)?.name ?? null : null,
+        lease_status: l?.status ?? null,
+        branch_name: branchName(db, items[0].branch_id),
+        total: items.length,
+        confirmed,
+        open,
+        blocks_invoice: items.some((x) => x.blocks_invoice && x.state !== "confirmed" && x.state !== "auto_closed"),
+        state,
+        last_at: items.reduce((m, x) => (x.created_at > m ? x.created_at : m), ""),
+        items: items.sort((x, y) => x.created_at.localeCompare(y.created_at)),
+      };
+    });
+    const order = { open: 0, answered: 1, resolved: 2 } as const;
+    rows.sort((x, y) => order[x.state] - order[y.state] || y.last_at.localeCompare(x.last_at));
+    const res: QaContractsRes = {
+      rows,
+      counts: {
+        open: rows.filter((r) => r.state === "open").length,
+        answered: rows.filter((r) => r.state === "answered").length,
+        resolved: rows.filter((r) => r.state === "resolved").length,
+      },
+    };
+    return res;
   }),
   route("POST /api/qa/:id/reopen", ({ params }) => {
     const q = must(getDB().qa.find((x) => x.id === params.id), "질문");

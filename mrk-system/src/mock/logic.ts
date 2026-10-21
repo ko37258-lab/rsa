@@ -116,8 +116,10 @@ export function operatedUnits(db: DB, branchId: string | null): Unit[] {
 export function occupancy(db: DB, branchId: string | null, from: string, to: string, today: string) {
   const units = operatedUnits(db, branchId);
   const unitIds = new Set(units.map((u) => u.id));
-  const days = daysBetween(from, to) + 1;
-  const capacity = units.length * days;
+  // 호실은 등록한 날부터 운영한 것으로 센다(새로 시작한 실사용 데이터에서 지난 달 공실이 부풀지 않게)
+  const opened = new Map(units.map((u) => [u.id, u.created_at.slice(0, 10)]));
+  const unitDays = (a: string, b: string) => units.reduce((s, u) => s + overlapDays(a, b, opened.get(u.id) as string, "9999-12-31"), 0);
+  const capacity = unitDays(from, to);
   let occupied = 0;
   let contracted = 0;
   for (const l of db.leases) {
@@ -130,12 +132,12 @@ export function occupancy(db: DB, branchId: string | null, from: string, to: str
     if (from <= occTo && (l.status === "occupied" || l.status === "closing" || l.status === "closed"))
       occupied += overlapDays(l.start_date, leaseLastDay(l), from, occTo);
   }
-  const pastDays = to < today ? days : Math.max(0, daysBetween(from, today) + 1);
+  const pastCapacity = from > today ? 0 : unitDays(from, to < today ? to : today);
   return {
     capacity,
     occupied_days: occupied,
     contracted_days: contracted,
-    occupancy: pastDays ? occupied / (units.length * pastDays) : null,
+    occupancy: pastCapacity ? occupied / pastCapacity : null,
     contract_rate: capacity ? contracted / capacity : null,
     vacant_days: Math.max(0, capacity - contracted),
   };

@@ -8,6 +8,7 @@ import { fmt, man, pct } from "@/lib/format";
 import { TodayTiles, TodayMoves } from "./TodayTiles";
 import { Insights } from "./Insights";
 import { Analytics } from "./Analytics";
+import { NoUnits, StartChecklist } from "./Onboarding";
 import type { BranchCompare, DashboardRes } from "./ops-api";
 
 const branchCols: Column<BranchCompare>[] = [
@@ -67,8 +68,14 @@ export default function DashboardPage() {
         <Loading label="오늘 현황을 불러오는 중" />
       ) : q.error || !q.data ? (
         <ErrorBox error={q.error} />
+      ) : q.data.operated_units === 0 && !q.data.branches?.some((b) => b.units > 0) ? (
+        <>
+          <StartChecklist />
+          <NoUnits />
+        </>
       ) : (
         <>
+          <StartChecklist />
           <section aria-label="오늘 현황" className="flex flex-col gap-3">
             <h2 className="label-caps">오늘 현황</h2>
             <TodayTiles data={q.data} />
@@ -122,6 +129,7 @@ export default function DashboardPage() {
         </>
       )}
 
+      {(!q.data || q.data.operated_units > 0) && (
       <section id="occupancy" aria-label="운영 분석" className="flex scroll-mt-20 flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-2 border-t border-line pt-6">
           <div>
@@ -133,6 +141,7 @@ export default function DashboardPage() {
         </div>
         <Analytics branchId={branchId} />
       </section>
+      )}
     </div>
   );
 }
