@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * MR.K 관리 시스템 — 디자인 토큰
+ * 레이아웃: 왼쪽 고정 내비 + 오른쪽 작업 영역(요약 타일 → 표 → 오른쪽 상세 패널)
+ * 색: 잉크 네이비(주요 동작) + 브라스(브랜드 포인트) + 상태색(정상/주의/위험/정보)
+ * 값은 "R G B" 삼중값 — Tailwind 의 투명도(bg-navy/10)를 쓰기 위해서다.
+ */
+:root {
+  --bg: 246 247 250;
+  --surface: 255 255 255;
+  --sunken: 238 240 245;
+  --line: 222 226 234;
+  --ink: 21 27 41;
+  --ink2: 63 72 92;
+  --ink3: 108 117 138;
+  --navy: 22 36 71;
+  --navy-fg: 255 255 255;
+  --brass: 168 124 50;
+  --good: 22 128 85;
+  --warn: 180 108 10;
+  --bad: 200 52 52;
+  --info: 37 99 199;
+  --violet: 112 72 192;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: 13 16 24;
+    --surface: 20 24 35;
+    --sunken: 27 32 46;
+    --line: 43 50 68;
+    --ink: 232 235 242;
+    --ink2: 186 193 209;
+    --ink3: 132 141 162;
+    --navy: 222 229 245;
+    --navy-fg: 16 22 38;
+    --brass: 214 172 98;
+    --good: 74 196 140;
+    --warn: 232 168 70;
+    --bad: 240 110 110;
+    --info: 116 164 245;
+    --violet: 172 144 240;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: 13 16 24;
+  --surface: 20 24 35;
+  --sunken: 27 32 46;
+  --line: 43 50 68;
+  --ink: 232 235 242;
+  --ink2: 186 193 209;
+  --ink3: 132 141 162;
+  --navy: 222 229 245;
+  --navy-fg: 16 22 38;
+  --brass: 214 172 98;
+  --good: 74 196 140;
+  --warn: 232 168 70;
+  --bad: 240 110 110;
+  --info: 116 164 245;
+  --violet: 172 144 240;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: "IBM Plex Sans KR", "Pretendard Variable", Pretendard, -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--brass));
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgb(var(--brass) / 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer components {
+  .label-caps {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink3;
+  }
+  .field {
+    @apply h-9 w-full rounded border border-line bg-surface px-3 text-sm text-ink placeholder:text-ink3 focus:border-navy focus:outline-none;
+  }
+  textarea.field {
+    @apply h-auto py-2;
+  }
+  .scroll-x {
+    @apply overflow-x-auto;
+  }
+}
