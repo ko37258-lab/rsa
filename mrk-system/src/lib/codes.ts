@@ -84,6 +84,7 @@ export const CHARGE_KIND: Record<ChargeKind, string> = {
   penalty: "위약금",
   damage: "원상복구",
   cleaning: "퇴실청소비",
+  discount: "할인",
   other: "기타",
 };
 

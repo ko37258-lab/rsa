@@ -6,11 +6,13 @@
 import type {
   Allocation, Branch, Building, Charge, ChargeKind, DB, Inquiry, Lease, LeaseStatus, Message, Party, Payment,
   Policy, PreparedFile, QaItem, ReplyTemplate, Settlement, Signature, Unit, UnitBlock, UnitType, Memo, HistoryEvent, Channel,
+  BranchTerms, Conversation, Invoice,
 } from "@/types";
 import { daysBetween, plusDays, plusMonths, ym } from "@/lib/dates";
+import { scheduleLines } from "./schedule";
 import { SOURCES, LOST_REASONS } from "@/lib/codes";
 
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 
 function mulberry32(seed: number) {
   let a = seed;
@@ -55,6 +57,16 @@ export function buildSeed(today: string): DB {
     { name: "프리미엄", area: 22.1, rent: 890000, mgmt: 100000 },
     { name: "투룸 스위트", area: 31.4, rent: 1250000, mgmt: 120000 },
   ];
+  // 지점마다 청구 방식이 다르다: 신촌=입주일 기준, 성수=입주일 기준+관리비 고지서, 판교=달력 월·25일 청구
+  const baseTerms: BranchTerms = {
+    deposit: 1000000, mgmt_deposit: 100000, contract_fee: 300000, cleaning_fee_small: 80000, cleaning_fee_large: 120000,
+    cycle: "anniversary", billing_mode: "prepaid", bill_day: 1, prorate: true, due_days: 0, mgmt_mode: "fixed", vat: "none", send_hour: 9,
+  };
+  const TERMS: BranchTerms[] = [
+    baseTerms,
+    { ...baseTerms, due_days: 3, mgmt_mode: "bill" },
+    { ...baseTerms, cycle: "calendar", bill_day: 25, due_days: 5 },
+  ];
   const branches: Branch[] = [];
   const buildings: Building[] = [];
   const unitTypes: UnitType[] = [];
@@ -71,6 +83,17 @@ export function buildSeed(today: string): DB {
       opened_on: plusDays(today, -900 + bi * 120),
       commission: { structure: bi === 1 ? "fixed_minus" : "rate", rate_bp: b.rate, fixed_amount: 18000000 },
       bank_account: `국민 ${400 + bi}-21-0${bi}93${bi}1`,
+      terms: TERMS[bi],
+      accounts: [
+        {
+          id: `ac_${b.code.toLowerCase()}`,
+          branch_id: `b_${b.code.toLowerCase()}`,
+          bank: "국민",
+          number: `${400 + bi}-21-0${bi}93${bi}1`,
+          holder: `(주)미스터케이 ${b.name.replace("MR.K ", "")}`,
+          format: { date: "거래일시", name: "기재내용", amount: "입금액", memo: "적요" },
+        },
+      ],
     };
     branches.push(branch);
     const bld: Building = { id: `bd_${b.code.toLowerCase()}`, branch_id: branch.id, name: `${b.name.replace("MR.K ", "")} 하우스`, floors: b.floors.length };
@@ -105,6 +128,7 @@ export function buildSeed(today: string): DB {
           layout: { col: i, span: t === types[3] ? 2 : 1 },
           memo: "",
           created_at: iso(branch.opened_on),
+          asking_history: [],
         });
       }
     });
@@ -248,6 +272,7 @@ export function buildSeed(today: string): DB {
       closed_at: stage === "lost" || stage === "concluded" ? iso(plusDays(created, int(2, 14))) : null,
       messages: msgs,
       tours: [],
+      extra_party_ids: [],
     };
     inquiries.push(inq);
     hist("inquiry", inq.id, createdAt, `${inq.channel === "platform" ? "플랫폼" : "직접"} 문의 접수`);
@@ -261,6 +286,7 @@ export function buildSeed(today: string): DB {
     if (unit.sale_status === "off_sale") continue;
     const branchId = unit.branch_id;
     const ut = unitTypes.find((t) => t.id === unit.unit_type_id)!;
+    const terms = branches.find((b) => b.id === branchId)!.terms;
     let cursor = plusDays(historyStart, -int(0, 90)); // 오래 산 입주자도 있게
     let prevParty: Party | null = null;
     let prevLease: Lease | null = null;
@@ -313,7 +339,7 @@ export function buildSeed(today: string): DB {
         list_rent: ut.list_rent,
         mgmt_fee: ut.list_mgmt,
         cleaning_fee: ut.area_m2 > 25 ? 120000 : 80000,
-        due_day: Number(start.slice(8, 10)),
+        due_day: terms.cycle === "calendar" ? terms.bill_day : Number(start.slice(8, 10)),
         vat: corp ? "excluded" : "none",
         source_group: isRenewal ? "기타" : src.g,
         assignee_id: pick(staff).id,
@@ -322,6 +348,14 @@ export function buildSeed(today: string): DB {
         closed_at: status === "closed" ? iso(plusDays(end, int(3, 12))) : null,
         renewal_of: isRenewal && prevLease ? prevLease.id : null,
         memo: corp ? `${payer.name} 법인 대납 · 세금계산서 발행` : "",
+        cycle: terms.cycle,
+        billing_mode: terms.billing_mode,
+        prorate: terms.prorate,
+        due_days: terms.due_days,
+        mgmt_mode: terms.mgmt_mode,
+        discounts: !isRenewal && chance(0.12) ? [{ label: "첫 달 입주 할인", amount: 50000, months: 1 }] : [],
+        occupant_ids: [],
+        signed_copies: [],
       };
       leases.push(lease);
       hist("lease", lease.id, lease.created_at, "계약 작성");
@@ -419,6 +453,7 @@ export function buildSeed(today: string): DB {
       closed_at: done ? iso(plusDays(created, 1)) : null,
       messages: [{ id: id("m"), direction: "inbound", body: lifeTopics[i % lifeTopics.length], at, author: p.name, via: "kakao" }],
       tours: [],
+      extra_party_ids: [],
     });
   }
 
@@ -435,26 +470,36 @@ export function buildSeed(today: string): DB {
     }
     return { amount, supply: amount, vat_amount: 0 };
   };
-  const addCharge = (l: Lease, kind: ChargeKind, label: string, base: number, due: string, from: string | null, to: string | null) => {
-    const v = kind === "rent" || kind === "mgmt" || kind === "usage" ? vatSplit(base, l.vat) : { amount: base, supply: base, vat_amount: 0 };
-    const sent = due <= plusDays(today, 4);
+  const addCharge = (
+    l: Lease, kind: ChargeKind, label: string, base: number, bill: string, due: string, from: string | null, to: string | null,
+    extra: { days?: number | null; month_days?: number | null; needs_amount?: boolean } = {},
+  ) => {
+    const v = kind === "rent" || kind === "mgmt" || kind === "usage" || kind === "discount" ? vatSplit(base, l.vat) : { amount: base, supply: base, vat_amount: 0 };
+    // 청구일이 지났으면 발송 완료, 4일 안이면 확인·예약, 그 뒤면 발송 대기
+    const needs = extra.needs_amount ?? false;
+    const status: Charge["status"] = needs ? "draft" : bill <= today ? "sent" : bill <= plusDays(today, 4) ? "scheduled" : "draft";
     const c: Charge = {
       id: id("c"),
       branch_id: l.branch_id,
       lease_id: l.id,
       payer_id: l.payer_id,
-      month: ym(due),
+      month: ym(bill),
       kind,
       label,
       ...v,
       period_from: from,
       period_to: to,
+      bill_date: bill,
       due_date: due,
-      status: sent ? "sent" : "draft",
-      invoice_no: sent ? `INV-${ym(due).replace("-", "")}-${l.id.slice(3)}` : null,
-      sent_at: sent ? iso(plusDays(due, -5), 9, 0) : null,
-      sent_via: sent ? "email" : null,
-      created_at: iso(plusDays(due, -7), 9, 0),
+      status,
+      invoice_no: null,
+      invoice_id: null,
+      sent_at: status === "sent" ? iso(bill, 9, 0) : null,
+      sent_via: status === "sent" ? "email" : null,
+      created_at: iso(plusDays(bill, -7), 9, 0),
+      days: extra.days ?? null,
+      month_days: extra.month_days ?? null,
+      needs_amount: needs,
     };
     charges.push(c);
     return c;
@@ -465,23 +510,25 @@ export function buildSeed(today: string): DB {
     if (l.end_date < historyStart) continue; // 아주 오래된 계약은 청구 기록 없이 둔다
     const signed = (l.signed_at ?? l.created_at).slice(0, 10);
     if (!l.renewal_of) {
-      addCharge(l, "contract_fee", "계약금", l.contract_fee, signed, null, null);
-      addCharge(l, "deposit", "보증금 잔금", l.deposit + l.mgmt_deposit - l.contract_fee, plusDays(l.start_date, -1) > signed ? plusDays(l.start_date, -1) : signed, null, null);
+      addCharge(l, "contract_fee", "계약금", l.contract_fee, signed, signed, null, null);
+      const balanceDay = plusDays(l.start_date, -1) > signed ? plusDays(l.start_date, -1) : signed;
+      addCharge(l, "deposit", "보증금 잔금", l.deposit + l.mgmt_deposit - l.contract_fee, balanceDay, balanceDay, null, null);
     }
-    let k = 0;
-    for (;;) {
-      const pFrom = plusMonths(l.start_date, k);
-      if (pFrom > l.end_date) break;
-      if (ym(pFrom) > thisM) break;
-      const pTo = plusDays(plusMonths(l.start_date, k + 1), -1);
-      addCharge(l, "rent", `${Number(pFrom.slice(5, 7))}월 월세`, l.rent, pFrom, pFrom, pTo);
-      addCharge(l, "mgmt", `${Number(pFrom.slice(5, 7))}월 관리비`, l.mgmt_fee, pFrom, pFrom, pTo);
-      if (k > 0 && daysBetween(pFrom, today) < 100 && daysBetween(pFrom, today) >= 0)
-        addCharge(l, "usage", "전기·가스 사용료", int(12, 48) * 1000, pFrom, plusMonths(pFrom, -1), plusDays(pFrom, -1));
-      k++;
+    for (const x of scheduleLines(l)) {
+      if (ym(x.bill_date) > thisM) continue;
+      let amount = x.amount;
+      let needs = x.needs_amount;
+      // 지난 달 관리비 고지서는 금액이 이미 들어와 있다
+      if (needs && x.bill_date <= plusDays(today, -3)) {
+        amount = int(68, 118) * 1000;
+        needs = false;
+      }
+      addCharge(l, x.kind, x.label, amount, x.bill_date, x.due_date, x.period_from, x.period_to, { days: x.days, month_days: x.month_days, needs_amount: needs });
+      if (x.kind === "rent" && l.mgmt_mode === "fixed" && x.period_from !== l.start_date && daysBetween(x.bill_date, today) < 100 && daysBetween(x.bill_date, today) >= 0)
+        addCharge(l, "usage", "전기·가스 사용료", int(12, 48) * 1000, x.bill_date, x.due_date, plusMonths(x.period_from, -1), plusDays(x.period_from, -1));
     }
     if ((l.status === "closing" || l.status === "closed") && !renewedIds.has(l.id) && daysBetween(l.end_date, today) >= 0)
-      addCharge(l, "cleaning", "퇴실청소비", l.cleaning_fee, l.end_date, null, null);
+      addCharge(l, "cleaning", "퇴실청소비", l.cleaning_fee, l.end_date, l.end_date, null, null);
   }
 
   // 납부자·납기일별로 묶어서 입금. 최근 달은 일부 미납.
@@ -516,10 +563,18 @@ export function buildSeed(today: string): DB {
       method: "bank",
       status: "matched",
       memo: "",
+      account_id: `ac_${branches.find((b) => b.id === cs[0].branch_id)!.code.toLowerCase()}`,
+      platform_fee: 0,
+      pass_through: 0,
+      pass_through_reason: null,
+      bank_row: null,
     };
     payments.push(pay);
-    let left = paidAmt;
-    for (const c of cs) {
+    // 할인(음수 청구)은 같은 입금에서 그대로 상쇄하고, 나머지를 양수 청구에 차례로 배분한다
+    const negatives = cs.filter((c) => c.amount < 0);
+    let left = paidAmt - negatives.reduce((s, c) => s + c.amount, 0);
+    for (const c of negatives) allocations.push({ id: id("al"), payment_id: pay.id, charge_id: c.id, amount: c.amount, at: pay.received_at });
+    for (const c of cs.filter((x) => x.amount > 0)) {
       if (left <= 0) break;
       const a = Math.min(left, c.amount);
       allocations.push({ id: id("al"), payment_id: pay.id, charge_id: c.id, amount: a, at: pay.received_at });
@@ -541,8 +596,119 @@ export function buildSeed(today: string): DB {
       method: "bank",
       status: "unmatched",
       memo: "",
+      account_id: `ac_${b.code.toLowerCase()}`,
+      platform_fee: 0,
+      pass_through: 0,
+      pass_through_reason: null,
+      bank_row: { 거래일시: "", 적요: "타행이체", 기재내용: oddNames[i], 입금액: "", 출금액: "0" },
     });
   }
+
+  for (const p of payments) {
+    if (!p.bank_row) continue;
+    p.bank_row.거래일시 = p.received_at.slice(0, 16).replace("T", " ");
+    p.bank_row.입금액 = p.amount.toLocaleString("ko-KR");
+  }
+
+  // ── 청구서(확인·발송한 청구 묶음) ─────────────────────────────
+  const invoices: Invoice[] = [];
+  const invGroups = new Map<string, Charge[]>();
+  for (const c of charges) {
+    if (c.status !== "sent" && c.status !== "scheduled") continue;
+    // 저장 공간을 아끼려고 최근 4개월 청구서만 묶음 기록을 남긴다(그 전은 번호만)
+    if (c.bill_date < plusDays(today, -120)) {
+      c.invoice_no = `${c.bill_date.slice(2, 4)}${c.bill_date.slice(5, 7)}-${c.payer_id.slice(3)}`;
+      continue;
+    }
+    const key = `${c.payer_id}|${c.bill_date}`;
+    invGroups.set(key, [...(invGroups.get(key) ?? []), c]);
+  }
+  let invSeq = 0;
+  for (const [key, cs] of [...invGroups.entries()].sort((a, b) => a[0].split("|")[1].localeCompare(b[0].split("|")[1]))) {
+    const [payerId, bill] = key.split("|");
+    invSeq += 1;
+    const no = `${bill.slice(2, 4)}${bill.slice(5, 7)}-${String(invSeq).padStart(5, "0")}`;
+    const sent = cs[0].status === "sent";
+    const inv: Invoice = {
+      id: id("inv"),
+      invoice_no: no,
+      branch_id: cs[0].branch_id,
+      payer_id: payerId,
+      bill_date: bill,
+      charge_ids: cs.map((c) => c.id),
+      total: cs.reduce((s, c) => s + c.amount, 0),
+      state: sent ? "sent" : "scheduled",
+      via: "email",
+      recipient_email: parties.find((x) => x.id === payerId)?.email ?? null,
+      confirmed_at: iso(plusDays(bill, -2), 17, 0),
+      send_after: iso(bill, 9, 0),
+      sent_at: sent ? iso(bill, 9, 0) : null,
+      cancelled_at: null,
+    };
+    invoices.push(inv);
+    for (const c of cs) {
+      c.invoice_id = inv.id;
+      c.invoice_no = no;
+    }
+  }
+
+  // ── 대화함: 상담에 아직 안 붙인 메일 · 입주자와 나눈 계약 대화 ─────────────
+  const conversations: Conversation[] = [];
+  const inboxMails: Array<[string, string, string, string]> = [
+    ["Mia Hoffmann", "mia.h@example.com", "Room inquiry for January", "Hello, I will start an exchange semester in Seoul in January. Do you have a furnished room from 1/5 for 5 months? My budget is around 800,000 KRW."],
+    ["정유나", "yuna.j@example.com", "12월 입주 가능한 방 문의", "안녕하세요. 12월 1일부터 6개월 정도 살 방을 찾고 있어요. 월 70만원 안쪽이면 좋겠고 2명이 같이 살 수도 있어요."],
+    ["(주)브릿지랩 인사팀", "hr@bridgelab.example.com", "신규 입사자 숙소 문의(3명)", "다음 달 15일부터 신규 입사자 3명이 3개월간 지낼 숙소가 필요합니다. 법인 계약과 세금계산서 발행이 가능한지 궁금합니다."],
+    ["김도경", "dk.kim@example.com", "주차 가능 여부", "투어 전에 여쭤봅니다. 차량 1대 주차가 가능한가요? 가능하면 이번 주말에 보러 가고 싶습니다."],
+  ];
+  inboxMails.forEach(([name, mail, subject, body], i) => {
+    const at = iso(plusDays(today, -i), int(8, 22));
+    conversations.push({
+      id: id("cv"),
+      branch_id: branches[i % 3].id,
+      inquiry_id: null,
+      lease_id: null,
+      channel: "email",
+      from_name: name,
+      from_contact: mail,
+      subject,
+      messages: [{ id: id("m"), direction: "inbound", body, at, author: name, via: "email", subject, attachments: [] }],
+      created_at: at,
+      last_activity_at: at,
+    });
+  });
+  leases
+    .filter((l) => l.status === "occupied")
+    .slice(0, 6)
+    .forEach((l, i) => {
+      const p = parties.find((x) => x.id === l.contractor_id)!;
+      const at = iso(plusDays(today, -int(1, 25)));
+      const topics = ["다음 달 월세를 며칠 늦게 내도 될까요?", "연장 계약 조건이 궁금합니다", "청구서에 사용료가 두 번 들어간 것 같아요", "퇴실 날짜를 일주일 당길 수 있을까요?", "현관 비밀번호가 바뀌었나요?", "세금계산서 다시 보내주실 수 있나요?"];
+      conversations.push({
+        id: id("cv"),
+        branch_id: l.branch_id,
+        inquiry_id: null,
+        lease_id: l.id,
+        channel: i % 2 ? "kakao" : "email",
+        from_name: p.name,
+        from_contact: i % 2 ? p.phone : p.email,
+        subject: topics[i],
+        messages: [
+          { id: id("m"), direction: "inbound", body: topics[i], at, author: p.name, via: i % 2 ? "kakao" : "email", subject: topics[i], attachments: [] },
+          { id: id("m"), direction: "outbound", body: "확인해서 오늘 안에 다시 연락드리겠습니다.", at: iso(at.slice(0, 10), 20, 10), author: pick(staff).name, via: i % 2 ? "kakao" : "email", attachments: [] },
+        ],
+        created_at: at,
+        last_activity_at: iso(at.slice(0, 10), 20, 10),
+      });
+    });
+
+  // 모집가 바뀐 기록 몇 개
+  units.slice(0, 12).forEach((u, i) => {
+    if (!u.asking_price) return;
+    u.asking_history = [
+      { at: iso(plusDays(today, -200 + i)), rent: u.asking_price.rent - 20000, mgmt: u.asking_price.mgmt, by: "김하늘" },
+      { at: iso(plusDays(today, -60 + i)), rent: u.asking_price.rent, mgmt: u.asking_price.mgmt, by: "김하늘" },
+    ];
+  });
 
   // ── 정산 ────────────────────────────────────────────────
   const settlements: Settlement[] = [];
@@ -566,6 +732,11 @@ export function buildSeed(today: string): DB {
         method: "direct",
         status: "matched",
         memo: "퇴실 정산 · 보증금에서 차감",
+        account_id: null,
+        platform_fee: 0,
+        pass_through: 0,
+        pass_through_reason: null,
+        bank_row: null,
       };
       payments.push(pay);
       allocations.push({ id: id("al"), payment_id: pay.id, charge_id: clean.id, amount: clean.amount, at: pay.received_at });
@@ -679,6 +850,8 @@ export function buildSeed(today: string): DB {
   return {
     version: DB_VERSION,
     seeded_on: today,
+    mode: "demo",
+    company_name: "MR.K",
     me: { id: "s_ko", name: "고상철", email: "owner@mrk-living.example.com", role: "owner", permissions: ["integrity_read", "billing_write", "policy_write"] },
     staff,
     branches,
@@ -701,5 +874,7 @@ export function buildSeed(today: string): DB {
     memos,
     history,
     readiness_confirms: [],
+    invoices,
+    conversations,
   };
 }

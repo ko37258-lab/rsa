@@ -211,6 +211,7 @@ export const salesRoutes: Route[] = [
       layout: { col: sameFloor.reduce((m, u) => Math.max(m, u.layout.col + u.layout.span - 1), 0) + 1, span: 1 },
       memo: "",
       created_at: nowIso(),
+      asking_history: [],
     };
     db.units.push(unit);
     logHistory("unit", unit.id, "호실 등록");
@@ -456,6 +457,7 @@ export const salesRoutes: Route[] = [
       closed_at: null,
       messages: msgs,
       tours: [],
+      extra_party_ids: [],
     };
     db.inquiries.push(inq);
     party.last_activity_at = at;

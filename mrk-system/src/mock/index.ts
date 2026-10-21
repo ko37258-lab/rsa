@@ -3,10 +3,12 @@ import { getDB, saveDB } from "./db";
 import { commonRoutes } from "./handlers/common";
 import { opsRoutes } from "./handlers/ops";
 import { salesRoutes } from "./handlers/sales";
-import { financeRoutes } from "./handlers/finance";
+import { leasesRoutes } from "./handlers/leases";
+import { billingRoutes } from "./handlers/billing";
+import { platformRoutes } from "./handlers/platform";
 
 // 구체적인 경로가 먼저 오도록: 각 영역 → 공통(":kinds" 같은 넓은 패턴) 순서
-const routes: Route[] = [...opsRoutes, ...salesRoutes, ...financeRoutes, ...commonRoutes];
+const routes: Route[] = [...platformRoutes, ...opsRoutes, ...salesRoutes, ...leasesRoutes, ...billingRoutes, ...commonRoutes];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

@@ -19,6 +19,9 @@ import IntegrityPage from "@/pages/integrity/IntegrityPage";
 import QaPage from "@/pages/qa/QaPage";
 import PoliciesPage from "@/pages/policies/PoliciesPage";
 import MaterialsPage from "@/pages/materials/MaterialsPage";
+import SettingsPage from "@/pages/settings/SettingsPage";
+import LeasePrintPage from "@/pages/leases/LeasePrintPage";
+import InvoicePrintPage from "@/pages/billing/InvoicePrintPage";
 
 function RouteError() {
   const err = useRouteError();
@@ -35,6 +38,9 @@ function RouteError() {
  * 해시 라우터라 어떤 정적 호스팅에 올려도 새로고침이 깨지지 않는다.
  */
 const router = createHashRouter([
+  // 인쇄용 문서는 사이드바 없이
+  { path: "/print/lease/:leaseId", element: <LeasePrintPage />, errorElement: <RouteError /> },
+  { path: "/print/invoice/:invoiceId", element: <InvoicePrintPage />, errorElement: <RouteError /> },
   {
     path: "/",
     element: <AppShell />,
@@ -63,6 +69,7 @@ const router = createHashRouter([
           { path: "qa", element: <QaPage /> },
           { path: "policies", element: <PoliciesPage /> },
           { path: "materials", element: <MaterialsPage /> },
+          { path: "settings", element: <SettingsPage /> },
           { path: "*", element: <Navigate to="/dashboard" replace /> },
         ],
       },
