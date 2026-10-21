@@ -29,6 +29,8 @@ export default {
         mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
       },
       borderRadius: { DEFAULT: "6px" },
+      // 배지 배경 등에 쓰는 옅은 단계(기본 눈금에 없는 값)
+      opacity: { 7: "0.07", 8: "0.08", 12: "0.12", 14: "0.14" },
     },
   },
   plugins: [],
