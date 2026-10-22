@@ -35,12 +35,18 @@ class Recorder:
             self.level = min(1.0, rms * 8)
 
         self._frames = []
+        stream = None
         try:
-            self._stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16", callback=callback)
-            self._stream.start()
+            stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="int16", callback=callback)
+            stream.start()
         except Exception as e:  # 마이크 없음·권한 없음 등
-            self._stream = None
+            if stream is not None:
+                try:
+                    stream.close()  # 열어 둔 채 버리면 마이크가 계속 '사용 중'으로 남습니다
+                except Exception:
+                    pass
             raise AudioError("마이크를 열지 못했습니다. 마이크 연결과 Windows 개인정보 설정(마이크 허용)을 확인해 주세요.") from e
+        self._stream = stream
         self.started_at = time.monotonic()
 
     def stop(self) -> tuple[bytes, float]:

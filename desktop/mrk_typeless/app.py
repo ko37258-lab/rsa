@@ -20,6 +20,7 @@ from .config import (
     load_config,
     load_dictionary,
     polish_engine,
+    same_hotkey,
     save_config,
     stt_key,
 )
@@ -29,8 +30,9 @@ from .modes import get_mode
 from .prompts import build_edit_prompt, build_polish_prompt
 from .stt import SttError, transcribe
 
-# 이보다 오래 누르고 있다가 떼면 '누르는 동안만 듣기', 짧게 누르면 '다시 누를 때까지 듣기'
-HOLD_SECONDS = 0.4
+# 이보다 오래 누르고 있다가 떼면 '누르는 동안만 듣기', 짧게 누르면 '다시 누를 때까지 듣기'.
+# Win+H를 또박또박 누르면 0.5초쯤 걸리므로 그보다 넉넉하게 둡니다.
+HOLD_SECONDS = 0.8
 # 이보다 짧은 녹음은 실수로 누른 것으로 보고 버립니다.
 MIN_SPEECH_SECONDS = 0.5
 
@@ -86,7 +88,12 @@ class App:
     def _set_state(self, state: str, text: str) -> None:
         self.state = state
         self.status_text = text
-        self.tray.set_state(state, text)
+        # 트레이 아이콘 그리기는 화면 스레드에서 (키보드 훅 안에서 하면 Windows가 훅을 끊을 수 있음)
+        self.post(self.tray.set_state, state, text)
+
+    def _spawn(self, fn, *args) -> None:
+        """무거운 일(마이크 열기·닫기, WAV 만들기)은 키보드 훅 밖의 스레드에서 합니다."""
+        threading.Thread(target=fn, args=args, daemon=True).start()
 
     # ---------- 단축키 ----------
     def register_hotkeys(self) -> None:
@@ -96,7 +103,8 @@ class App:
         triggers = [("dictate", "dictate", self.cfg["hotkey_dictate"]), ("edit", "edit", self.cfg["hotkey_edit"])]
         # Win+H: Windows 음성 입력 대신 MR.K 받아쓰기를 엽니다. Win 키를 혼자 누르거나 다른 키와 누르면
         # keyboard가 Win 누름을 그대로 다시 보내므로 시작 메뉴·Win+E 같은 단축키는 그대로 됩니다.
-        if self.cfg.get("win_h", True):
+        # 사용자가 단축키를 Win+H로 직접 정했으면 같은 키를 두 번 걸지 않습니다.
+        if self.cfg.get("win_h", True) and not any(same_hotkey(c, "windows+h") for _, _, c in triggers):
             triggers.append(("dictate", "winh", "windows+h"))
         for purpose, trigger, combo in triggers:
             keyboard.add_hotkey(combo, self._on_record_hotkey, args=(purpose, trigger), suppress=True)
@@ -126,7 +134,7 @@ class App:
             if self.state == "working":
                 self.post(self.overlay.show_error, "아직 앞의 글을 정리하고 있습니다. 잠시만 기다려 주세요.")
                 return
-            self._start_recording(purpose)
+            self._begin_recording(purpose)
 
     def _on_record_key_up(self, purpose: str, trigger: str | None = None) -> None:
         trigger = trigger or purpose
@@ -142,9 +150,9 @@ class App:
         with self._lock:
             if self.state != "recording":
                 return
-            self.recorder.cancel()
             self.purpose = None
             self._set_state("idle", "대기 중")
+        self._spawn(self.recorder.cancel)
         self.post(self.overlay.show_info, "녹음을 버렸습니다.", "", 1.5)
 
     def _on_polish_hotkey(self) -> None:
@@ -156,7 +164,8 @@ class App:
         threading.Thread(target=self._polish_selection, daemon=True).start()
 
     # ---------- 녹음 ----------
-    def _start_recording(self, purpose: str) -> None:
+    def _begin_recording(self, purpose: str) -> None:
+        """(락 안에서) 녹음 가능 여부만 보고 상태를 바꾼 뒤, 마이크 열기는 작업 스레드로 넘깁니다."""
         if not stt_key(self.cfg):
             self.post(self.overlay.show_error, "받아쓰기 키가 없습니다. 설정 창에서 Gemini 키를 넣어 주세요.")
             self.post(self.open_settings)
@@ -164,36 +173,47 @@ class App:
         if purpose == "edit" and polish_engine(self.cfg) == "local":
             self.post(self.overlay.show_error, "말로 고치기는 AI 키(Gemini나 Claude)가 있어야 합니다. 설정에서 넣어 주세요.")
             return
-        try:
-            self.recorder.start()
-        except AudioError as e:
-            self.post(self.overlay.show_error, str(e))
-            return
         self.purpose = purpose
         self._pressed_at = time.monotonic()
         self._set_state("recording", "듣는 중")
+        self._spawn(self._start_recording, purpose)
+
+    def _start_recording(self, purpose: str) -> None:
+        try:
+            self.recorder.start()
+        except AudioError as e:
+            with self._lock:
+                if self.state == "recording" and self.purpose == purpose:
+                    self.purpose = None
+                    self._set_state("idle", "대기 중")
+            self.post(self.overlay.show_error, str(e))
+            return
         title = f"듣는 중 · {get_mode(self.cfg['mode'])['label']}" if purpose == "dictate" else "고칠 내용을 말하세요"
         hint = "손을 떼거나 같은 키를 한 번 더 누르면 끝 · Esc 취소"
         recorder = self.recorder
         self.post(self.overlay.show_recording, title, hint, lambda: (recorder.level, time.monotonic() - recorder.started_at))
 
     def _finish_recording(self) -> None:
+        """(락 안에서) 상태만 바꾸고, 녹음 멈추기·WAV 만들기는 작업 스레드에서 합니다."""
         purpose = self.purpose
         self.purpose = None
+        self._set_state("working", "받아쓰는 중")
+        self._spawn(self._stop_recording, purpose)
+
+    def _stop_recording(self, purpose: str) -> None:
         wav, seconds = self.recorder.stop()
         if not wav or seconds < MIN_SPEECH_SECONDS:
             self._set_state("idle", "대기 중")
-            self.post(self.overlay.hide)
+            self.post(self.overlay.show_info, "너무 짧아요", "누른 채 말하거나, 짧게 눌렀다가 다 말한 뒤 한 번 더 누르세요", 2.5)
             return
-        self._set_state("working", "받아쓰는 중")
-        threading.Thread(target=self._process_recording, args=(purpose, wav, seconds), daemon=True).start()
+        self._process_recording(purpose, wav, seconds)
 
     # ---------- 처리 (작업 스레드) ----------
     def _process_recording(self, purpose: str, wav: bytes, seconds: float) -> None:
         cfg = self.cfg
         try:
             self.post(self.overlay.show_working, "받아쓰는 중…")
-            dictionary = load_dictionary()
+            dictionary = self._dictionary()
             spoken = transcribe(wav, cfg["stt_provider"], stt_key(cfg), cfg["speech_lang"], hints=dictionary.get("terms", []))
             spoken = sanitize_dictation(spoken).strip()
             if not spoken:
@@ -215,10 +235,16 @@ class App:
         finally:
             self._set_state("idle", "대기 중")
 
+    def _dictionary(self) -> dict:
+        dictionary, problem = load_dictionary()
+        if problem:
+            log.warning("사전 파일 오류: %s", problem)
+        return dictionary
+
     def _polish_selection(self) -> None:
         try:
             selection, previous = self._selection()
-            result = self._polish(selection, load_dictionary())
+            result = self._polish(selection, self._dictionary())
             self._deliver(result, raw=selection, kind="polish", previous=previous)
         except (LlmError, UserFacingError) as e:
             self.post(self.overlay.show_error, str(e))
@@ -228,7 +254,7 @@ class App:
         finally:
             self._set_state("idle", "대기 중")
 
-    def _selection(self) -> tuple[str, str]:
+    def _selection(self):
         from .clipboard import copy_selection
 
         text, previous = copy_selection()
@@ -248,11 +274,11 @@ class App:
         system, user = build_polish_prompt(text, self.cfg["mode"], self.cfg, dictionary)
         return run_ai(system, user, self.cfg)
 
-    def _deliver(self, result: str, raw: str, kind: str, previous: str | None = None, command: str = "", seconds: float = 0) -> None:
+    def _deliver(self, result: str, raw: str, kind: str, previous=None, command: str = "", seconds: float = 0) -> None:
         from .clipboard import paste_text, set_text
 
         if self.cfg.get("auto_paste", True):
-            paste_text(result, restore=bool(self.cfg.get("restore_clipboard", True)), previous=previous)
+            paste_text(result, restore_previous=bool(self.cfg.get("restore_clipboard", True)), previous=previous)
             done, sub = "붙여넣었습니다", ""
         else:
             set_text(result)
@@ -329,7 +355,14 @@ class App:
             self.overlay.show_info(f"새 버전 {newer}이 나왔습니다", "트레이 아이콘 → '새 버전 받기'에서 내려받으세요", 6)
 
     def open_dictionary(self) -> None:
-        load_dictionary()  # 파일이 없으면 기본 사전으로 만들어 둡니다.
+        _, problem = load_dictionary()  # 파일이 없으면 기본 사전으로 만들어 둡니다.
+        if problem:
+            from tkinter import messagebox
+
+            messagebox.showwarning(
+                "사전 파일 확인",
+                f"사전 파일에 오류가 있어 지금은 기본 사전을 씁니다. 메모장에서 고쳐 저장하면 다시 읽습니다.\n\n{problem}",
+            )
         subprocess.Popen(["notepad.exe", str(DICTIONARY_PATH)])
 
     def open_folder(self) -> None:
@@ -370,14 +403,20 @@ class App:
 
 
 # ---------- 프로그램 시작점 ----------
+_mutex_handle = None  # 프로그램이 끝날 때까지 쥐고 있어야 합니다
+
+
 def _single_instance() -> bool:
     """이미 실행 중이면 False (Windows 이름 있는 뮤텍스)."""
+    global _mutex_handle
     if sys.platform != "win32":
         return True
     import ctypes
 
-    ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\MRK-Typeless-SingleInstance")
-    return ctypes.windll.kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateMutexW.restype = ctypes.c_void_p
+    _mutex_handle = k32.CreateMutexW(None, False, "Local\\MRK-Typeless-SingleInstance")
+    return ctypes.get_last_error() != 183  # ERROR_ALREADY_EXISTS
 
 
 def _check_ca_bundle() -> str:

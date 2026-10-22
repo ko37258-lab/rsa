@@ -36,7 +36,11 @@ class FakeOverlay:
         self.calls = []
 
     def __getattr__(self, name):
-        return lambda *a, **k: self.calls.append((name, a))
+        def method(*a, **k):
+            self.calls.append((name, a))
+
+        method.__name__ = name
+        return method
 
 
 class FakeTray:
@@ -55,7 +59,14 @@ def app(monkeypatch, tmp_path):
 
     a._lock = threading.Lock()
     a.posted = []
-    a.post = lambda fn, *args: (a.posted.append(getattr(fn, "__name__", str(fn))), fn(*args) if getattr(fn, "__self__", None) is a.overlay else None)
+
+    def post(fn, *args):
+        name = getattr(fn, "__name__", str(fn))
+        a.posted.append(name)
+        if name.startswith(("show_", "hide")):  # 화면 표시는 바로 실행해 기록합니다
+            fn(*args)
+
+    a.post = post
 
     pasted = []
     a.stt_calls = []
@@ -66,9 +77,9 @@ def app(monkeypatch, tmp_path):
 
     monkeypatch.setattr(app_module, "transcribe", fake_transcribe)
     monkeypatch.setattr(app_module, "run_ai", lambda system, user, cfg: "내일 오후 3시에 현장 답사를 갑니다.")
-    monkeypatch.setattr(app_module, "load_dictionary", lambda: {"terms": ["지구단위계획"], "replacements": [{"from": "건폐률", "to": "건폐율"}]})
+    monkeypatch.setattr(app_module, "load_dictionary", lambda: ({"terms": ["지구단위계획"], "replacements": [{"from": "건폐률", "to": "건폐율"}]}, None))
     monkeypatch.setattr(app_module, "append_history", lambda entry: None)
-    monkeypatch.setattr(clipboard, "paste_text", lambda text, restore=True, previous=None: pasted.append((text, previous)))
+    monkeypatch.setattr(clipboard, "paste_text", lambda text, restore_previous=True, previous=None: pasted.append((text, previous)))
     monkeypatch.setattr(clipboard, "set_text", lambda text: pasted.append((text, "copied")))
     a.pasted = pasted
     return a
@@ -109,7 +120,70 @@ def test_key_repeat_while_held_is_ignored(app):
 def test_escape_discards_recording(app):
     app._on_record_hotkey("dictate")
     app._on_escape()
-    assert app.state == "idle" and not app.recorder.running and app.pasted == []
+    assert app.state == "idle" and app.pasted == []
+    end = time.monotonic() + 1.0
+    while app.recorder.running and time.monotonic() < end:
+        time.sleep(0.01)
+    assert not app.recorder.running
+
+
+def test_hook_callbacks_do_not_touch_the_mic_or_tray_directly(app, monkeypatch):
+    """키보드 훅 안에서는 상태만 바꾸고, 마이크 열기·닫기와 트레이 그리기는 다른 스레드/화면 스레드로 넘깁니다."""
+    import threading
+
+    hook_thread = threading.current_thread().name
+    calls = []
+
+    def start():
+        calls.append(("start", threading.current_thread().name))
+        app.recorder.running, app.recorder.started_at = True, time.monotonic()
+
+    def stop():
+        calls.append(("stop", threading.current_thread().name))
+        app.recorder.running = False
+        return b"RIFF-fake-wav", 1.5
+
+    monkeypatch.setattr(app.recorder, "start", start)
+    monkeypatch.setattr(app.recorder, "stop", stop)
+    def set_state(state, title):
+        calls.append(("tray", threading.current_thread().name))
+
+    monkeypatch.setattr(app.tray, "set_state", set_state)
+    app._on_record_hotkey("dictate")
+    assert app.state == "recording"
+    app._pressed_at -= 1.0
+    app._on_record_key_up("dictate")
+    wait_idle(app)
+    time.sleep(0.05)
+    assert all(thread != hook_thread for kind, thread in calls if kind in ("start", "stop")), calls
+    assert "tray" not in [k for k, _ in calls] and "set_state" in app.posted  # 트레이는 post()로만
+
+
+def test_mic_open_failure_returns_to_idle(app, monkeypatch):
+    def fail():
+        raise app_module.AudioError("마이크를 열지 못했습니다.")
+
+    monkeypatch.setattr(app.recorder, "start", fail)
+    app._on_record_hotkey("dictate")
+    wait_idle(app)
+    assert app.purpose is None and any(name == "show_error" for name, _ in app.overlay.calls)
+
+
+def test_too_short_recording_tells_the_user(app, monkeypatch):
+    monkeypatch.setattr(app.recorder, "stop", lambda: (b"RIFF", 0.2))
+    app._on_record_hotkey("dictate")
+    app._pressed_at -= 1.0
+    app._on_record_key_up("dictate")
+    wait_idle(app)
+    assert app.pasted == [] and any(name == "show_info" and "짧아요" in args[0] for name, args in app.overlay.calls)
+
+
+def test_user_hotkey_equal_to_win_h_is_registered_once(app, monkeypatch):
+    kb = FakeKeyboard()
+    monkeypatch.setitem(sys.modules, "keyboard", kb)
+    app.cfg.update({"win_h": True, "hotkey_dictate": "win+h"})
+    app.register_hotkeys()
+    assert [c for c, _, _ in kb.hotkeys].count("windows+h") + [c for c, _, _ in kb.hotkeys].count("win+h") == 1
 
 
 def test_missing_stt_key_opens_settings(app):
@@ -210,6 +284,9 @@ class FakeKeyboard(types.ModuleType):
 
     def on_press_key(self, key, callback):
         pass
+
+    def parse_hotkey(self, combo):
+        return tuple(sorted(k.strip().lower().replace("windows", "win") for k in combo.split("+")))
 
 
 @pytest.mark.parametrize("win_h", [True, False])

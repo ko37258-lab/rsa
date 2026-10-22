@@ -98,9 +98,18 @@ jobs:
 
       - name: 버전 읽기
         id: ver
-        run: echo "version=$((Get-Content VERSION).Trim())" >> $env:GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = (Get-Content VERSION).Trim()
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+          # 같은 버전의 릴리스가 이미 있으면 덮어쓰지 않습니다 (VERSION을 올려야 새로 올라감).
+          gh release view "desktop-v$v" --repo "$env:GITHUB_REPOSITORY" 2>$null
+          if ($LASTEXITCODE -eq 0) { echo "publish=false" >> $env:GITHUB_OUTPUT; Write-Host "desktop-v$v 릴리스가 이미 있어 올리지 않습니다 (artifact만 남김)" }
+          else { echo "publish=true" >> $env:GITHUB_OUTPUT }
 
       - name: 릴리스에 올리기
+        if: steps.ver.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-v${{ steps.ver.outputs.version }}

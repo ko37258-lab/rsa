@@ -16,6 +16,7 @@ from .config import (
     SPEECH_LANGS,
     STT_PROVIDERS,
     TARGET_LANGS,
+    same_hotkey,
     stt_key,
 )
 from .guide import help_items, readiness
@@ -356,6 +357,9 @@ class SettingsWindow:
                 return
         if len(set(hotkeys.values())) < 3:
             messagebox.showerror("단축키 확인", "세 단축키는 서로 달라야 합니다.", parent=self.win)
+            return
+        if bool(self.win_h.get()) and any(same_hotkey(c, "windows+h") for c in hotkeys.values()):
+            messagebox.showerror("단축키 확인", "Win+H는 이미 '말해서 입력'에 쓰이고 있습니다. 다른 단축키를 적거나 Win+H 옵션을 꺼 주세요.", parent=self.win)
             return
 
         cfg = dict(self.cfg)

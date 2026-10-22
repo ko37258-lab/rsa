@@ -51,6 +51,8 @@ Name: "{autodesktop}\MR.K Typeless"; Filename: "{app}\MRK-Typeless.exe"; Tasks: 
 [Registry]
 ; 프로그램 설정의 "Windows를 켤 때 자동으로 실행"과 같은 자리입니다.
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "MRK-Typeless"; ValueData: """{app}\MRK-Typeless.exe"""; Flags: uninsdeletevalue; Tasks: autostart
+; 설치 뒤 프로그램 설정에서 자동 실행을 켰더라도, 제거할 때 그 항목을 지웁니다 (값은 만들지 않음).
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "MRK-Typeless"; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{app}\MRK-Typeless.exe"; Description: "MR.K Typeless 바로 실행"; Flags: nowait postinstall skipifsilent

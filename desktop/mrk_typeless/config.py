@@ -115,13 +115,33 @@ def save_config(cfg: dict) -> None:
     _write_json(CONFIG_PATH, cfg)
 
 
-def load_dictionary() -> dict:
-    """사전 파일이 없으면 기본 사전(부동산공법 용어)으로 만들어 둡니다. 메모장으로 고칠 수 있습니다."""
-    stored = _read_json(DICTIONARY_PATH)
+def load_dictionary() -> tuple[dict, str | None]:
+    """(사전, 문제). 파일이 없으면 기본 사전(부동산공법 용어)으로 만들어 둡니다. 메모장으로 고칠 수 있습니다.
+    파일이 있는데 읽을 수 없으면(메모장에서 쉼표를 빠뜨리는 등) 덮어쓰지 않고 기본 사전을 쓰며 그 이유를 돌려줍니다."""
+    if not DICTIONARY_PATH.exists():
+        _write_json(DICTIONARY_PATH, DEFAULT_DICTIONARY)
+        return DEFAULT_DICTIONARY, None
+    try:
+        stored = json.loads(DICTIONARY_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return DEFAULT_DICTIONARY, f"{DICTIONARY_PATH.name}: {e}"
     if isinstance(stored, dict) and isinstance(stored.get("terms"), list):
-        return {"terms": stored.get("terms", []), "replacements": stored.get("replacements", [])}
-    _write_json(DICTIONARY_PATH, DEFAULT_DICTIONARY)
-    return DEFAULT_DICTIONARY
+        return {"terms": stored.get("terms", []), "replacements": stored.get("replacements") or []}, None
+    return DEFAULT_DICTIONARY, f"{DICTIONARY_PATH.name}: 'terms' 목록이 없습니다"
+
+
+def same_hotkey(a: str, b: str) -> bool:
+    """'win+h'와 'windows+h'처럼 적는 법만 다른 단축키를 같은 것으로 봅니다."""
+    try:
+        import keyboard
+
+        return keyboard.parse_hotkey(a) == keyboard.parse_hotkey(b)
+    except Exception:
+        def norm(combo: str) -> str:
+            keys = (k.strip().lower() for k in combo.split("+"))
+            return "+".join(sorted("windows" if k in ("win", "windows", "super", "cmd") else k for k in keys))
+
+        return norm(a) == norm(b)
 
 
 def append_history(entry: dict) -> None:
