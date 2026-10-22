@@ -90,7 +90,8 @@ mrk-video/
 ├─ assets/
 │  ├─ fonts/             Pretendard Variable (자체 호스팅)
 │  ├─ samples/           힉스필드로 만든 예시 실사 이미지
-│  └─ video/             사용법 영상(tutorial.mp4)
+│  ├─ guide/             사용 안내 단계별 캡처(step-01~06.jpg)
+│  └─ video/             사용법 영상(tutorial.mp4, 포스터 tutorial-poster.jpg) — 없으면 안내 화면의 영상 칸이 숨겨짐
 ├─ tests/                스타일 20종 스냅샷 시트(style-sheet.cjs)
 ├─ scripts/artifact-page.mjs   Claude 아티팩트용 페이지 만들기
 └─ docs/ANALYSIS.md      설치 파일 분석 보고서
