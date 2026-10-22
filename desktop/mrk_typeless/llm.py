@@ -10,6 +10,9 @@ class LlmError(Exception):
     pass
 
 
+TRUNCATED_MESSAGE = "글이 너무 길어 끝까지 정리하지 못했습니다. 나눠서 말해 주세요."
+
+
 def run_ai(system: str, user: str, cfg: dict) -> str:
     """설정에서 고른 AI로 정리합니다. 키가 없으면 LlmError."""
     engine = polish_engine(cfg)
@@ -31,10 +34,12 @@ def run_gemini(system: str, user: str, cfg: dict) -> str:
     except gemini.GeminiError as e:
         raise LlmError(str(e)) from e
     text = gemini.text_of(data).strip()
-    if not text and gemini.is_blocked(data):
+    if gemini.is_blocked(data):
         raise LlmError("Gemini가 이 내용을 정리하지 않았습니다. 내용을 바꿔 다시 해 주세요.")
     if not text:
         raise LlmError("정리된 글이 비어 있습니다. 조금 더 길게 말해 주세요.")
+    if gemini.is_truncated(data):
+        raise LlmError(TRUNCATED_MESSAGE)
     return text
 
 
@@ -77,4 +82,7 @@ def run_claude(system: str, user: str, cfg: dict) -> str:
     text = "".join(block.text for block in message.content if block.type == "text").strip()
     if not text:
         raise LlmError("정리된 글이 비어 있습니다. 조금 더 길게 말해 주세요.")
+    # 출력 한도에 걸려 중간에 끊긴 글은 붙여넣지 않고 알립니다.
+    if message.stop_reason == "max_tokens":
+        raise LlmError(TRUNCATED_MESSAGE)
     return text

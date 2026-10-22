@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failureMessage, isBlocked, parseSse, textOf, thinkingLevelFor } from "./gemini";
+import { failureMessage, isBlocked, isTruncated, parseSse, streamFailure, textOf, thinkingLevelFor } from "./gemini";
 import { geminiMime } from "./transcribe";
 
 const chunk = (text: string, extra: object = {}) => ({ candidates: [{ content: { parts: [{ text }] }, ...extra }] });
@@ -11,6 +11,20 @@ describe("parseSse", () => {
     const { events, rest } = parseSse(`data: ${a}\r\n\r\ndata: ${b}\n\ndata: {"cand`);
     expect(events.map(textOf)).toEqual(["이번 주 ", "금요일"]);
     expect(rest).toBe('data: {"cand');
+  });
+
+  it("data: 줄이 여러 개면 줄바꿈으로 이어 붙인다 (SSE 규칙)", () => {
+    const { events } = parseSse('data: {"candidates":[{"content":{"parts":[{"text":"a\\nb"}]}}]}\n\n');
+    expect(events.map(textOf)).toEqual(["a\nb"]);
+    const split = parseSse('data: {"candidates":[{"content":{"parts":[{"text":"x"}]},\ndata: "finishReason":"STOP"}]}\n\n');
+    expect(split.events.map(textOf)).toEqual(["x"]);
+  });
+
+  it("스트림 안의 오류와 끊김을 알아본다", () => {
+    expect(streamFailure({ error: { code: 429, message: "Resource exhausted", status: "RESOURCE_EXHAUSTED" } })?.status).toBe(429);
+    expect(streamFailure(chunk("ok"))).toBeNull();
+    expect(isTruncated(chunk("…", { finishReason: "MAX_TOKENS" }))).toBe(true);
+    expect(isTruncated(chunk("끝", { finishReason: "STOP" }))).toBe(false);
   });
 
   it("깨진 덩어리는 건너뛴다", () => {
@@ -45,6 +59,8 @@ describe("failureMessage", () => {
     expect(failureMessage({ status: 400, reason: "API_KEY_INVALID", message: "" }, "정리")).toContain("키가 맞지 않습니다");
     expect(failureMessage({ status: 429, reason: "RESOURCE_EXHAUSTED", message: "" }, "정리")).toContain("한도");
     expect(failureMessage({ status: 503, reason: "UNAVAILABLE", message: "" }, "받아쓰기")).toContain("다시 받아쓰기해");
+    expect(failureMessage({ status: 404, reason: "", message: "" }, "받아쓰기")).toContain("다른 받아쓰기 서비스");
+    expect(failureMessage({ status: 404, reason: "", message: "" }, "정리")).toContain("다른 Gemini 모델");
   });
 });
 

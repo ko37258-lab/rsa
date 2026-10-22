@@ -50,6 +50,9 @@ export async function runWithApiKey(req: AiRequest, settings: Settings, opts: Ru
       .join("")
       .trim();
     if (!text) throw new EngineError("failed", "정리된 글이 비어 있습니다. 원문을 조금 더 길게 말해 주세요.");
+    // 출력 한도에 걸려 중간에 끊긴 글은 완성본으로 저장·복사하지 않고 알립니다.
+    if (message.stop_reason === "max_tokens")
+      throw new EngineError("failed", "글이 너무 길어 끝까지 정리하지 못했습니다. 나눠서 정리해 주세요.", text);
     return text;
   } catch (e) {
     if (e instanceof EngineError) throw e;

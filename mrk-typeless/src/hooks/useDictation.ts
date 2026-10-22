@@ -71,7 +71,7 @@ export function useDictation(settings: Settings, onFinal: (text: string) => void
   const stop = useCallback(async (): Promise<StopResult> => {
     wantRef.current = false;
     const [a, b] = await Promise.all([speech.stop(), recorder.stop()]);
-    return { spokenMs: Math.max(a.spokenMs, b.spokenMs) };
+    return { spokenMs: Math.max(a.spokenMs, b.spokenMs), cancelled: !!(a.cancelled || b.cancelled) };
   }, [speech, recorder]);
 
   const cancel = useCallback(() => {

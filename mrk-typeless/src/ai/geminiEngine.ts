@@ -1,7 +1,18 @@
 import type { AiRequest } from "../lib/prompts";
 import type { Settings } from "../lib/settings";
 import { EngineError, type RunOptions } from "./engine";
-import { failureMessage, GEMINI_BASE, isBlocked, parseSse, readFailure, textOf, thinkingLevelFor } from "./gemini";
+import {
+  failureMessage,
+  GEMINI_BASE,
+  isBlocked,
+  isTruncated,
+  parseSse,
+  readFailure,
+  streamFailure,
+  textOf,
+  thinkingLevelFor,
+  TRUNCATED_MESSAGE,
+} from "./gemini";
 
 // 사용자 본인의 Gemini API 키로 정리합니다. 글이 써지는 대로 화면에 보이도록 스트리밍합니다.
 export async function runWithGemini(req: AiRequest, settings: Settings, opts: RunOptions): Promise<string> {
@@ -17,6 +28,7 @@ export async function runWithGemini(req: AiRequest, settings: Settings, opts: Ru
 
   let streamed = "";
   let blocked = false;
+  let truncated = false;
   try {
     let res: Response | null = null;
     // 서버가 잠깐 바쁠 때(5xx)만 한 번 더 시도합니다.
@@ -43,7 +55,11 @@ export async function runWithGemini(req: AiRequest, settings: Settings, opts: Ru
       const { events, rest } = parseSse(done ? `${buffer}\n\n` : buffer);
       buffer = rest;
       for (const event of events) {
+        // 스트리밍 도중 온 오류(한도 초과 등)는 지금까지의 글과 함께 실패로 알립니다.
+        const failure = streamFailure(event);
+        if (failure) throw new EngineError("failed", failureMessage(failure, "정리"), streamed);
         if (isBlocked(event)) blocked = true;
+        if (isTruncated(event)) truncated = true;
         const delta = textOf(event);
         if (delta) {
           streamed += delta;
@@ -59,7 +75,8 @@ export async function runWithGemini(req: AiRequest, settings: Settings, opts: Ru
   }
 
   const text = streamed.trim();
-  if (blocked && !text) throw new EngineError("refused", "Gemini가 이 내용을 정리하지 않았습니다. 내용을 바꿔 다시 시도해 주세요.");
+  if (blocked) throw new EngineError("refused", "Gemini가 이 내용을 정리하지 않았습니다. 내용을 바꿔 다시 시도해 주세요.", text || undefined);
   if (!text) throw new EngineError("failed", "정리된 글이 비어 있습니다. 원문을 조금 더 길게 말해 주세요.");
+  if (truncated) throw new EngineError("failed", TRUNCATED_MESSAGE, text);
   return text;
 }

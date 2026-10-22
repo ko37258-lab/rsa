@@ -45,14 +45,17 @@ async function runWithAccount(req: AiRequest, settings: Settings, opts: RunOptio
   const sample = await getSample();
   if (!sample) throw new EngineError("unavailable", "Claude 계정 연결을 쓸 수 없습니다. 설정에서 다른 방식을 골라 주세요.");
   try {
-    const { text } = await sample(toSingleInput(req), {
+    const { text, truncated } = await sample(toSingleInput(req), {
       modelTier: settings.accountTier,
       signal: opts.signal,
       onText: ({ text }) => opts.onText?.(text),
       ...(opts.fresh ? { cache: false } : {}),
     });
+    // 끝까지 쓰지 못한 글은 완성본으로 저장·복사하지 않고 알립니다.
+    if (truncated) throw new EngineError("failed", "글이 너무 길어 끝까지 정리하지 못했습니다. 나눠서 정리해 주세요.", text.trim());
     return text.trim();
   } catch (e) {
+    if (e instanceof EngineError) throw e;
     const err = e as ClaudeSampleError;
     if (err?.code === "cancelled") throw new EngineError("cancelled", "정리를 멈췄습니다.", err.text);
     const message = SAMPLE_MESSAGES[err?.code] ?? "Claude 연결이 잠시 끊겼습니다. 다시 정리해 주세요.";

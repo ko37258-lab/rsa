@@ -75,8 +75,8 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
   );
 
   const stopAndApply = useCallback(async () => {
-    await speech.stop();
-    if (commandRef.current.trim()) await apply(commandRef.current);
+    const { cancelled } = await speech.stop();
+    if (!cancelled && commandRef.current.trim()) await apply(commandRef.current);
   }, [apply, speech]);
 
   const aiOff = engine === "local";
@@ -118,8 +118,8 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
           <input
             id="edit-command"
             className="command__input"
-            value={speech.interim ? `${command} ${speech.interim}`.trim() : command}
-            placeholder="예: 더 공손하게, 세 줄로 요약해줘"
+            value={command}
+            placeholder={speech.interim ? speech.interim : "예: 더 공손하게, 세 줄로 요약해줘"}
             onChange={(e) => updateCommand(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -152,6 +152,7 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
         {(speech.problem === "blocked" || speech.problem === "network") && (
           <p className="notice">지금은 마이크로 지시를 받을 수 없어 글로 적어 주세요. 키보드의 음성 입력도 됩니다.</p>
         )}
+        {speech.interim && <p className="pad__interim">{speech.interim}</p>}
         {speech.transcribing && <p className="notice">지시를 받아쓰는 중…</p>}
         {speech.error && <p className="notice">{speech.error}</p>}
       </div>

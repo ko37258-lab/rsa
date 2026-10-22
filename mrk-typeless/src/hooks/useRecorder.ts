@@ -111,7 +111,7 @@ export function useRecorder(options: RecorderOptions, onFinal: (text: string) =>
         setListening(false);
         setElapsedMs(spokenMs);
         if (cancelledRef.current || spokenMs < MIN_SPOKEN_MS || chunks.length === 0) {
-          settle({ spokenMs });
+          settle({ spokenMs, cancelled: cancelledRef.current });
           return;
         }
         const audio = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });

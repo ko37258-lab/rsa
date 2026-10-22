@@ -67,4 +67,8 @@ def _transcribe_gemini(wav: bytes, api_key: str, lang: str, hints: list[str]) ->
         data = gemini.generate(gemini.STT_MODEL, api_key, body, "받아쓰기", timeout=60)
     except gemini.GeminiError as e:
         raise SttError(str(e)) from e
+    if gemini.is_blocked(data):
+        raise SttError("Gemini가 이 녹음을 받아쓰지 않았습니다. 다시 말해 주세요.")
+    if gemini.is_truncated(data):
+        raise SttError("녹음이 너무 길어 끝까지 받아쓰지 못했습니다. 나눠서 말해 주세요.")
     return gemini.text_of(data).strip()

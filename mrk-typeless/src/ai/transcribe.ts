@@ -1,7 +1,18 @@
 // 녹음 받아쓰기: 녹음한 음성 파일을 받아쓰기 API로 보내 글자로 바꿉니다.
 // 브라우저 음성인식(구글 서버)을 쓸 수 없는 브라우저·네트워크에서도 동작합니다.
 
-import { blobToBase64, failureMessage, GEMINI_BASE, GEMINI_STT_MODEL, readFailure, textOf, thinkingLevelFor, type GeminiResponse } from "./gemini";
+import {
+  blobToBase64,
+  failureMessage,
+  GEMINI_BASE,
+  GEMINI_STT_MODEL,
+  isBlocked,
+  isTruncated,
+  readFailure,
+  textOf,
+  thinkingLevelFor,
+  type GeminiResponse,
+} from "./gemini";
 
 export type SttProvider = "elevenlabs" | "openai" | "gemini";
 
@@ -131,5 +142,8 @@ async function transcribeWithGemini(audio: Blob, opts: TranscribeOptions): Promi
     throw new SttError("받아쓰기 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.");
   }
   if (!res.ok) throw new SttError(failureMessage(await readFailure(res), "받아쓰기"));
-  return textOf((await res.json()) as GeminiResponse).trim();
+  const data = (await res.json()) as GeminiResponse;
+  if (isBlocked(data)) throw new SttError("Gemini가 이 녹음을 받아쓰지 않았습니다. 다시 말해 주세요.");
+  if (isTruncated(data)) throw new SttError("녹음이 너무 길어 끝까지 받아쓰지 못했습니다. 나눠서 말해 주세요.");
+  return textOf(data).trim();
 }

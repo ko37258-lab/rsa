@@ -13,6 +13,8 @@ const IS_ANDROID = typeof navigator !== "undefined" && /Android/i.test(navigator
 export interface StopResult {
   /** 이번에 말한 시간 */
   spokenMs: number;
+  /** Esc 등으로 버린 경우 (정리하지 않음) */
+  cancelled?: boolean;
 }
 
 /**
@@ -33,6 +35,7 @@ export function useSpeech(lang: string, onFinal: (text: string) => void) {
   const interimRef = useRef("");
   const onFinalRef = useRef(onFinal);
   const stopWaitersRef = useRef<((r: StopResult) => void)[]>([]);
+  const stopTimerRef = useRef<number | null>(null);
   onFinalRef.current = onFinal;
 
   useEffect(() => {
@@ -41,9 +44,11 @@ export function useSpeech(lang: string, onFinal: (text: string) => void) {
     return () => window.clearInterval(timer);
   }, [listening]);
 
-  const finish = useCallback(() => {
+  const finish = useCallback((cancelled = false) => {
+    if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
+    stopTimerRef.current = null;
     const leftover = interimRef.current.trim();
-    if (leftover) onFinalRef.current(leftover);
+    if (leftover && !cancelled) onFinalRef.current(leftover);
     interimRef.current = "";
     setInterim("");
     setListening(false);
@@ -51,12 +56,15 @@ export function useSpeech(lang: string, onFinal: (text: string) => void) {
     setElapsedMs(spokenMs);
     const waiters = stopWaitersRef.current;
     stopWaitersRef.current = [];
-    waiters.forEach((resolve) => resolve({ spokenMs }));
+    waiters.forEach((resolve) => resolve({ spokenMs, cancelled }));
   }, []);
 
   const start = useCallback(() => {
     const Ctor = getRecognitionCtor();
     if (!Ctor || wantRef.current) return;
+    // 앞 세션의 멈춤 대기 타이머가 남아 있으면 지웁니다 (새 세션을 잘못 끝내지 않도록).
+    if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
+    stopTimerRef.current = null;
     const rec = new Ctor();
     rec.lang = lang;
     rec.continuous = !IS_ANDROID;
@@ -131,12 +139,20 @@ export function useSpeech(lang: string, onFinal: (text: string) => void) {
       } catch {
         finish();
       }
-      // 브라우저가 끝 신호를 주지 않는 경우를 대비
-      window.setTimeout(() => {
-        if (stopWaitersRef.current.length) {
-          recRef.current = null;
-          finish();
+      // 브라우저가 끝 신호를 주지 않는 경우를 대비. 이 세션(rec)이 아직 기다리고 있을 때만 끝냅니다.
+      if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = window.setTimeout(() => {
+        stopTimerRef.current = null;
+        if (recRef.current !== rec || !stopWaitersRef.current.length) return;
+        recRef.current = null;
+        rec.onend = null;
+        rec.onresult = null;
+        try {
+          rec.abort();
+        } catch {
+          /* 이미 끝남 */
         }
+        finish();
       }, 2500);
     });
   }, [finish]);
@@ -156,7 +172,7 @@ export function useSpeech(lang: string, onFinal: (text: string) => void) {
         /* 이미 끝남 */
       }
     }
-    finish();
+    finish(true);
   }, [finish]);
 
   useEffect(() => () => recRef.current?.abort(), []);

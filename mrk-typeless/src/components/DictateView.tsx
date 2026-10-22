@@ -208,11 +208,15 @@ export function DictateView({
   const spokenRef = useRef<number | undefined>(undefined);
   const rawAtStartRef = useRef<string | null>(null);
   const stopAndPolish = useCallback(async () => {
-    const { spokenMs } = await speech.stop();
+    // 같은 세션을 두 번 멈추지 않습니다 (마이크 두 번 탭, Space 떼기 + 클릭 등).
+    const rawAtStart = rawAtStartRef.current;
+    if (rawAtStart === null) return;
+    rawAtStartRef.current = null;
+    const { spokenMs, cancelled } = await speech.stop();
+    if (cancelled) return;
     spokenRef.current = spokenMs;
     // 이번에 받아쓴 말이 없으면(인식 실패 등) 예전 원문을 다시 정리하지 않습니다.
-    const heardSomething = rawRef.current !== rawAtStartRef.current;
-    rawAtStartRef.current = null;
+    const heardSomething = rawRef.current !== rawAtStart;
     if (settings.autoPolish && heardSomething) await polish(false, spokenMs);
   }, [polish, settings.autoPolish, speech]);
 
@@ -250,7 +254,10 @@ export function DictateView({
       save("usedMic", true);
     }
     ai.cancel();
-    if (leaveExample()) updateRaw("");
+    if (leaveExample()) {
+      updateRaw("");
+      ai.show("");
+    }
     rawAtStartRef.current = rawRef.current;
     speech.start();
   }, [ai, leaveExample, speech, updateRaw, usedMic]);
@@ -281,16 +288,21 @@ export function DictateView({
       // 사용법 같은 대화 상자가 열려 있으면 뒤에서 단축키가 동작하지 않게 합니다.
       if (!active || document.querySelector("dialog[open]")) return;
       if (e.key === "Escape") {
-        if (speech.listening || speech.transcribing) speech.cancel();
+        if (speech.listening || speech.transcribing) {
+          speech.cancel();
+          rawAtStartRef.current = null;
+        }
         ai.cancel();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
-        void polish(false, spokenRef.current);
+        if (!ai.busy) void polish(false, spokenRef.current);
         return;
       }
-      if (e.code === "Space" && !e.repeat && !isEditable(e.target) && !speech.listening && !speech.transcribing) {
+      // 글 칸이 아니면 Space는 말하기. 방금 누른 버튼에 포커스가 남아 있어도 그 버튼을 다시 누르지 않습니다.
+      const onButton = e.target instanceof HTMLButtonElement;
+      if (e.code === "Space" && !e.repeat && (onButton || !isEditable(e.target)) && !speech.listening && !speech.transcribing) {
         e.preventDefault();
         spaceHeld = true;
         startListening();
@@ -393,12 +405,23 @@ export function DictateView({
               }
             }}
             onKeyDown={(e) => {
-              // 실제 키보드로 친 글자만 '직접 입력'으로 봅니다 (Win 키 조합은 제외).
-              if (e.code && !e.metaKey && e.key !== "Meta" && e.key !== "OS") {
+              // 키보드로 친 글자는 '직접 입력'으로 봅니다 (Win+H 음성 입력은 키 누름 없이 글자만 들어옵니다).
+              // 휴대폰 키보드는 code가 비어 있고 keyCode 229로 오므로 code는 보지 않습니다.
+              if (!e.metaKey && e.key !== "Meta" && e.key !== "OS") {
                 lastKeyAtRef.current = Date.now();
                 voiceTypedRef.current = false;
                 clearVoiceTimer();
               }
+            }}
+            onPaste={() => {
+              lastKeyAtRef.current = Date.now();
+              voiceTypedRef.current = false;
+              clearVoiceTimer();
+            }}
+            onDrop={() => {
+              lastKeyAtRef.current = Date.now();
+              voiceTypedRef.current = false;
+              clearVoiceTimer();
             }}
             onCompositionStart={() => {
               composingRef.current = true;
@@ -413,6 +436,8 @@ export function DictateView({
               leaveExample();
               const grew = e.target.value.trim().length > rawRef.current.trim().length;
               updateRaw(e.target.value);
+              // 직접 고친 글에는 지난 녹음 시간을 붙이지 않습니다 (아낀 시간 계산용).
+              spokenRef.current = undefined;
               if (grew && Date.now() - lastKeyAtRef.current > 1200) voiceTypedRef.current = true;
               scheduleVoicePolish();
             }}
@@ -434,6 +459,7 @@ export function DictateView({
                 onClick={() => {
                   leaveExample();
                   updateRaw("");
+                  spokenRef.current = undefined;
                 }}
                 disabled={!raw}
               >

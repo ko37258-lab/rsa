@@ -28,6 +28,8 @@ def failure_message(status: int, reason: str, message: str, what: str) -> str:
     if status == 403:
         return "이 Gemini API 키로는 쓸 수 없습니다. Google AI Studio에서 키를 확인해 주세요."
     if status == 404:
+        if what == "받아쓰기":
+            return f"받아쓰기용 Gemini 모델({STT_MODEL})을 이 키로 쓸 수 없습니다. 설정에서 다른 받아쓰기 서비스를 골라 주세요."
         return "Gemini 모델을 찾지 못했습니다. 설정에서 다른 Gemini 모델을 골라 주세요."
     if status == 429:
         return "Gemini 사용량 한도에 닿았습니다. 잠시 뒤 다시 하거나 Google AI Studio에서 한도를 확인해 주세요."
@@ -42,6 +44,15 @@ def text_of(data: dict) -> str:
     """응답에서 생각(thought)을 뺀 글만 꺼냅니다."""
     parts = ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
     return "".join(p.get("text", "") for p in parts if not p.get("thought") and isinstance(p.get("text"), str))
+
+
+def finish_reason(data: dict) -> str:
+    return (data.get("candidates") or [{}])[0].get("finishReason") or ""
+
+
+def is_truncated(data: dict) -> bool:
+    """출력 한도에 걸려 끝까지 쓰지 못했는지"""
+    return finish_reason(data) == "MAX_TOKENS"
 
 
 def is_blocked(data: dict) -> bool:

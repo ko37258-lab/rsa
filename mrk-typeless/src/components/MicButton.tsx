@@ -30,6 +30,12 @@ export function MicButton({ listening, disabled, size = "large", pulse, label, o
       data-pulse={pulse % 2}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
+        // 누른 채 손가락·마우스가 버튼 밖으로 나가도 뗄 때 신호를 받도록 붙잡아 둡니다.
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* 지원하지 않는 환경 */
+        }
         downAtRef.current = Date.now();
         startedHereRef.current = !listening;
         if (!listening) onPressStart();
@@ -46,6 +52,10 @@ export function MicButton({ listening, disabled, size = "large", pulse, label, o
         }
       }}
       onPointerCancel={() => {
+        if (downAtRef.current !== null && startedHereRef.current) onHoldEnd();
+        downAtRef.current = null;
+      }}
+      onLostPointerCapture={() => {
         if (downAtRef.current !== null && startedHereRef.current) onHoldEnd();
         downAtRef.current = null;
       }}

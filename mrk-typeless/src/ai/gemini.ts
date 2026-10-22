@@ -31,7 +31,27 @@ export interface GeminiPart {
 export interface GeminiResponse {
   candidates?: { content?: { parts?: GeminiPart[] }; finishReason?: string }[];
   promptFeedback?: { blockReason?: string };
+  /** 스트리밍 도중 서버가 보내는 오류 (한도 초과, 서버 문제 등) */
+  error?: { code?: number; message?: string; status?: string };
 }
+
+/** 첫 후보의 끝난 이유 (STOP, MAX_TOKENS, SAFETY …) */
+export function finishReasonOf(chunk: GeminiResponse): string | undefined {
+  return chunk.candidates?.[0]?.finishReason;
+}
+
+/** 출력 한도에 걸려 끝까지 쓰지 못했는지 */
+export function isTruncated(chunk: GeminiResponse): boolean {
+  return finishReasonOf(chunk) === "MAX_TOKENS";
+}
+
+/** 스트림 안의 오류 덩어리를 실패 정보로 바꿉니다 */
+export function streamFailure(chunk: GeminiResponse): GeminiFailure | null {
+  if (!chunk.error) return null;
+  return { status: chunk.error.code ?? 500, reason: chunk.error.status ?? "", message: chunk.error.message ?? "" };
+}
+
+export const TRUNCATED_MESSAGE = "글이 너무 길어 끝까지 정리하지 못했습니다. 나눠서 정리해 주세요.";
 
 /** 응답 한 덩어리에서 생각(thought)을 뺀 글만 꺼냅니다. */
 export function textOf(chunk: GeminiResponse): string {
@@ -58,11 +78,13 @@ export function parseSse(buffer: string): { events: GeminiResponse[]; rest: stri
   const blocks = buffer.replace(/\r\n/g, "\n").split("\n\n");
   const rest = blocks.pop() ?? "";
   for (const block of blocks) {
+    // SSE 규칙대로: data: 줄 여러 개는 줄바꿈으로 잇고, 앞의 빈칸 하나만 뗍니다.
     const data = block
       .split("\n")
       .filter((line) => line.startsWith("data:"))
-      .map((line) => line.slice(5).trim())
-      .join("");
+      .map((line) => line.slice(5).replace(/^ /, ""))
+      .join("\n")
+      .trim();
     if (!data || data === "[DONE]") continue;
     try {
       events.push(JSON.parse(data) as GeminiResponse);
@@ -101,7 +123,10 @@ export function failureMessage(f: GeminiFailure, what: "정리" | "받아쓰기"
     return "Gemini API 키가 맞지 않습니다. 설정에서 키를 확인해 주세요.";
   if (f.status === 403)
     return "이 Gemini API 키로는 쓸 수 없습니다. Google AI Studio에서 키와 결제 설정을 확인해 주세요.";
-  if (f.status === 404) return "Gemini 모델을 찾지 못했습니다. 설정에서 다른 Gemini 모델을 골라 주세요.";
+  if (f.status === 404)
+    return what === "받아쓰기"
+      ? `받아쓰기용 Gemini 모델(${GEMINI_STT_MODEL})을 이 키로 쓸 수 없습니다. 설정 → 음성 인식에서 다른 받아쓰기 서비스를 골라 주세요.`
+      : "Gemini 모델을 찾지 못했습니다. 설정에서 다른 Gemini 모델을 골라 주세요.";
   if (f.status === 429) return "Gemini 사용량 한도에 닿았습니다. 잠시 뒤 다시 하거나 Google AI Studio에서 한도를 확인해 주세요.";
   if (f.status === 413 || /payload size/i.test(f.message)) return "녹음이 너무 깁니다. 나눠서 말해 주세요.";
   if (f.status >= 500) return `Gemini 서버가 바쁩니다. 잠시 뒤 다시 ${what}해 주세요.`;

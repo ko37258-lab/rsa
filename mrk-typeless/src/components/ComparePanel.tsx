@@ -55,8 +55,10 @@ function sidesFor(settings: Settings, accountAvailable: boolean): Side[] {
 
 /** 같은 원문·같은 지시를 Claude와 Gemini에 동시에 보내 결과를 나란히 견줘 봅니다. */
 export function ComparePanel({ req, settings, accountAvailable, onAdopt, onOpenSettings, onClose }: Props) {
-  const sides = sidesFor(settings, accountAvailable);
   const [round, setRound] = useState(0);
+  // 비교를 연(또는 '다시 비교'를 누른) 순간의 설정으로 고정합니다. 그 사이 설정을 바꿔도 머리말과 결과가 어긋나지 않습니다.
+  const [snap, setSnap] = useState(() => ({ sides: sidesFor(settings, accountAvailable), settings }));
+  const sides = snap.sides;
   const [times, setTimes] = useState<Partial<Record<SideKey, number>>>({});
   const [adopted, setAdopted] = useState<SideKey | null>(null);
   const ref = useRef<HTMLElement>(null);
@@ -93,6 +95,7 @@ export function ComparePanel({ req, settings, accountAvailable, onAdopt, onOpenS
               onClick={() => {
                 setTimes({});
                 setAdopted(null);
+                setSnap({ sides: sidesFor(settings, accountAvailable), settings });
                 setRound((r) => r + 1);
               }}
             >
@@ -111,7 +114,7 @@ export function ComparePanel({ req, settings, accountAvailable, onAdopt, onOpenS
             side={side}
             order={i}
             req={req}
-            settings={settings}
+            settings={snap.settings}
             round={round}
             fastest={fastest === side.key}
             adopted={adopted === side.key}
