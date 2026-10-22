@@ -1,0 +1,389 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MR.K 고상철의 부동산IT 활용</title>
+    <meta name="description" content="토지 가치 분석부터 건축 가능성, 건축 시뮬레이션, 비용, 사업성까지 한 흐름으로 보는 부동산 개발 검토 도구입니다.">
+    <meta property="og:title" content="MR.K 고상철의 부동산IT 활용">
+    <meta property="og:description" content="토지 → 가능성 → 건축 → 비용 → 사업성. 토지를 받으면 이 순서대로 판단합니다.">
+    <meta property="og:image" content="assets/hx-hero-1280.webp">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preload" as="image" href="assets/hx-hero-2400.webp" imagesrcset="assets/hx-hero-1280.webp 1280w, assets/hx-hero-2400.webp 2400w" imagesizes="140vw">
+    <link rel="stylesheet" href="css/style.css?v=theme7">
+    <link rel="stylesheet" href="css/home-fix.css?v=3">
+    <link rel="stylesheet" href="css/corporate-theme.css?v=3">
+    <link rel="stylesheet" href="css/motion.css?v=1">
+    <link rel="stylesheet" href="css/home-motion.css?v=1">
+    <script>
+        // 모션 준비 표시 — 스크립트가 4초 안에 뜨지 않으면 콘텐츠를 그대로 보여줍니다.
+        (function (d) {
+            d.classList.add('mx-on');
+            setTimeout(function () { if (!window.__mrkMotion) d.classList.remove('mx-on'); }, 4000);
+        })(document.documentElement);
+    </script>
+    <script src="js/theme-switcher.js?v=2" defer></script>
+    <script src="js/motion.js?v=1" defer></script>
+</head>
+<body>
+
+<nav class="site-nav" id="siteNav">
+    <div class="container nav-inner">
+        <a href="index.html" class="logo"><span class="logo-dot"></span>MR.K 고상철의 부동산IT 활용</a>
+        <div class="nav-links">
+            <a href="index.html" class="active">홈</a>
+            <a href="index.html#flow">개발 검토 플로우</a>
+            <a href="property.html">토지 가치 분석</a>
+            <a href="report-land.html">토지 상세보고서</a>
+            <a href="building-simulation.html">건축 시뮬레이션</a>
+            <a href="cost-simulation.html">비용·사업성</a>
+            <a href="report2.html">종합보고서</a>
+        </div>
+        <button class="nav-toggle" id="navToggle" aria-label="메뉴 열기"><span></span><span></span><span></span></button>
+    </div>
+</nav>
+
+<section class="hero hx-hero" data-parallax data-glow>
+    <div class="hx-media" aria-hidden="true">
+        <div class="hx-media-layer" data-depth="0.9" data-scroll="0.28">
+            <div class="hx-frame">
+                <img class="hx-photo" src="assets/hx-hero-2400.webp" srcset="assets/hx-hero-1280.webp 1280w, assets/hx-hero-2400.webp 2400w" sizes="140vw" alt="" fetchpriority="high" decoding="async">
+                <svg class="hx-site" viewBox="0 0 2688 1152" data-hx-site></svg>
+                <div class="hx-tag hx-tag-below" style="--x:50.6%; --y:67.5%"><b>01</b>필지 경계 · 지적 확인</div>
+                <div class="hx-tag hx-tag-left" style="--x:67.2%; --y:51.8%"><b>03</b>건축 가능 매스 · 일조 사선</div>
+                <div class="hx-tag" style="--x:74.6%; --y:82%"><b>02</b>접도 · 진입로 확인</div>
+            </div>
+        </div>
+        <div class="hx-shade"></div>
+        <div class="hx-grain"></div>
+    </div>
+
+    <div class="container">
+        <div class="hero-inner">
+            <div class="hero-eyebrow" data-reveal><span class="pulse"></span> Land Development Flow</div>
+            <h1 data-split>토지를 받으면<br><span class="accent-text">개발 가능성과 사업성</span>을<br>순서대로 판단합니다.</h1>
+            <p class="hero-lead" data-reveal style="--i:4">토지 가치, 개발 가능성, 건축 규모, 건축비와 부담금, 최종 수익률까지 한 번에 이어지는 수업용·상담용 플로우입니다.</p>
+            <div class="hero-actions" data-reveal style="--i:5">
+                <a href="property.html" class="btn-primary">1단계 토지 분석 시작 <span class="arrow">→</span></a>
+                <a href="#flow" class="btn-secondary">전체 흐름 보기</a>
+            </div>
+            <div class="hero-meta" data-stagger>
+                <div class="meta-item"><span class="num" data-count="01">01</span><span class="label">토지 가치·개발 분석</span></div>
+                <div class="meta-item"><span class="num" data-count="05">05</span><span class="label">사업성 시뮬레이션</span></div>
+                <div class="meta-item"><span class="num" data-scramble="PDF">PDF</span><span class="label">상담 보고서 출력</span></div>
+            </div>
+        </div>
+    </div>
+
+    <p class="hx-hint" aria-hidden="true"><span class="hx-hint-sun"></span>마우스를 좌우로 움직이면 해가 이동하고 건물 그림자가 바뀝니다</p>
+    <a class="hx-scroll" href="#intro" aria-label="아래로 스크롤"><span></span></a>
+</section>
+
+<div class="hx-marquee" aria-hidden="true">
+    <div class="hx-marquee-row" data-marquee="0.7">
+        <div class="mx-marquee-track">
+            <span>토지 가치</span><i></i><span>용도지역</span><i></i><span>도로 접도</span><i></i><span>농지·산지</span><i></i><span>건폐율</span><i></i><span>용적률</span><i></i><span>일조 사선</span><i></i><span>주차장</span><i></i><span>개발부담금</span><i></i><span>총사업비</span><i></i><span>수익률</span><i></i>
+        </div>
+    </div>
+    <div class="hx-marquee-row is-outline" data-marquee="-0.45">
+        <div class="mx-marquee-track">
+            <span>LAND</span><i></i><span>BUILDABILITY</span><i></i><span>MASS</span><i></i><span>COST</span><i></i><span>FEASIBILITY</span><i></i><span>REPORT</span><i></i>
+        </div>
+    </div>
+</div>
+
+<section class="intro hx-intro" id="intro">
+    <div class="container">
+        <div class="hx-intro-grid">
+            <figure class="hx-intro-figure" data-reveal="left" data-tilt="6" data-spot>
+                <div class="hx-intro-img">
+                    <img src="assets/hx-intro.webp" width="1000" height="1250" loading="lazy" decoding="async" alt="컨설턴트가 지적도 위의 필지를 펜으로 짚으며 건축 매스 모형과 함께 검토하는 책상">
+                </div>
+                <figcaption class="hx-intro-badge">
+                    <span>판단 순서</span>
+                    <strong>토지 → 가능성 → 건축 → 비용 → 사업성</strong>
+                </figcaption>
+            </figure>
+            <div class="hx-intro-copy">
+                <span class="label-tag" data-reveal>핵심 방향</span>
+                <h2 data-split>AI가 먼저가 아니라,<br>토지 판단 흐름이<br>먼저입니다.</h2>
+                <p data-reveal>수업과 상담에서는 도구 이름보다 판단 순서가 중요합니다. 토지를 받았을 때 먼저 가치와 개발 가능성을 보고, 그 다음 건축 규모와 비용, 마지막으로 사업성이 남는지를 확인해야 합니다.</p>
+                <p data-reveal>그래서 이 사이트는 도구 설명을 앞에 두지 않고, 실제 개발 검토 흐름을 중심으로 다시 정리했습니다. 먼저 토지와 사업성 판단 흐름을 완성한 뒤, 필요한 보조 도구는 나중에 별도 메뉴로 붙이면 됩니다.</p>
+                <p class="intro-quote" data-scrub-words>"토지 → 가능성 → 건축 → 비용 → 사업성. 이 순서가 흔들리면 상담도, 투자 판단도 흔들립니다."</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="master-visual-section" id="master-visual">
+    <div class="container">
+        <div class="master-visual-head">
+            <span class="label-tag" data-reveal>한 장으로 보는 개발 검토</span>
+            <h2 data-split>한 사람이 토지를 받아<br>건축과 사업성까지 완성하는 모습</h2>
+            <p data-reveal>토지를 받는 순간부터 가치 분석, 건축 가능성 판단, 건물 매스, 비용, 수익률 판단까지 한 장면으로 보여줍니다. 마우스를 올리면 단계 카드가 깊이감 있게 떠오릅니다.</p>
+        </div>
+        <div class="master-visual" data-mv data-reveal="zoom">
+            <svg viewBox="0 0 1180 560" role="img" aria-label="토지 개발 검토 전체 흐름 시각화" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="mvSky" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="#f4f1e9"/>
+                        <stop offset="1" stop-color="#e7ece7"/>
+                    </linearGradient>
+                    <linearGradient id="mvLand" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stop-color="#93ad70"/>
+                        <stop offset="1" stop-color="#668353"/>
+                    </linearGradient>
+                    <filter id="mvShadow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#141413" flood-opacity="0.22"/>
+                    </filter>
+                </defs>
+
+                <rect width="1180" height="560" rx="18" fill="url(#mvSky)"/>
+                <path d="M55 455 C205 395 331 405 482 365 C655 319 823 299 1125 360 L1125 560 L55 560 Z" fill="#d7dcc9"/>
+
+                <g data-mv-depth="0.2">
+                    <g filter="url(#mvShadow)">
+                        <polygon points="274,352 627,250 1005,374 616,506" fill="url(#mvLand)" stroke="#fff" stroke-width="4"/>
+                        <g opacity="0.26" stroke="#fff" stroke-width="1.4">
+                            <line x1="335" y1="334" x2="700" y2="464"/>
+                            <line x1="415" y1="312" x2="782" y2="438"/>
+                            <line x1="495" y1="289" x2="863" y2="414"/>
+                            <line x1="575" y1="267" x2="944" y2="389"/>
+                            <line x1="337" y1="373" x2="724" y2="270"/>
+                            <line x1="434" y1="407" x2="826" y2="303"/>
+                            <line x1="535" y1="441" x2="927" y2="336"/>
+                        </g>
+                    </g>
+                </g>
+
+                <g data-mv-depth="0.55" class="mv-building">
+                    <g filter="url(#mvShadow)">
+                        <polygon points="612,252 782,301 869,267 695,220" fill="#24323a"/>
+                        <polygon points="612,252 782,301 782,430 612,376" fill="#7893a1" stroke="#fff" stroke-opacity="0.35"/>
+                        <polygon points="782,301 869,267 869,392 782,430" fill="#4d6572" stroke="#fff" stroke-opacity="0.25"/>
+                        <g stroke="#fff" stroke-opacity="0.36">
+                            <line x1="612" y1="283" x2="782" y2="334"/>
+                            <line x1="612" y1="314" x2="782" y2="365"/>
+                            <line x1="612" y1="345" x2="782" y2="396"/>
+                            <line x1="782" y1="334" x2="869" y2="299"/>
+                            <line x1="782" y1="365" x2="869" y2="331"/>
+                        </g>
+                        <g fill="#dceff5" class="mv-windows">
+                            <rect x="633" y="286" width="14" height="10" rx="1"/>
+                            <rect x="678" y="300" width="14" height="10" rx="1"/>
+                            <rect x="724" y="314" width="14" height="10" rx="1"/>
+                            <rect x="633" y="320" width="14" height="10" rx="1"/>
+                            <rect x="678" y="334" width="14" height="10" rx="1"/>
+                            <rect x="724" y="348" width="14" height="10" rx="1"/>
+                        </g>
+                    </g>
+                </g>
+
+                <g data-mv-depth="0.7">
+                    <line class="mv-limit" x1="942" y1="182" x2="1018" y2="455" stroke="#d9a441" stroke-width="8" stroke-linecap="round"/>
+                    <text x="962" y="232" fill="#6f5523" font-size="18" font-weight="800">일조·높이 제한</text>
+                </g>
+
+                <g data-mv-depth="0.45">
+                    <text x="258" y="392" fill="#203027" font-size="17" font-weight="900">주차장 검토</text>
+                    <g fill="#5f7a89" stroke="#fff" stroke-opacity="0.75" class="mv-cars">
+                        <rect x="257" y="406" width="24" height="16" rx="3"/>
+                        <rect x="286" y="413" width="24" height="16" rx="3"/>
+                        <rect x="315" y="420" width="24" height="16" rx="3"/>
+                        <rect x="344" y="427" width="24" height="16" rx="3"/>
+                        <rect x="373" y="434" width="24" height="16" rx="3"/>
+                    </g>
+                </g>
+
+                <g data-mv-depth="0.95">
+                    <g filter="url(#mvShadow)">
+                        <circle cx="198" cy="284" r="34" fill="#d97757"/>
+                        <path d="M168 378 C174 322 219 322 229 378 Z" fill="#2f3e46"/>
+                        <rect x="183" y="317" width="27" height="62" rx="12" fill="#2f3e46"/>
+                        <path d="M224 334 L301 355" stroke="#2f3e46" stroke-width="12" stroke-linecap="round"/>
+                        <rect x="118" y="385" width="165" height="64" rx="12" fill="#fff" stroke="#ddd8ce"/>
+                        <text x="140" y="412" fill="#d97757" font-size="13" font-weight="900">컨설턴트</text>
+                        <text x="140" y="435" fill="#151515" font-size="18" font-weight="900">토지부터 판단</text>
+                    </g>
+                </g>
+
+                <g data-mv-depth="1.35">
+                    <g filter="url(#mvShadow)" class="mv-step">
+                        <rect x="68" y="72" width="230" height="118" rx="14" fill="#fff" stroke="#ddd8ce"/>
+                        <text x="92" y="106" fill="#d97757" font-size="13" font-weight="900">STEP 01</text>
+                        <text x="92" y="136" fill="#151515" font-size="22" font-weight="900">토지 가치 분석</text>
+                        <text x="92" y="164" fill="#666" font-size="14">공시지가 · 시세 · 도로 · 입지</text>
+                    </g>
+                    <g filter="url(#mvShadow)" class="mv-step">
+                        <rect x="344" y="72" width="230" height="118" rx="14" fill="#fff" stroke="#ddd8ce"/>
+                        <text x="368" y="106" fill="#d97757" font-size="13" font-weight="900">STEP 02</text>
+                        <text x="368" y="136" fill="#151515" font-size="22" font-weight="900">건축 가능 판단</text>
+                        <text x="368" y="164" fill="#666" font-size="14">용도지역 · 도로 · 농지/산지</text>
+                    </g>
+                    <g filter="url(#mvShadow)" class="mv-step">
+                        <rect x="620" y="72" width="230" height="118" rx="14" fill="#fff" stroke="#ddd8ce"/>
+                        <text x="644" y="106" fill="#d97757" font-size="13" font-weight="900">STEP 03</text>
+                        <text x="644" y="136" fill="#151515" font-size="22" font-weight="900">건축 시뮬레이션</text>
+                        <text x="644" y="164" fill="#666" font-size="14">건폐율 · 용적률 · 주차장</text>
+                    </g>
+                    <g filter="url(#mvShadow)" class="mv-step">
+                        <rect x="896" y="72" width="230" height="118" rx="14" fill="#fff" stroke="#ddd8ce"/>
+                        <text x="920" y="106" fill="#d97757" font-size="13" font-weight="900">STEP 04 · 05</text>
+                        <text x="920" y="136" fill="#151515" font-size="22" font-weight="900">비용과 사업성</text>
+                        <text x="920" y="164" fill="#666" font-size="14">총사업비 · 매출 · 수익률</text>
+                    </g>
+
+                    <g class="mv-arrows" stroke="#d97757" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9">
+                        <path d="M298 131 L344 131"/>
+                        <path d="M574 131 L620 131"/>
+                        <path d="M850 131 L896 131"/>
+                    </g>
+                </g>
+
+                <g data-mv-depth="1.7">
+                    <g filter="url(#mvShadow)">
+                        <rect x="892" y="252" width="222" height="160" rx="14" fill="#fff" stroke="#ddd8ce"/>
+                        <text x="916" y="286" fill="#d97757" font-size="13" font-weight="900">LIVE RESULT</text>
+                        <text x="916" y="318" fill="#151515" font-size="24" font-weight="900">사업성 판단</text>
+                        <g font-size="14" font-weight="800">
+                            <text x="916" y="352" fill="#555">총사업비</text>
+                            <text x="1030" y="352" fill="#151515" text-anchor="end" data-count="38.2억">38.2억</text>
+                            <text x="916" y="378" fill="#555">예상 수익률</text>
+                            <text x="1030" y="378" fill="#d97757" text-anchor="end" data-count="17.4%">17.4%</text>
+                        </g>
+                        <rect x="916" y="392" width="154" height="10" rx="5" fill="#eee7dc"/>
+                        <rect class="mv-bar" x="916" y="392" width="105" height="10" rx="5" fill="#d97757"/>
+                    </g>
+                </g>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<section class="flow-section" id="flow">
+    <div class="container">
+        <div class="tools-header">
+            <span class="label-tag" data-reveal>전체 개발 검토 플로우</span>
+            <h2 data-split>토지를 받으면<br>이 순서대로 검토합니다.</h2>
+            <p class="tools-lead" data-reveal>각 단계는 독립된 계산기가 아니라 하나의 상담 흐름으로 연결됩니다.</p>
+        </div>
+        <div class="hx-flow-line" data-progress-line aria-hidden="true"><span></span></div>
+        <div class="flow-grid hx-flow-grid" data-stagger>
+            <a href="property.html" class="flow-card hx-flow-card active" data-tilt="7" data-spot data-cursor="열기">
+                <div class="hx-card-media"><img src="assets/hx-step1-land.webp" width="1000" height="750" loading="lazy" decoding="async" alt="안개 낀 아침, 논과 도로 사이의 빈 필지를 내려다본 항공 사진"></div>
+                <span>01</span>
+                <h3>토지 가치 / 개발 분석</h3>
+                <p>주소, 면적, 용도지역, 공시지가, 주변 시세를 기준으로 토지의 기본 가치를 먼저 봅니다.</p>
+                <strong>토지부터 입력 <em class="arrow">→</em></strong>
+            </a>
+            <a href="property.html#buildability" class="flow-card hx-flow-card" data-tilt="7" data-spot data-cursor="열기">
+                <div class="hx-card-media"><img src="assets/hx-step2-zoning.webp" width="1000" height="750" loading="lazy" decoding="async" alt="용도지역별로 색이 칠해진 지도 위에서 필지 경계를 그리는 손"></div>
+                <span>02</span>
+                <h3>건축 가능여부 판단</h3>
+                <p>용도지역, 도로, 농지·산지, 개발행위허가, 조례 제한을 체크합니다.</p>
+                <strong>가능성 체크 <em class="arrow">→</em></strong>
+            </a>
+            <a href="building-simulation.html" class="flow-card hx-flow-card" data-tilt="7" data-spot data-cursor="열기">
+                <div class="hx-card-media"><img src="assets/hx-step3-mass.webp" width="1000" height="750" loading="lazy" decoding="async" alt="상층부가 계단식으로 후퇴한 흰색 건축 매스 모형"></div>
+                <span>03</span>
+                <h3>건축 시뮬레이션</h3>
+                <p>대지면적, 건폐율, 용적률, 주차장, 일조사선으로 건물 매스를 시각화합니다.</p>
+                <strong>건물 규모 보기 <em class="arrow">→</em></strong>
+            </a>
+            <a href="cost-simulation.html" class="flow-card hx-flow-card" data-tilt="7" data-spot data-cursor="열기">
+                <div class="hx-card-media"><img src="assets/hx-step4-build.webp" width="1000" height="750" loading="lazy" decoding="async" alt="노을 무렵 타워크레인이 철근을 올리는 골조 공사 현장"></div>
+                <span>04</span>
+                <h3>비용 시뮬레이션</h3>
+                <p>건축비, 지하층, 주차장 설치비, 농지·산지·개발부담금을 한 번에 계산합니다.</p>
+                <strong>총사업비 보기 <em class="arrow">→</em></strong>
+            </a>
+            <a href="cost-simulation.html" class="flow-card hx-flow-card" data-tilt="7" data-spot data-cursor="열기">
+                <div class="hx-card-media"><img src="assets/hx-step5-done.webp" width="1000" height="750" loading="lazy" decoding="async" alt="해 질 녘 불이 켜진 준공된 7층 근린생활 건물"></div>
+                <span>05</span>
+                <h3>사업성 시뮬레이션</h3>
+                <p>토지비, 금융비, 매출, 예상 이익, 투자수익률과 손익분기 분양가를 확인합니다.</p>
+                <strong>수익률 판단 <em class="arrow">→</em></strong>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="tools" id="tools">
+    <div class="container">
+        <div class="tools-header">
+            <span class="label-tag" data-reveal>현재 사용 가능한 시뮬레이터</span>
+            <h2 data-split>수업에서 바로<br>움직여 볼 수 있습니다.</h2>
+        </div>
+        <div class="tools-grid hx-tools-grid" data-stagger>
+            <a href="property.html" class="tool-card simulator-card hx-tool-card" data-tilt="5" data-spot data-cursor="실행">
+                <div class="hx-tool-bg" aria-hidden="true"><img src="assets/hx-tool-survey.webp" alt="" loading="lazy" decoding="async"></div>
+                <div class="tool-card-head"><span class="tool-num" data-scramble="LAND">LAND</span><span class="tool-badge">1단계</span></div>
+                <h3>토지 가치·개발 분석</h3>
+                <p>토지 정보를 먼저 정리하고 개발 가능성 검토 순서를 잡습니다.</p>
+                <span class="tool-link">토지 분석 열기 <span class="arrow">→</span></span>
+            </a>
+            <a href="building-simulation.html" class="tool-card simulator-card hx-tool-card" data-tilt="5" data-spot data-cursor="실행">
+                <div class="hx-tool-bg" aria-hidden="true"><img src="assets/hx-tool-sunstudy.webp" alt="" loading="lazy" decoding="async"></div>
+                <div class="tool-card-head"><span class="tool-num" data-scramble="MASS">MASS</span><span class="tool-badge">3단계</span></div>
+                <h3>건축 매스 시뮬레이터</h3>
+                <p>건폐율, 용적률, 주차장, 일조사선이 건물 규모를 어떻게 바꾸는지 보여줍니다.</p>
+                <span class="tool-link">건축 시뮬레이션 <span class="arrow">→</span></span>
+            </a>
+            <a href="cost-simulation.html" class="tool-card simulator-card hx-tool-card" data-tilt="5" data-spot data-cursor="실행">
+                <div class="hx-tool-bg" aria-hidden="true"><img src="assets/hx-tool-finance.webp" alt="" loading="lazy" decoding="async"></div>
+                <div class="tool-card-head"><span class="tool-num" data-scramble="COST">COST</span><span class="tool-badge">4·5단계</span></div>
+                <h3>비용·사업성 시뮬레이터</h3>
+                <p>건축비, 부담금, 토지비, 매출, 이익률까지 한 화면에서 계산합니다.</p>
+                <span class="tool-link">비용·사업성 보기 <span class="arrow">→</span></span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="cta hx-cta" id="cta" data-parallax>
+    <div class="hx-cta-bg" aria-hidden="true">
+        <div class="hx-cta-layer" data-depth="1.2" data-scroll="0.22">
+            <img src="assets/hx-city-2400.webp" srcset="assets/hx-city-1280.webp 1280w, assets/hx-city-2400.webp 2400w" sizes="110vw" alt="" loading="lazy" decoding="async">
+        </div>
+    </div>
+    <div class="container">
+        <h2 data-split>토지부터 시작하세요.<br><em>그 다음에 건축과 사업성을 봅니다.</em></h2>
+        <p class="cta-lead" data-reveal style="--i:2">먼저 토지 가치와 개발 가능성을 정리한 뒤, 건축 시뮬레이션과 비용·사업성 시뮬레이션으로 이어가면 됩니다.</p>
+        <div class="cta-actions" data-reveal style="--i:3">
+            <a href="property.html" class="btn-primary">토지 분석 시작 <span class="arrow">→</span></a>
+            <a href="cost-simulation.html" class="btn-secondary">비용·사업성 바로 보기</a>
+        </div>
+    </div>
+</section>
+
+<section class="ai-curriculum" id="ai-curriculum">
+    <div class="container">
+        <div class="curriculum-head">
+            <span class="label-tag" data-reveal>AI 공생공존</span>
+            <h2 data-split>개발 검토를 돕는 AI 활용은<br>마지막에 정리합니다.</h2>
+            <p data-reveal>이 사이트의 중심은 토지 판단, 건축 가능성, 건축·비용·사업성 시뮬레이션입니다. AI 도구는 그 흐름을 더 빠르게 정리하고 보고서화하기 위한 보조 도구로 배치했습니다.</p>
+        </div>
+        <div class="curriculum-merge-grid" data-stagger>
+            <a href="report2.html#ai-guide" class="merge-card" data-tilt="6" data-spot data-cursor="보기"><span>01</span><h3>Gemini</h3><p>사진, 문서, PDF 자료를 함께 읽고 현장 정보를 빠르게 요약합니다.</p></a>
+            <a href="report2.html#ai-guide" class="merge-card" data-tilt="6" data-spot data-cursor="보기"><span>02</span><h3>ChatGPT</h3><p>상담 문구, 보고서 초안, 고객 응대 흐름을 정리합니다.</p></a>
+            <a href="report2.html#ai-guide" class="merge-card" data-tilt="6" data-spot data-cursor="보기"><span>03</span><h3>Genspark</h3><p>시장 조사와 지역 자료 리서치를 보조합니다.</p></a>
+            <a href="report2.html#ai-guide" class="merge-card" data-tilt="6" data-spot data-cursor="보기"><span>04</span><h3>Claude</h3><p>계약서, 특약, 긴 문서의 리스크를 검토합니다.</p></a>
+            <a href="report2.html#ai-guide" class="merge-card" data-tilt="6" data-spot data-cursor="보기"><span>05</span><h3>블로그·SNS</h3><p>콘텐츠 발행과 마케팅 글감을 정리합니다.</p></a>
+            <a href="report2.html#ai-guide" class="merge-card" data-tilt="6" data-spot data-cursor="보기"><span>06</span><h3>YouTube</h3><p>강의와 홍보 영상의 기획, 대본, 편집 흐름을 잡습니다.</p></a>
+        </div>
+    </div>
+</section>
+
+<footer class="site-footer">
+    <div class="container footer-inner">
+        <div>MR.K 고상철 · 부동산IT 활용 허브</div>
+        <div>© 2026</div>
+    </div>
+</footer>
+
+<script src="js/main.js?v=5"></script>
+</body>
+</html>
