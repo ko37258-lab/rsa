@@ -1,0 +1,604 @@
+/* PC 프로그램 내려받기 페이지. 토큰과 버튼·키캡은 styles.css의 것을 그대로 씁니다. */
+
+.dl {
+  gap: 28px;
+}
+
+.dl a.brand {
+  text-decoration: none;
+}
+
+.dl-hero {
+  padding-top: 26px;
+}
+
+.dl-eyebrow {
+  margin: 0 0 10px;
+  display: inline-block;
+  font-size: var(--step--1);
+  font-weight: 700;
+  color: var(--primary-text);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px var(--primary-soft-2);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.dl .hero__title {
+  max-width: 19ch;
+}
+
+.dl-cta {
+  margin-top: 22px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.dl-btn {
+  text-decoration: none;
+}
+
+.dl-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dl-btn--big {
+  min-height: 52px;
+  padding: 0 26px;
+  font-size: var(--step-1);
+  border-radius: var(--r);
+}
+
+.dl-btn:hover svg {
+  animation: nudge 0.6s var(--spring);
+}
+
+.dl-meta {
+  margin: 0;
+  font-size: var(--step--1);
+  color: var(--text);
+}
+
+.dl-meta a {
+  color: var(--primary-text);
+}
+
+.dl-hero__note {
+  position: absolute;
+  right: 0;
+  top: 96px;
+}
+
+/* ---------- 시연 ---------- */
+
+.demo {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding-bottom: 34px;
+}
+
+.demo__window {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg), var(--shadow-base);
+  overflow: hidden;
+  min-height: 190px;
+}
+
+.demo__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.demo__bar i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.demo__bar span {
+  margin-left: 8px;
+}
+
+.demo__doc {
+  padding: 18px 20px;
+  min-height: 140px;
+}
+
+.demo__result {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--ink);
+  font-size: var(--step-1);
+  line-height: 1.8;
+  animation: rise 0.6s var(--ease-out) both;
+}
+
+.demo__caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.3em;
+  background: var(--primary);
+  animation: caret 0.9s steps(1) infinite;
+}
+
+.demo__said {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.demo__said-label {
+  font-family: var(--font-hand);
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--primary-text);
+  transform: rotate(-3deg);
+  justify-self: start;
+}
+
+.demo__listening {
+  margin: 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  padding: 12px 14px;
+  color: var(--ink-2);
+  line-height: 1.85;
+  animation: type-in 1.4s steps(28) both;
+  clip-path: inset(0 0 0 0);
+}
+
+.demo__pill {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--night);
+  color: #f2f4f7;
+  font-weight: 700;
+  font-size: var(--step--1);
+  white-space: nowrap;
+  box-shadow: var(--shadow-lg);
+}
+
+.demo__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4cc38a;
+  transition: background-color 0.3s;
+}
+
+.demo__pill.is-rec .demo__dot {
+  background: #ff5a5f;
+  animation: cmp-blink 0.9s ease-in-out infinite;
+}
+
+.demo__pill.is-work .demo__dot {
+  background: #f0b443;
+}
+
+.demo__bars {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+}
+
+.demo__bars i {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: #ff5a5f;
+  transform-origin: center;
+  animation: eq 0.8s ease-in-out infinite;
+}
+
+.demo__bars i:nth-child(2) {
+  animation-delay: -0.2s;
+}
+
+.demo__bars i:nth-child(3) {
+  animation-delay: -0.45s;
+}
+
+.demo__bars i:nth-child(4) {
+  animation-delay: -0.1s;
+}
+
+/* ---------- 단계 · 쓰는 법 ---------- */
+
+.dl-section {
+  display: grid;
+  gap: 14px;
+}
+
+.dl-h2 {
+  margin: 0;
+  font-size: var(--step-2);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.dl-lead {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--step-0);
+}
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.step {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-base);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.step__num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(180deg, var(--primary), var(--primary-deep));
+  box-shadow: var(--shadow-primary);
+}
+
+.step__title {
+  margin: 4px 0 0;
+  font-size: var(--step-1);
+  font-weight: 800;
+}
+
+.step__desc {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--step--1);
+  line-height: 1.7;
+}
+
+.step .key-link {
+  align-self: flex-start;
+}
+
+.mock {
+  margin-top: auto;
+  border-radius: var(--r);
+  padding: 12px;
+  font-size: 0.75rem;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.mock--smartscreen {
+  background: #0f5ea8;
+  color: #fff;
+}
+
+.mock__title {
+  margin: 0;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.mock__text {
+  margin: 0;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+.mock__link {
+  position: relative;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.mock__circle {
+  position: absolute;
+  left: -16px;
+  top: -10px;
+  width: calc(100% + 32px);
+  height: calc(100% + 20px);
+  fill: none;
+  stroke: #ffd43b;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 280;
+  stroke-dashoffset: 280;
+  animation: draw 0.9s 0.6s var(--ease-out) forwards;
+}
+
+.mock__btn {
+  justify-self: end;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  padding: 3px 14px;
+  border-radius: 3px;
+}
+
+.mock--settings {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.mock__label {
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.mock__input {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  padding: 3px 8px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+}
+
+.mock__chip {
+  grid-column: 2;
+  color: var(--primary-text);
+  font-weight: 700;
+}
+
+.mock__btn--save {
+  grid-column: 2;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.mock--keys {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  justify-items: center;
+  padding: 18px 12px;
+}
+
+.caps {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.caps__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.caps__plus {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.cap {
+  font-family: var(--font-sans);
+  font-size: var(--step--1);
+  font-weight: 700;
+  min-width: 34px;
+  text-align: center;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 3px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.mock--keys .cap {
+  font-size: var(--step-1);
+  padding: 8px 16px;
+  animation: keypress 2.4s 1s ease-in-out infinite;
+}
+
+.mock--keys .caps__group + .caps__group .cap {
+  animation-delay: 1.15s;
+}
+
+.keys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.keyrow {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 14px 18px;
+}
+
+.keyrow--main {
+  border-color: var(--primary-line);
+  background: var(--primary-soft);
+}
+
+.keyrow__title {
+  margin: 0;
+  font-weight: 800;
+}
+
+.keyrow__desc {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: var(--step--1);
+}
+
+/* ---------- 자주 묻는 것 ---------- */
+
+.faq {
+  display: grid;
+  gap: 8px;
+}
+
+.faq__item {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 0 18px;
+}
+
+.faq__item summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 14px 0;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.faq__item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq__item summary::after {
+  content: "+";
+  color: var(--primary-text);
+  font-weight: 800;
+  transition: transform 0.3s var(--spring);
+}
+
+.faq__item[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.faq__item p {
+  margin: 0 0 14px;
+  color: var(--text);
+  line-height: 1.75;
+  animation: fade-up 0.3s var(--ease-out);
+}
+
+.dl-final {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 26px 16px;
+  border-radius: var(--r-lg);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px var(--primary-soft-2);
+}
+
+.dl-final__title {
+  margin: 0;
+  font-weight: 800;
+  font-size: var(--step-1);
+  text-align: center;
+}
+
+@keyframes nudge {
+  40% {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes type-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes keypress {
+  0%,
+  70%,
+  100% {
+    transform: none;
+    border-bottom-width: 3px;
+  }
+  78% {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+    background: var(--primary-soft);
+  }
+}
+
+@media (max-width: 760px) {
+  .demo,
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .demo {
+    padding-bottom: 52px;
+  }
+
+  .keyrow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .dl-hero__note {
+    position: static;
+    margin-top: 14px;
+    justify-self: center;
+  }
+
+  .dl-hero__note .hand-note__arrow {
+    display: none;
+  }
+}

@@ -10,6 +10,7 @@ import { SettingsView } from "./components/SettingsView";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { DEFAULT_DICTIONARY, type Dictionary } from "./lib/dictionary";
 import { addToHistory, type HistoryItem } from "./lib/history";
+import { DOWNLOAD_PAGE_URL } from "./lib/desktop";
 import { DEFAULT_SETTINGS, resolveEngine, type Settings } from "./lib/settings";
 import { load } from "./lib/storage";
 
@@ -72,10 +73,25 @@ export function App() {
             MR.K <b>Typeless</b>
           </span>
         </div>
-        <button type="button" className={`engine-pill is-${engine}`} onClick={() => setTab("settings")}>
-          <span className="engine-pill__dot" aria-hidden="true" />
-          {checking ? "연결 확인 중" : ENGINE_LABEL[engine]}
-        </button>
+        <div className="nav__actions">
+          <a
+            className="pc-link"
+            href={DOWNLOAD_PAGE_URL}
+            target={__ARTIFACT__ ? "_blank" : undefined}
+            rel="noopener noreferrer"
+            aria-label="Windows PC 프로그램 내려받기"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <rect x="2.5" y="3.5" width="15" height="10" rx="1.5" />
+              <path d="M7 16.5h6M10 13.5v3" />
+            </svg>
+            PC 프로그램
+          </a>
+          <button type="button" className={`engine-pill is-${engine}`} onClick={() => setTab("settings")}>
+            <span className="engine-pill__dot" aria-hidden="true" />
+            {checking ? "연결 확인 중" : ENGINE_LABEL[engine]}
+          </button>
+        </div>
       </header>
 
       <section className="hero">
@@ -145,6 +161,9 @@ export function App() {
       <footer className="foot">
         <span>Typeless를 분석해 만든 MR.K 전용 받아쓰기</span>
         <span>기록·사전·설정은 이 기기에만 저장됩니다</span>
+        <a href={DOWNLOAD_PAGE_URL} target={__ARTIFACT__ ? "_blank" : undefined} rel="noopener noreferrer">
+          Windows PC 프로그램 내려받기
+        </a>
       </footer>
     </div>
   );

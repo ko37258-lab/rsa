@@ -1,6 +1,7 @@
-"""Windows 전용 점검 (CI): 실제 키보드 훅에 Win+H와 Ctrl+Shift+Space를 눌러 넣고 MR.K가 받는지 봅니다.
+"""Windows 실제 PC 전용 점검: 키보드 훅에 Win+H와 Ctrl+Shift+Space를 눌러 넣고 MR.K가 받는지 봅니다.
 
 pytest가 아니라 desktop 폴더에서 `python -m tests.win_hotkey_probe`로 실행합니다.
+GitHub Actions의 Windows 러너는 화면(대화형 세션)이 없어 키 입력이 훅에 들어오지 않으므로 CI에서는 돌리지 않습니다.
 """
 
 import sys

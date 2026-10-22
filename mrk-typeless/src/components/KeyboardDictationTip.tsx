@@ -1,4 +1,5 @@
 import type { SpeechProblem } from "../hooks/useSpeech";
+import { DOWNLOAD_PAGE_URL } from "../lib/desktop";
 
 /** 브라우저 마이크를 못 쓸 때: 운영체제 키보드의 음성 입력으로 원문 칸에 말하는 방법 */
 export function KeyboardDictationTip({ reason }: { reason: SpeechProblem }) {
@@ -33,6 +34,13 @@ export function KeyboardDictationTip({ reason }: { reason: SpeechProblem }) {
           </dd>
         </div>
       </dl>
+      <p className="tip__foot">
+        Windows에서는{" "}
+        <a href={DOWNLOAD_PAGE_URL} target="_blank" rel="noopener noreferrer">
+          MR.K PC 프로그램
+        </a>
+        을 설치하면 어느 창에서든 Win+H가 바로 정리된 글을 입력합니다.
+      </p>
     </aside>
   );
 }

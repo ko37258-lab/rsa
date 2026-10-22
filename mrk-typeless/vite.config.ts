@@ -35,7 +35,16 @@ export default defineConfig(({ mode }) => {
             },
           },
         }
-      : { outDir: "dist" },
+      : {
+          outDir: "dist",
+          // 웹앱(index.html)과 PC 프로그램 내려받기 페이지(download.html) 두 장을 만듭니다.
+          rollupOptions: {
+            input: {
+              main: fileURLToPath(new URL("./index.html", import.meta.url)),
+              download: fileURLToPath(new URL("./download.html", import.meta.url)),
+            },
+          },
+        },
     test: { environment: "node" },
   };
 });

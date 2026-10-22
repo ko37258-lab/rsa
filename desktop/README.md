@@ -49,10 +49,11 @@ cd desktop
 pip install -r requirements.txt pytest
 python -m pytest -q tests      # 정리 규칙·프롬프트·단축키 흐름 테스트
 python -m mrk_typeless         # 실행 (Windows)
+python -m tests.win_hotkey_probe   # 실제 PC에서 Win+H·단축키가 훅에 잡히는지 점검 (CI 러너에서는 안 됨)
 ```
 
 `desktop/` 아래가 바뀌어 푸시되면 GitHub Actions(`.github/workflows/desktop-windows.yml`)가 Windows에서
-테스트 → exe 빌드 → exe 자체 점검(`--self-test`) → Win+H 훅 점검 → 설치 프로그램 만들기(Inno Setup, `installer.iss`)
+테스트 → exe 빌드 → exe 자체 점검(`--self-test`) → 설치 프로그램 만들기(Inno Setup, `installer.iss`)
 → 조용히 설치·실행·제거 점검을 하고, `desktop/VERSION` 번호로 릴리스에 `MRK-Typeless-Setup.exe`와 `MRK-Typeless.exe`를 올립니다.
 
 ```

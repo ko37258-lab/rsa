@@ -64,10 +64,6 @@ jobs:
             if ($p.ExitCode -ne 0) { exit 1 }
           }
 
-      - name: Win+H 가로채기 점검 (실제 키보드 훅)
-        continue-on-error: true
-        run: python -m tests.win_hotkey_probe
-
       - name: 설치 프로그램 만들기 (Inno Setup)
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"

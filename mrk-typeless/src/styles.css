@@ -153,6 +153,7 @@ textarea {
 }
 
 .brand__name {
+  white-space: nowrap;
   font-weight: 800;
   font-size: 1.125rem;
   letter-spacing: -0.02em;
@@ -164,6 +165,7 @@ textarea {
 }
 
 .engine-pill {
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -195,6 +197,43 @@ textarea {
 .engine-pill.is-gemini .engine-pill__dot {
   background: var(--ok-dot);
   box-shadow: 0 0 0 3px rgba(64, 192, 87, 0.18);
+}
+
+.nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  font-size: var(--step--1);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.pc-link:hover {
+  background: var(--primary-soft);
+  color: var(--primary-text);
+}
+
+.pc-link svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
 }
 
 /* ---------- 첫 화면 제목 ---------- */
@@ -425,6 +464,11 @@ textarea {
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+  font-weight: 600;
+}
+
+.foot a {
+  color: var(--primary-text);
   font-weight: 600;
 }
 
@@ -971,6 +1015,17 @@ textarea:focus {
   gap: 4px;
   font-size: var(--step--1);
   color: var(--ink-2);
+}
+
+.tip__foot {
+  margin: 0;
+  font-size: var(--step--1);
+  color: var(--text);
+}
+
+.tip__foot a {
+  color: var(--primary-text);
+  font-weight: 700;
 }
 
 .tip__list {
@@ -2161,6 +2216,11 @@ textarea:focus {
 @media (max-width: 520px) {
   .seg--tabs .seg__opt {
     padding: 7px 11px;
+  }
+
+  /* 휴대폰에서는 PC 프로그램 안내를 아래 바닥글에만 둡니다. */
+  .nav__actions .pc-link {
+    display: none;
   }
 
   .tip__list,
