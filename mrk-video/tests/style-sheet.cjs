@@ -1,6 +1,6 @@
 // 렌더 엔진 점검(Playwright).
 //   node tests/style-sheet.cjs
-// 1) tests/style-sheet.html 을 열어 STYLES 격자 시트 → tests/out/style-sheet.png
+// 1) tests/style-sheet.html 을 열어 STYLES 격자 시트(타일 270px, 한 줄 5개, 스타일마다 2프레임) → tests/out/style-sheet.png
 // 2) 어휘 점검용 스타일 20개 시트 → tests/out/vocab-sheet.png
 // 3) 모든 template×overlay×captionAnim×transition 조합을 한 번씩 그려 예외 0 확인
 // 4) 1080×1920 프레임 평균 시간 측정
@@ -49,8 +49,8 @@ function savePng(dataUrl, file) {
     await page.goto(`${BASE}/tests/style-sheet.html`, { waitUntil: 'load' });
     await page.waitForFunction(() => window.sheetReady === true, null, { timeout: 20000 });
 
-    // 1) STYLES 시트
-    const r1 = await page.evaluate(async () => window.sheet.renderSheet(window.sheet.STYLES, { cellW: 540, cellH: 960 }));
+    // 1) STYLES 시트: 타일 폭 270px, 한 줄 5개(스타일마다 2프레임), 타일 아래 id·이름
+    const r1 = await page.evaluate(async () => window.sheet.renderSheet(window.sheet.STYLES, { cellW: 270, cellH: 480, cols: 5 }));
     report.renderErrors.push(...r1.errors);
     const f1 = path.join(OUT, 'style-sheet.png');
     savePng(r1.dataUrl, f1);

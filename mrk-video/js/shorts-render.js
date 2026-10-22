@@ -90,6 +90,17 @@ export function segmentAt(tl, t) {
   return 0;
 }
 
+/**
+ * 썸네일·미리보기용 시각: 훅 장면은 레이아웃과 상관없이 "흐린 사진 + 큰 자막"으로 그려지므로,
+ * 스타일 모양이 드러나는 첫 보통 장면 안의 시각을 고릅니다(없으면 첫 장면).
+ */
+export function previewTime(tl, { offset = 1.4 } = {}) {
+  const seg = tl.segs.find((s) => s.kind === 'scene' && s.scene.kind !== 'hook') || tl.segs[0];
+  if (!seg) return 0;
+  const dur = seg.end - seg.start;
+  return clamp(seg.start + clamp(offset, 0.2, Math.max(0.2, dur - 0.2)), 0, Math.max(0.05, tl.total - 0.1));
+}
+
 /** 템플릿별 영역 나누기. 돌려주는 값: u, pad, img, title, cap, textBox (+ panel, card, thumb, hook) */
 export function layout(p, W, H) {
   const u = Math.min(W, H) / 1080;
@@ -374,7 +385,7 @@ function layoutText(ctx, text, box, o) {
 const VIS = { alpha: 1, dy: 0, kind: 'read' };
 const HIDE = { alpha: 0, dy: 0, kind: 'hide' };
 const CUR = { alpha: 1, dy: 0, kind: 'cur' };
-const DIM = { alpha: 0.42, dy: 0, kind: 'dim' };
+const DIM = { alpha: 0.55, dy: 0, kind: 'dim' }; // 가라오케에서 아직 안 읽은 글자(밝은 배경에서도 보이게 0.55)
 
 /** 자막 애니메이션별 조각 상태 함수. anim = { mode, t(장면 시작 후 초), dur(장면 길이) } */
 function makeState(anim, TL, size) {
@@ -414,15 +425,21 @@ function makeState(anim, TL, size) {
   return null;
 }
 
-/** pop 자막: 1~2단어씩 교체. 현재 보여 줄 글과 크기 배율 */
+/** pop 자막: 1~2단어씩 교체. 줄바꿈을 먼저 지키고(구 경계가 깨지지 않게) 줄 안에서만 2단어씩 묶습니다. 현재 보여 줄 글과 크기 배율 */
 function popGroup(text, anim) {
-  const words = markedWords(text);
-  if (!words.length) return null;
-  const G = Math.ceil(words.length / 2);
+  const groups = [];
+  for (const line of String(text).split('\n')) {
+    const words = markedWords(line);
+    if (!words.length) continue;
+    if (words.length <= 3) groups.push(words.join(' ')); // 짧은 줄은 통째로(구 하나가 한 묶음)
+    else for (let i = 0; i < words.length; i += 2) groups.push(words.slice(i, i + 2).join(' '));
+  }
+  if (!groups.length) return null;
+  const G = groups.length;
   const step = Math.max(0.2, (anim.dur || 3) / G);
   const g = clamp(Math.floor(Math.max(0, anim.t) / step), 0, G - 1);
   const lt = Math.max(0, anim.t) - g * step;
-  return { text: words.slice(g * 2, g * 2 + 2).join(' '), scale: 1.35 - 0.35 * easeOut(lt / 0.18) };
+  return { text: groups[g], scale: 1.35 - 0.35 * easeOut(lt / 0.18) };
 }
 
 /**
@@ -497,6 +514,7 @@ export function drawRichText(ctx, text, box, o) {
     if (!txt) return;
     let color = r.hl ? o.hl : o.color;
     if (st.kind === 'cur') color = o.hl;
+    if (st.kind === 'dim') color = o.color; // 아직 안 읽은 강조 단어는 본문색으로 흐리게 깔고, 읽는 순간부터 강조색
     const yy = y + st.dy;
     if (st.kind === 'cur') {
       ctx.save();
@@ -568,6 +586,8 @@ function chip(ctx, text, x, y, o) {
     ctx.fillStyle = o.bg;
     roundRectPath(ctx, x0, y - h / 2, w, h, o.radius ?? h / 2);
     ctx.fill();
+    // 배경과 칩 색이 비슷할 때(훅 장면) 윤곽이 사라지지 않게 테두리
+    if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 3 * (o.u || 1); ctx.stroke(); }
   }
   ctx.fillStyle = o.color || '#fff';
   ctx.fillText(text, x0 + padX, y + size * 0.04);
@@ -576,7 +596,7 @@ function chip(ctx, text, x, y, o) {
 }
 
 // ── 장면 그리기 ───────────────────────────────────────
-function drawEnding(ctx, p, L, W, H, logo) {
+function drawEnding(ctx, p, L, W, H, logo, textAlpha = 1) {
   const { u } = L;
   ctx.save();
   ctx.fillStyle = p.bandColor;
@@ -594,6 +614,9 @@ function drawEnding(ctx, p, L, W, H, logo) {
     y += lh * 0.8;
   }
   const color = onColor(p.bandColor, p);
+  // 글은 배경보다 늦게 나타납니다(전환 중 앞 장면 자막과 겹치지 않게) — textAlpha
+  ctx.save();
+  ctx.globalAlpha *= textAlpha;
   drawRichText(ctx, p.ending?.text, { x: L.pad, y, w: W - L.pad * 2, h: H * 0.24 }, {
     size: p.captionSize * 1.15 * u, weight: p.font, color, hl: p.highlightColor,
     style: 'plain', valign: 'center', maxLines: 3, u,
@@ -604,21 +627,40 @@ function drawEnding(ctx, p, L, W, H, logo) {
   ctx.textBaseline = 'middle';
   ctx.fillText(plainText(p.ending?.sub), W / 2, y + H * 0.24 + 40 * u);
   ctx.restore();
+  ctx.restore();
 }
 
-/** 훅 장면 배경: highlight→band 그라데이션 + 흐린 사진 */
+/**
+ * 훅 전용 배경을 쓰는 장면인지. 사진이 화면을 채우는 full/blur 템플릿의 훅 장면만 "색 틴트 사진 + 큰 자막"으로 그리고,
+ * card/split/band/dark 는 평소 레이아웃을 그대로 두고 자막만 키웁니다(20개 훅이 다 똑같아 보이지 않게).
+ */
+const hasHookBg = (p, scene) => scene?.kind === 'hook' && (p.template === 'full' || p.template === 'blur');
+
+/** 훅 장면 배경: 선명한 사진 위에 highlight→band 그라데이션 틴트. 자막이 놓이는 화면 가운데 아래는 bandColor */
 function drawHookBackground(ctx, p, W, H, scene) {
+  if (scene.img) drawImageFit(ctx, scene.img, 0, 0, W, H, 'cover', 1.08);
+  else { ctx.fillStyle = p.bandColor; ctx.fillRect(0, 0, W, H); }
   const g = ctx.createLinearGradient(0, 0, W * 0.35, H);
   g.addColorStop(0, p.highlightColor);
+  g.addColorStop(0.45, p.bandColor);
   g.addColorStop(1, p.bandColor);
+  ctx.save();
+  if (scene.img) ctx.globalAlpha *= 0.62;
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
-  if (scene.img) {
-    ctx.save();
-    ctx.globalAlpha *= 0.38;
-    ctx.drawImage(blurredOf(scene.img, W, H), 0, 0, W, H);
-    ctx.restore();
+  ctx.restore();
+}
+
+/** 사진 없는 글자 장면의 자막 상자(템플릿별). split 은 사진 칸까지 패널색으로 채우므로 둘을 합친 영역 */
+function noImgBox(p, L) {
+  const { u, pad } = L;
+  if (p.template === 'dark') return L.capNoImg;
+  if (p.template === 'full') return L.hook;
+  if (p.template === 'split' && L.panel) {
+    const bottom = L.panel.y + L.panel.h;
+    return { x: pad, y: L.img.y + pad * 0.5, w: L.img.w - pad * 2, h: bottom - L.img.y - pad - 30 * u };
   }
+  return L.textBox;
 }
 
 /** 템플릿의 고정 배경(장면과 무관): card 도트 격자, split 패널 */
@@ -668,7 +710,7 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
   ctx.globalAlpha *= fx.alpha;
   ctx.translate(fx.dx, 0);
 
-  if (scene.kind === 'hook') {
+  if (hasHookBg(p, scene)) {
     drawHookBackground(ctx, p, W, H, scene);
     ctx.restore();
     return;
@@ -720,6 +762,13 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
   }
 
   const rect = L.img;
+  if (!scene.img && tpl === 'split' && L.panel) {
+    // split 은 사진 칸까지 패널색으로 채워 한 장의 글자 패널로(빈 사진 자리처럼 보이지 않게). 경계선이 남지 않게 한 번에 칠합니다.
+    ctx.fillStyle = p.panelColor;
+    ctx.fillRect(rect.x, rect.y, rect.w, L.panel.y + L.panel.h - rect.y);
+    ctx.restore();
+    return;
+  }
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
   ctx.clip();
@@ -754,21 +803,32 @@ function drawCaption(ctx, p, L, seg, alpha, t, adj) {
   const scene = seg.scene;
   const dur = seg.end - seg.start;
   const anim = { mode: p.captionAnim, t: t - seg.start, dur };
+  // titleMode=hook 이면 첫 장면의 자막 애니메이션은 제목 화면이 사라진 뒤 시작(제목에 덮여 첫 단어가 안 보이는 일이 없게)
+  if (p.titleMode === 'hook' && seg.index === 0 && plainText(p.title).trim()) {
+    const d = Math.min(HOOK_TITLE_HOLD + HOOK_TITLE_FADE, dur * 0.6);
+    anim.t -= d;
+    anim.dur = dur - d;
+  }
   const tpl = p.template;
   const hook = scene.kind === 'hook';
   const overPhoto = tpl === 'full' || tpl === 'blur';
+  const hookBg = hasHookBg(p, scene);
   let box;
   let o;
-  if (hook) {
-    const bothBright = isBright(p.highlightColor) && isBright(p.bandColor);
-    const look = captionLook(p, bothBright ? '#ffffff' : '#000000', false);
+  if (hookBg) {
+    // 훅 배경(틴트 사진) 위: 자막 자리는 bandColor 이므로 그 밝기로 글자색을 고릅니다
+    const look = captionLook(p, p.bandColor, false);
     box = L.hook;
-    o = { ...look, size: p.captionSize * 1.4 * u, valign: 'center', maxLines: 5, style: look.style === 'pill' ? 'pill' : 'plain' };
-  } else if (!scene.img && tpl !== 'dark' && tpl !== 'card') {
-    // 사진 없는 장면: 도면 패널 위 가운데 크게
-    box = L.textBox;
-    o = { size: p.captionSize * 1.25 * u, color: '#ffffff', hl: p.highlightColor, style: p.captionStyle === 'pill' ? 'pill' : 'plain', valign: 'center', maxLines: 5 };
-    if (o.style === 'pill') Object.assign(o, captionLook(p, '#000', false));
+    o = { ...look, size: p.captionSize * 1.4 * u, valign: 'center', maxLines: 5, style: look.style === 'pill' ? 'pill' : 'plain', shadow: isBright(look.color) };
+  } else if (!scene.img && tpl !== 'dark') {
+    // 사진 없는 장면: split 은 패널색 위(글자색은 패널 기준), 그 밖은 남색 도면 패널 위 흰 글자. 가운데 크게
+    box = noImgBox(p, L);
+    const bg = tpl === 'split' ? p.panelColor : null;
+    o = {
+      size: p.captionSize * (tpl === 'card' ? 1.1 : 1.25) * u, color: bg ? onColor(bg, p) : '#ffffff', hl: p.highlightColor,
+      style: p.captionStyle === 'pill' ? 'pill' : 'plain', valign: 'center', maxLines: 5, align: tpl === 'split' ? 'left' : 'center',
+    };
+    if (o.style === 'pill') Object.assign(o, captionLook(p, bg || '#000', false));
   } else if (tpl === 'split') {
     box = L.cap;
     o = { ...captionLook(p, p.panelColor, false), size: p.captionSize * 1.12 * u, align: 'left', valign: 'top', maxLines: 4 };
@@ -785,6 +845,8 @@ function drawCaption(ctx, p, L, seg, alpha, t, adj) {
     box = L.cap;
     o = { ...captionLook(p, p.bandColor, tpl === 'blur'), size: p.captionSize * u, valign: 'top', maxLines: 3 };
   }
+  // 훅 장면은 평소 레이아웃이라도 자막을 1.4배로(이미 더 큰 글자 장면은 그대로)
+  if (hook && !hookBg) o.size = Math.max(o.size, p.captionSize * 1.4 * u);
   if (adj) {
     if (adj.box) box = adj.box;
     if (adj.sizeMul) o.size *= adj.sizeMul;
@@ -839,30 +901,35 @@ function drawChrome(ctx, p, L, W, H, logo, alpha) {
   ctx.restore();
 }
 
-/** titleMode=hook: 첫 1.2초 동안 큰 제목이 화면을 덮고 사라집니다. */
+/** titleMode=hook: 첫 1.2초 동안 큰 제목이 화면을 덮고 0.25초에 걸쳐 사라집니다. */
+const HOOK_TITLE_HOLD = 1.2;
+const HOOK_TITLE_FADE = 0.25;
 function drawHookTitle(ctx, p, L, W, H, t, logo) {
-  const HOLD = 1.2;
-  const FADE = 0.25;
+  const HOLD = HOOK_TITLE_HOLD;
+  const FADE = HOOK_TITLE_FADE;
   if (t >= HOLD + FADE || !plainText(p.title).trim()) return;
   const a = t < HOLD ? 1 : 1 - (t - HOLD) / FADE;
   const { u, pad } = L;
   ctx.save();
   ctx.globalAlpha *= a;
+  // 제목이 놓이는 화면 가운데는 bandColor 가 되게(강조색과 글자색이 겹치지 않음)
   const g = ctx.createLinearGradient(0, 0, W * 0.4, H);
   g.addColorStop(0, p.highlightColor);
+  g.addColorStop(0.45, p.bandColor);
   g.addColorStop(1, p.bandColor);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
-  const bothBright = isBright(p.highlightColor) && isBright(p.bandColor);
-  const color = bothBright ? p.inkColor : (isBright(p.textColor) ? p.textColor : '#ffffff');
+  const brightBg = isBright(p.bandColor);
+  const color = brightBg ? p.inkColor : (isBright(p.textColor) ? p.textColor : '#ffffff');
+  const hl = brightBg && isBright(p.highlightColor) ? p.inkColor : p.highlightColor;
   const e = easeOut(t / 0.35);
   const scale = 0.92 + 0.08 * e;
   ctx.translate(W / 2, H / 2);
   ctx.scale(scale, scale);
   ctx.translate(-W / 2, -H / 2);
   drawRichText(ctx, p.title, { x: pad, y: H * 0.2, w: W - pad * 2, h: H * 0.6 }, {
-    size: p.captionSize * 1.6 * u, weight: p.font, color, hl: bothBright ? p.inkColor : p.highlightColor,
-    style: 'plain', shadow: !bothBright, valign: 'center', maxLines: 4, u,
+    size: p.captionSize * 1.6 * u, weight: p.font, color, hl,
+    style: 'plain', shadow: !brightBg, valign: 'center', maxLines: 4, u,
   });
   if (p.channel) {
     ctx.font = uiFont(34 * u, 700);
@@ -901,10 +968,13 @@ function drawCheckMark(ctx, x, y, s, color) {
   ctx.restore();
 }
 
+/** 훅 장면(배경 윗부분이 강조색)에서 강조색 칩의 윤곽이 사라지지 않게 쓰는 테두리 색 */
+const hookChipBorder = (p, scene) => (scene.kind === 'hook' ? (isBright(p.highlightColor) ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.85)') : undefined);
+
 function ovNews(ctx, e) {
-  const { p, L, W, u, pad, top } = e;
+  const { p, L, W, u, pad, top, scene } = e;
   const img = L.img;
-  chip(ctx, '속보', img.x + pad * 0.5, top + pad * 0.5 + 26 * u, { size: 34 * u, weight: '900', bg: p.highlightColor, color: onHl(p), h: 58 * u, padX: 22 * u, radius: 8 * u });
+  chip(ctx, '속보', img.x + pad * 0.5, top + pad * 0.5 + 26 * u, { size: 34 * u, weight: '900', bg: p.highlightColor, color: onHl(p), h: 58 * u, padX: 22 * u, radius: 8 * u, border: hookChipBorder(p, scene), u });
   const cap = L.cap;
   const bandY = cap.y - 10 * u;
   const bandH = Math.min(cap.h + 20 * u, 340 * u);
@@ -932,35 +1002,42 @@ function ovWarning(ctx, e) {
   chip(ctx, '주의', pad, Math.max(h + 44 * u, top + 30 * u), { size: 34 * u, weight: '900', bg: '#111111', color: '#ffd400', h: 58 * u, padX: 22 * u, radius: 8 * u });
 }
 
+// STEP 칩·번호 배지는 "항목" 번호(훅·CTA 를 뺀 순번, e.itemIndex)를 씁니다. 훅·CTA 장면에는 그리지 않습니다.
 function ovSteps(ctx, e) {
-  const { p, L, u, pad, index, count, scene, top } = e;
+  const { p, L, u, pad, scene, top, itemIndex, itemCount } = e;
+  if (itemIndex < 0) return;
   const img = L.img;
-  const n = String(index + 1).padStart(2, '0');
-  const total = String(count).padStart(2, '0');
+  const n = String(itemIndex + 1).padStart(2, '0');
+  const total = String(itemCount).padStart(2, '0');
   const y = top + pad * 0.5 + 24 * u;
   const w = chip(ctx, `STEP ${n} / ${total}`, img.x + pad * 0.5, y, { size: 28 * u, weight: '800', bg: p.highlightColor, color: onHl(p), h: 50 * u, padX: 18 * u, radius: 10 * u });
   let x = img.x + pad * 0.5 + w + 22 * u;
-  for (let i = 0; i < Math.min(count, 12); i++) {
-    ctx.fillStyle = i <= index ? p.highlightColor : 'rgba(255,255,255,0.45)';
+  for (let i = 0; i < Math.min(itemCount, 12); i++) {
+    ctx.fillStyle = i <= itemIndex ? p.highlightColor : 'rgba(255,255,255,0.45)';
     ctx.beginPath();
     ctx.arc(x, y, 7 * u, 0, Math.PI * 2);
     ctx.fill();
     x += 24 * u;
   }
-  if (!scene.img && scene.kind !== 'hook') {
-    const box = L.textBox;
+  if (!scene.img) {
+    // 글자 장면: 큰 번호를 왼쪽에, 자막은 그 오른쪽에 세로 가운데. 칩·점 줄(위 70u)은 비워 둡니다.
+    const base = noImgBox(p, L);
+    const box = { x: base.x, y: base.y + 70 * u, w: base.w, h: base.h - 70 * u };
+    const bg = p.template === 'split' ? p.panelColor : p.template === 'dark' ? p.bandColor : null; // 그 밖(card·band·blur·full)은 남색 도면 패널
+    const color = bg ? onColor(bg, p) : '#ffffff';
     ctx.font = fontCss('900', 190 * u);
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.fillStyle = p.highlightColor;
     ctx.fillText(n, box.x, box.y + box.h / 2);
     const shift = ctx.measureText(n).width + 30 * u;
-    return { box: { x: box.x + shift, y: box.y, w: box.w - shift, h: box.h }, align: 'left', sizeMul: 0.9 };
+    return { box: { x: box.x + shift, y: box.y, w: box.w - shift, h: box.h }, align: 'left', valign: 'center', sizeMul: 0.9, color, hl: p.highlightColor, shadow: false };
   }
 }
 
 function ovNumber(ctx, e) {
-  const { p, L, W, u, pad, index, scene, top } = e;
+  const { p, L, W, u, pad, scene, top, itemIndex } = e;
+  if (itemIndex < 0) return;
   const r = 64 * u;
   const cx = scene.img ? L.img.x + pad + r : W / 2;
   const cy = top + pad * 0.6 + r;
@@ -972,21 +1049,27 @@ function ovNumber(ctx, e) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = onHl(p);
-  ctx.fillText(String(index + 1), cx, cy + 4 * u);
+  ctx.fillText(String(itemIndex + 1), cx, cy + 4 * u);
+}
+
+/** ✓ 칩 라벨: *강조* 단어가 있으면 그것(항목명), 없으면 첫 줄 앞 10자 */
+function checkLabel(caption) {
+  const hl = parseRuns(String(caption || '').replace(/\n/g, ' ')).find((r) => r.hl && r.text.trim());
+  return hl ? hl.text.trim().slice(0, 12) : firstLine(caption, 10);
 }
 
 function ovCheck(ctx, e) {
   const { p, L, u, pad, index, tl, top } = e;
-  const prev = tl.segs.filter((s) => s.kind === 'scene' && s.index < index).slice(-6);
-  let y = top + pad * 0.5 + 24 * u;
+  // 훅(경고문)·CTA 는 항목이 아니므로 쌓지 않습니다
+  const prev = tl.segs.filter((s) => s.kind === 'scene' && s.index < index && s.scene.kind !== 'hook' && s.scene.kind !== 'cta').slice(-6);
+  let y = top + pad * 0.5 + 27 * u;
   for (const s of prev) {
-    const label = firstLine(s.scene.caption, 8);
+    const label = checkLabel(s.scene.caption);
     if (!label) continue;
-    const size = 26 * u;
-    const w = chip(ctx, '      ' + label, L.img.x + pad * 0.5, y, { size, weight: '700', bg: 'rgba(255,255,255,0.94)', color: p.inkColor, h: 48 * u, padX: 14 * u, radius: 12 * u });
-    drawCheckMark(ctx, L.img.x + pad * 0.5 + 26 * u, y, 24 * u, '#1fcf62');
-    void w;
-    y += 56 * u;
+    const size = 30 * u;
+    chip(ctx, '      ' + label, L.img.x + pad * 0.5, y, { size, weight: '700', bg: 'rgba(255,255,255,0.94)', color: p.inkColor, h: 54 * u, padX: 16 * u, radius: 14 * u });
+    drawCheckMark(ctx, L.img.x + pad * 0.5 + 30 * u, y, 26 * u, '#1fcf62');
+    y += 62 * u;
   }
 }
 
@@ -1010,31 +1093,47 @@ function ovPin(ctx, e) {
 }
 
 function ovPrice(ctx, e) {
-  const { p, L, u, pad, scene, top } = e;
+  const { p, L, W, u, pad, scene, top } = e;
   if (!scene.tag) return;
   const img = L.img;
-  chip(ctx, String(scene.tag), img.x + img.w - pad * 0.5, top + pad * 0.5 + 32 * u, { size: 40 * u, weight: '900', bg: p.highlightColor, color: onHl(p), h: 70 * u, padX: 24 * u, align: 'right', radius: 14 * u });
+  const common = { weight: '900', bg: p.highlightColor, color: onHl(p), border: hookChipBorder(p, scene), u };
+  if (hasHookBg(p, scene)) {
+    // 매물형 훅: 가격이 먼저 보이게 화면 위 가운데에 크게
+    chip(ctx, String(scene.tag), W / 2, L.hook.y + 120 * u, { ...common, size: 72 * u, h: 120 * u, padX: 40 * u, align: 'center', radius: 24 * u });
+    return;
+  }
+  chip(ctx, String(scene.tag), img.x + img.w - pad * 0.5, top + pad * 0.5 + 40 * u, { ...common, size: 52 * u, h: 86 * u, padX: 28 * u, align: 'right', radius: 16 * u });
 }
 
 function ovQuote(ctx, e) {
-  const { p, L, u } = e;
-  const cap = L.cap;
+  const { p, L, u, scene } = e;
+  const tpl = p.template;
+  const overPhoto = tpl === 'full' || tpl === 'blur';
+  // 글이 세로 가운데에 오는 장면(훅 배경·사진 없는 장면)은 따옴표를 글 블록 바로 위에, 서명을 바로 아래에 둡니다
+  const centered = hasHookBg(p, scene) || !scene.img;
+  const cap = hasHookBg(p, scene) ? L.hook : (!scene.img ? noImgBox(p, L) : L.cap);
+  const box = centered
+    ? { x: cap.x, y: Math.max(cap.y + 44 * u, cap.y + cap.h / 2 - 240 * u), w: cap.w, h: Math.min(460 * u, cap.h - 120 * u) }
+    : { x: cap.x, y: cap.y + 44 * u, w: cap.w, h: cap.h - 100 * u };
+  const qy = centered ? Math.max(cap.y - 36 * u, box.y - 150 * u) : cap.y - 36 * u;
   ctx.save();
   ctx.font = fontCss('900', 150 * u);
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
   ctx.fillStyle = p.highlightColor;
   ctx.globalAlpha *= 0.9;
-  ctx.fillText('“', cap.x - 8 * u, cap.y - 36 * u);
+  ctx.fillText('“', cap.x - 8 * u, qy);
   ctx.restore();
   if (p.channel) {
     ctx.font = uiFont(30 * u, 700);
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'right';
-    ctx.fillStyle = rgba(p.template === 'split' ? onColor(p.panelColor, p) : (p.template === 'full' || p.template === 'blur' ? '#ffffff' : onColor(p.bandColor, p)), 0.75);
-    ctx.fillText(`— ${p.channel}`, cap.x + cap.w, cap.y + cap.h - 16 * u);
+    const bg = tpl === 'split' ? p.panelColor : p.bandColor;
+    const ink = overPhoto || (!scene.img && tpl !== 'dark' && tpl !== 'split') ? '#ffffff' : onColor(bg, p); // 사진 없는 band/card 는 남색 도면 패널 위
+    ctx.fillStyle = rgba(ink, 0.75);
+    ctx.fillText(`— ${p.channel}`, cap.x + cap.w, centered ? box.y + box.h + 30 * u : cap.y + cap.h - 16 * u);
   }
-  return { box: { x: cap.x, y: cap.y + 44 * u, w: cap.w, h: cap.h - 100 * u } };
+  return centered ? { box, valign: 'top' } : { box };
 }
 
 function ovQuiz(ctx, e) {
@@ -1045,13 +1144,13 @@ function ovQuiz(ctx, e) {
     return;
   }
   if (scene.kind === 'hook' || index === 0) {
-    chip(ctx, 'Q.', img.x + pad * 0.5, top + pad * 0.5 + 34 * u, { size: 44 * u, weight: '900', bg: p.highlightColor, color: onHl(p), h: 70 * u, padX: 22 * u, radius: 14 * u });
+    chip(ctx, 'Q.', img.x + pad * 0.5, top + pad * 0.5 + 34 * u, { size: 44 * u, weight: '900', bg: p.highlightColor, color: onHl(p), h: 70 * u, padX: 22 * u, radius: 14 * u, border: hookChipBorder(p, scene), u });
     const remain = dur - local;
     if (remain <= 1 && remain > 0) {
       const n = clamp(Math.ceil(remain * 3), 1, 3);
       const frac = (remain * 3) - (n - 1);
       const cx = img.x + img.w / 2;
-      const cy = scene.kind === 'hook' ? L.hook.y + L.hook.h - 120 * u : img.y + img.h / 2;
+      const cy = hasHookBg(p, scene) ? L.hook.y + L.hook.h - 120 * u : img.y + img.h / 2;
       const r = 80 * u;
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
@@ -1089,6 +1188,7 @@ function ovTicker(ctx, e) {
     ctx.restore();
   }
   if (p.dateLabel) chip(ctx, String(p.dateLabel), W - pad * 0.5, top + pad * 0.5 + 26 * u, { size: 28 * u, weight: '700', bg: 'rgba(0,0,0,0.62)', color: '#ffffff', h: 50 * u, padX: 18 * u, align: 'right', radius: 10 * u });
+  if (!e.scene.img) return; // 사진 없는 장면의 자막은 자막 칸이 아니라 패널 가운데라 티커와 겹치지 않음
   const cap = L.cap;
   if (cap.y + cap.h > y - 10 * u) return { box: { x: cap.x, y: cap.y, w: cap.w, h: Math.max(60 * u, y - 16 * u - cap.y) } };
 }
@@ -1111,32 +1211,43 @@ function ovDate(ctx, e) {
 }
 
 function ovComment(ctx, e) {
-  const { p, L, W, u, pad } = e;
+  const { p, L, W, H, u, pad, scene } = e;
+  // 훅 = 시청자 질문(회색 아바타, 닉네임 '시청자' 또는 scene.label), 나머지 = MR.K 답변(강조색 아바타 + 강조색 테두리)
+  const question = scene.kind === 'hook';
+  const hookBg = hasHookBg(p, scene);
   const cap = L.cap;
-  const b = { x: pad * 0.7, y: cap.y, w: W - pad * 1.4, h: cap.h };
+  const b = hookBg
+    ? { x: pad * 0.7, y: L.hook.y + L.hook.h / 2 - H * 0.15, w: W - pad * 1.4, h: H * 0.3 } // 질문 말풍선은 화면 가운데 크게
+    : { x: pad * 0.7, y: cap.y, w: W - pad * 1.4, h: cap.h };
   ctx.fillStyle = 'rgba(255,255,255,0.96)';
   roundRectPath(ctx, b.x, b.y, b.w, b.h, 26 * u);
   ctx.fill();
+  if (!question) { ctx.strokeStyle = rgba(p.highlightColor, 0.5); ctx.lineWidth = 4 * u; ctx.stroke(); }
+  const nick = scene.label || (question ? '시청자' : p.channel || '');
   const r = 32 * u;
   const ax = b.x + 30 * u + r;
   const ay = b.y + 30 * u + r;
-  ctx.fillStyle = p.highlightColor;
+  ctx.fillStyle = question ? '#8b949e' : p.highlightColor;
   ctx.beginPath(); ctx.arc(ax, ay, r, 0, Math.PI * 2); ctx.fill();
-  const ch = (p.channel || 'K').trim().charAt(0).toUpperCase();
+  const ch = (nick || 'K').trim().charAt(0).toUpperCase();
   ctx.font = fontCss('900', 34 * u);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = onHl(p);
+  ctx.fillStyle = question ? '#ffffff' : onHl(p);
   ctx.fillText(ch, ax, ay + 2 * u);
   ctx.font = uiFont(30 * u, 800);
   ctx.textAlign = 'left';
   ctx.fillStyle = p.inkColor;
-  ctx.fillText(p.channel || '', ax + r + 18 * u, ay - 2 * u);
-  const nw = ctx.measureText(p.channel || '').width;
+  ctx.fillText(nick, ax + r + 18 * u, ay - 2 * u);
+  const nw = ctx.measureText(nick).width;
   ctx.font = uiFont(24 * u, 600);
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
-  ctx.fillText('· 방금', ax + r + 18 * u + nw + 12 * u, ay);
-  return { box: { x: b.x + 30 * u, y: ay + r + 22 * u, w: b.w - 60 * u, h: b.h - (ay + r + 22 * u - b.y) - 24 * u }, color: p.inkColor, hl: p.highlightColor, style: 'plain', shadow: false, align: 'left', valign: 'top', maxLines: 4, sizeMul: 0.82 };
+  ctx.fillText(question ? '· 댓글' : '· 방금', ax + r + 18 * u + nw + 12 * u, ay);
+  const top = ay + r + 22 * u;
+  return {
+    box: { x: b.x + 30 * u, y: top, w: b.w - 60 * u, h: b.h - (top - b.y) - 24 * u },
+    color: p.inkColor, hl: p.highlightColor, style: 'plain', shadow: false, align: 'left', valign: hookBg ? 'center' : 'top', maxLines: 4, sizeMul: hookBg ? 0.8 : 1,
+  };
 }
 
 function ovVs(ctx, e) {
@@ -1166,8 +1277,14 @@ function ovCounter(ctx, e) {
   const to = Number(c.to) || 0;
   const k = easeOut(local / Math.max(0.3, dur * 0.8));
   const v = Math.round(from + (to - from) * k);
-  const text = `${v.toLocaleString('ko-KR')}${c.suffix || ''}`;
-  const box = scene.kind === 'hook' ? L.hook : (scene.img && p.template === 'dark' ? L.thumb : L.img);
+  // 만원 단위가 1억을 넘으면 '2.6억'처럼 억 단위로(자막의 단위와 맞게)
+  const text = c.suffix === '만원' && Math.abs(v) >= 10000
+    ? `${(v / 10000).toFixed(1).replace(/\.0$/, '')}억`
+    : `${v.toLocaleString('ko-KR')}${c.suffix || ''}`;
+  const hookBg = hasHookBg(p, scene);
+  const darkImg = scene.img && p.template === 'dark';
+  // dark 사진 장면: 숫자는 썸네일을 가리지 않게 썸네일 아래·자막 위 띠(220u)에
+  const box = hookBg ? L.hook : (darkImg ? { x: L.cap.x, y: L.cap.y, w: L.cap.w, h: 220 * u } : L.img);
   const cx = box.x + box.w / 2;
   const cy = box.y + box.h / 2;
   ctx.save();
@@ -1183,8 +1300,13 @@ function ovCounter(ctx, e) {
   ctx.fillStyle = p.highlightColor;
   ctx.fillText(text, cx, cy);
   ctx.restore();
-  if (scene.kind === 'hook') return { box: { x: L.hook.x, y: cy + size * 0.6, w: L.hook.w, h: L.hook.h - (cy + size * 0.6 - L.hook.y) }, sizeMul: 0.6, valign: 'top' };
-  if (!scene.img && p.template !== 'dark' && p.template !== 'card') return { box: { x: L.cap.x, y: L.cap.y, w: L.cap.w, h: L.cap.h }, sizeMul: 0.8, valign: 'top' };
+  if (hookBg) return { box: { x: L.hook.x, y: cy + size * 0.6, w: L.hook.w, h: L.hook.h - (cy + size * 0.6 - L.hook.y) }, sizeMul: 0.6, valign: 'top' };
+  if (darkImg) return { box: { x: L.cap.x, y: L.cap.y + 220 * u, w: L.cap.w, h: L.cap.h - 220 * u }, sizeMul: 0.85, valign: 'top' };
+  // 사진 없는 장면: 숫자가 사진 자리(도면 패널·카드)에 있으므로 자막은 그 아래 자막 칸에
+  if (!scene.img && p.template !== 'dark') {
+    const onBand = p.template === 'card';
+    return { box: { x: L.cap.x, y: L.cap.y, w: L.cap.w, h: L.cap.h }, sizeMul: 0.8, valign: 'top', ...(onBand ? { color: onColor(p.bandColor, p), hl: p.highlightColor, shadow: false, align: 'center' } : {}) };
+  }
   return { sizeMul: 0.85 };
 }
 
@@ -1212,6 +1334,7 @@ function ovDots(ctx, e) {
   }
   ctx.fillStyle = overPhoto ? '#ffffff' : onColor(bg, p);
   ctx.fillText(label, x + 6 * u, y);
+  if (!e.scene.img) return; // 사진 없는 장면의 자막은 패널·카드 가운데라 점과 겹치지 않음
   const cap = L.cap;
   if (cap.y + cap.h > y - 24 * u) return { box: { x: cap.x, y: cap.y, w: cap.w, h: Math.max(60 * u, y - 30 * u - cap.y) } };
 }
@@ -1224,17 +1347,22 @@ export const OVERLAYS = {
 // 장면이 바뀌어도 항상 보이는 장식(전환 중 흐려지지 않음)
 const PERSISTENT_OVERLAYS = new Set(['warning', 'steps', 'ticker', 'dots', 'news', 'check']);
 
-function drawOverlay(ctx, p, L, W, H, seg, t, tl, alpha) {
+/** hidden=true 면 그리지 않고(알파 0) 자막 상자·색 조정값만 받아 옵니다(전환 중 사라지는 앞 장면 자막용) */
+function drawOverlay(ctx, p, L, W, H, seg, t, tl, alpha, hidden = false) {
   const fn = OVERLAYS[p.overlay];
   if (!fn || seg.kind !== 'scene') return undefined;
   const count = tl.segs.reduce((n, s) => n + (s.kind === 'scene' ? 1 : 0), 0);
+  // 항목 번호: 훅·CTA 를 뺀 순번(STEP 칩·번호 배지가 '1단계'와 어긋나지 않게). 훅·CTA 면 -1
+  const items = tl.segs.filter((s) => s.kind === 'scene' && s.scene.kind !== 'hook' && s.scene.kind !== 'cta');
   const e = {
     p, L, W, H, u: L.u, pad: L.pad, seg, scene: seg.scene, index: seg.index, count, t, tl,
+    itemIndex: items.findIndex((s) => s.index === seg.index), itemCount: items.length,
     local: t - seg.start, dur: seg.end - seg.start, alpha,
     top: Math.max(L.img.y, L.titleH), // 배지가 채널 이름·제목과 겹치지 않는 위쪽 기준선
   };
   ctx.save();
-  if (!PERSISTENT_OVERLAYS.has(p.overlay)) ctx.globalAlpha *= alpha;
+  if (hidden) ctx.globalAlpha = 0;
+  else if (!PERSISTENT_OVERLAYS.has(p.overlay)) ctx.globalAlpha *= alpha;
   let adj;
   try { adj = fn(ctx, e); } finally { ctx.restore(); }
   return adj;
@@ -1268,12 +1396,14 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
 
   drawStaticBackground(ctx, p, L, W, H);
 
+  // 자막은 겹치면 읽기 어려워서, 앞 자막이 먼저 사라진 뒤(전환 후반부) 새 자막이 나타납니다. 엔딩 문구도 같은 규칙.
+  const capAlpha = inTr ? clamp(k * 2 - 1, 0, 1) : 1;
   const draw = (s, fx) => {
     if (s.kind === 'ending') {
       ctx.save();
       ctx.globalAlpha = fx.alpha;
       ctx.translate(fx.dx, 0);
-      drawEnding(ctx, p, L, W, H, logo);
+      drawEnding(ctx, p, L, W, H, logo, inTr && p.transition !== 'slide' ? capAlpha : 1);
       ctx.restore();
     } else {
       drawSceneVisual(ctx, p, L, W, H, s, t, fx);
@@ -1299,6 +1429,10 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
         ctx.beginPath();
         ctx.moveTo(0, 0); ctx.lineTo(edge, 0); ctx.lineTo(0, edge); ctx.closePath();
         ctx.clip();
+        // 띠가 지나간 영역은 앞 장면이 남지 않게 바탕(밴드색·패널·도트)부터 다시 칠합니다
+        ctx.fillStyle = p.bandColor;
+        ctx.fillRect(0, 0, W, H);
+        drawStaticBackground(ctx, p, L, W, H);
         draw(seg, { alpha: 1, dx: 0, zoom: 1 });
         ctx.restore();
       }
@@ -1318,17 +1452,21 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
     draw(seg, { alpha: 1, dx: 0, zoom: 1 });
   }
 
-  // 제목·채널: 엔딩으로 넘어갈 때만 함께 사라집니다. 훅 장면 위에는 채널만.
+  // 제목·채널: 엔딩으로 넘어갈 때만 함께 사라집니다. 훅 배경(full/blur 훅) 위에는 채널만.
   const chromeAlpha = seg.kind === 'ending' ? (inTr && prev?.kind === 'scene' ? 1 - k : 0) : 1;
   if (chromeAlpha > 0) {
-    if (seg.kind === 'scene' && seg.scene.kind === 'hook') drawChrome(ctx, { ...p, titleMode: 'none' }, L, W, H, logo, chromeAlpha);
+    if (seg.kind === 'scene' && hasHookBg(p, seg.scene)) drawChrome(ctx, { ...p, titleMode: 'none' }, L, W, H, logo, chromeAlpha);
     else drawChrome(ctx, p, L, W, H, logo, chromeAlpha);
   }
 
-  // 장식 → 자막. 자막은 겹치면 읽기 어려워서, 앞 자막이 먼저 사라진 뒤 새 자막이 나타납니다.
-  const capAlpha = inTr ? clamp(k * 2 - 1, 0, 1) : 1;
+  // 장식 → 자막. 사라지는 앞 장면 자막도 그 장면의 장식(말풍선·숫자 등)과 함께 흐려지고, 상자·색 조정을 그대로 받아 자리가 튀지 않게 합니다.
+  // 항상 보이는 장식(STEP 칩·티커 등)은 앞 장면 것을 그리지 않고 조정값만 받습니다(같은 자리에 두 번 찍히지 않게).
+  if (inTr && prev.kind === 'scene' && k < 0.5) {
+    const prevAlpha = clamp(1 - k * 2, 0, 1);
+    const adjPrev = drawOverlay(ctx, p, L, W, H, prev, t, tl, prevAlpha, PERSISTENT_OVERLAYS.has(p.overlay));
+    drawCaption(ctx, p, L, prev, prevAlpha, t, adjPrev);
+  }
   const adj = drawOverlay(ctx, p, L, W, H, seg, t, tl, capAlpha);
-  if (inTr && prev.kind === 'scene') drawCaption(ctx, p, L, prev, clamp(1 - k * 2, 0, 1), t, undefined);
   drawCaption(ctx, p, L, seg, capAlpha, t, adj);
 
   if (p.showProgress) {

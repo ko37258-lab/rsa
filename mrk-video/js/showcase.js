@@ -1,7 +1,7 @@
 // 00 사례 보기 — 실제 렌더 엔진으로 "넣는 것 → 나오는 것"을 살아 있는 미리보기로 보여 줍니다.
 
-import { $, clamp } from './util.js';
-import { buildTimeline, drawFrame, ensureFonts, plainText } from './shorts-render.js';
+import { $ } from './util.js';
+import { buildTimeline, drawFrame, ensureFonts, plainText, previewTime } from './shorts-render.js';
 import { drawComposite, COMPOSE_DEFAULTS } from './compose.js';
 import { sample, SHORTS_CASE, COMPOSE_CASE, DOWNLOAD_CASE } from './samples.js';
 import { revealOnScroll, popIn, countUp } from './motion.js';
@@ -12,6 +12,8 @@ let styles = [];
 let raf = null;
 let running = false;
 let t0 = 0;
+let userPaused = false; // 멈춤 버튼을 눌렀는지(다른 화면을 오가도 유지)
+const reduce = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function baseProject(scenes) {
   return {
@@ -44,7 +46,7 @@ function drawLoop() {
 }
 
 export function resumeShowcase() {
-  if (!heroProject || running) return;
+  if (!heroProject || running || userPaused) return;
   running = true;
   t0 = performance.now() - 1200;
   raf = requestAnimationFrame(drawLoop);
@@ -53,6 +55,24 @@ export function pauseShowcase() {
   running = false;
   if (raf) cancelAnimationFrame(raf);
   raf = null;
+}
+
+/** 폰 미리보기 멈춤/재생 버튼. 움직임 줄이기 설정이면 처음부터 멈춰 두고 원할 때만 재생합니다. */
+function wirePause() {
+  const btn = $('#heroPause');
+  if (!btn) return;
+  const sync = () => {
+    btn.setAttribute('aria-pressed', String(userPaused));
+    btn.setAttribute('aria-label', userPaused ? '미리보기 재생' : '미리보기 멈춤');
+    btn.textContent = userPaused ? '▶' : '❚❚';
+  };
+  userPaused = !!reduce();
+  sync();
+  btn.addEventListener('click', () => {
+    userPaused = !userPaused;
+    if (userPaused) pauseShowcase(); else resumeShowcase();
+    sync();
+  });
 }
 
 function fillShortsCase(scenes) {
@@ -106,7 +126,7 @@ async function fillStyleWall() {
     wall.append(c);
     const p = st.apply({ ...heroProject, scenes: heroProject.scenes.map((s) => ({ ...s })) });
     const ptl = buildTimeline(p);
-    const t = clamp(1.4 + (i % 3) * 0.9, 0, Math.max(0.1, ptl.total - 0.2));
+    const t = previewTime(ptl, { offset: 1.4 + (i % 3) * 0.9 });
     try { drawFrame(c.getContext('2d'), p, c.width, c.height, t, ptl); } catch (e) { console.warn('style preview', st.id, e); }
     pending.push(c);
   });
@@ -180,6 +200,7 @@ export async function initShowcase() {
   await fillComposeCase();
   revealOnScroll(document.getElementById('view-showcase'));
   wireCaseDots();
+  wirePause();
   popIn(document.querySelectorAll('#heroChips .chip'), { delay: 500 });
   const cnt = $('#caseStyleCount');
   if (cnt) countUp(cnt, Number(cnt.textContent) || 20);

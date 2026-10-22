@@ -142,13 +142,23 @@ function renderThumbs() {
       im.src = it.img.src;
       im.alt = it.name;
       im.title = it.name;
-      if (isMain) im.addEventListener('click', () => { cur = i; draw(); });
+      // 메인 썸네일은 버튼으로 감싸 키보드로도 미리볼 사진을 고를 수 있게
+      let face = im;
+      if (isMain) {
+        face = document.createElement('button');
+        face.type = 'button';
+        face.className = 'pickbtn';
+        face.setAttribute('aria-label', `${i + 1}번 메인 사진 보기`);
+        face.setAttribute('aria-pressed', String(i === cur));
+        face.append(im);
+        face.addEventListener('click', () => { cur = i; draw(); });
+      }
       const del = document.createElement('button');
       del.type = 'button';
       del.textContent = '✕';
       del.setAttribute('aria-label', `${it.name} 빼기`);
       del.addEventListener('click', () => { arr.splice(i, 1); draw(); });
-      li.append(im, del);
+      li.append(face, del);
       ul.append(li);
     });
   };
@@ -272,7 +282,7 @@ function syncControls() {
   $('#cSubWOut').textContent = `${cfg.subW}%`;
   $('#cSubXOut').textContent = `${cfg.subX}%`;
   $('#cSubYOut').textContent = `${cfg.subY}%`;
-  $('#cQualityOut').textContent = cfg.format === 'png' ? '무손실' : `${Math.round(cfg.quality * 100)}`;
+  $('#cQualityOut').textContent = cfg.format === 'png' ? '무손실' : `${Math.round(cfg.quality * 100)}%`;
 }
 
 export async function initCompose() {

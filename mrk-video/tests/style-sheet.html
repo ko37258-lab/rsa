@@ -107,14 +107,17 @@ async function renderSheet(styles, { cellW = 540, cellH = 960, cols = 0 } = {}) 
       c.width = W; c.height = H;
       try { drawFrame(c.getContext('2d'), p, W, H, t, tl); }
       catch (e) { errors.push({ style: st.id, t, message: String(e && e.stack || e) }); }
-      cells.push({ canvas: c, label: `${st.name || st.id} · t=${t.toFixed(1)}`, sub: `${p.template}/${p.captionAnim}/${p.overlay}/${p.transition}/${p.titleMode}` });
+      cells.push({ canvas: c, id: `${st.id} · t=${t.toFixed(1)}`, label: st.name || st.id, sub: `${p.template}/${p.captionAnim}/${p.overlay}/${p.transition}/${p.titleMode}` });
     }
   }
   const n = cells.length;
   const C = cols || Math.min(8, Math.max(2, Math.ceil(Math.sqrt(n * 1.6))));
   const R = Math.ceil(n / C);
-  const labelH = 54;
+  // 타일 아래 글자 3줄: id·시간 / 스타일 이름 / 어휘 요약. 글자 크기는 타일 폭에 맞춰 줄입니다(270px 타일에서도 읽히게).
+  const fs = Math.max(11, Math.min(20, Math.round(cellW / 15)));
+  const labelH = Math.round(fs * 4.2);
   const gap = 14;
+  const fit = (g, text, maxW) => { let s = String(text); while (s.length > 2 && g.measureText(s).width > maxW) s = s.slice(0, -2) + '…'; return s; };
   const sheet = document.createElement('canvas');
   sheet.width = C * (cellW + gap) + gap;
   sheet.height = R * (cellH + labelH + gap) + gap;
@@ -127,13 +130,16 @@ async function renderSheet(styles, { cellW = 540, cellH = 960, cols = 0 } = {}) 
     g.fillStyle = '#000';
     g.fillRect(x, y, cellW, cellH);
     g.drawImage(cell.canvas, x, y);
-    g.fillStyle = '#eee';
-    g.font = '700 20px "Pretendard Variable", sans-serif';
     g.textBaseline = 'top';
-    g.fillText(cell.label, x, y + cellH + 8);
+    g.fillStyle = '#8fd3ff';
+    g.font = `700 ${fs}px "Pretendard Variable", sans-serif`;
+    g.fillText(fit(g, cell.id, cellW), x, y + cellH + 6);
+    g.fillStyle = '#eee';
+    g.font = `700 ${fs}px "Pretendard Variable", sans-serif`;
+    g.fillText(fit(g, cell.label, cellW), x, y + cellH + 6 + fs * 1.3);
     g.fillStyle = '#9aa';
-    g.font = '500 16px "Pretendard Variable", sans-serif';
-    g.fillText(cell.sub, x, y + cellH + 32);
+    g.font = `500 ${Math.round(fs * 0.85)}px "Pretendard Variable", sans-serif`;
+    g.fillText(fit(g, cell.sub, cellW), x, y + cellH + 6 + fs * 2.6);
   });
   document.getElementById('out').replaceChildren(sheet);
   return { dataUrl: sheet.toDataURL('image/png'), errors, cells: n };

@@ -301,6 +301,7 @@ export async function initDownloader() {
   });
   $('#dlAddRows').addEventListener('click', () => { ensureRows(rows.length + 5); render(); });
   $('#dlClear').addEventListener('click', () => { if (running) return; rows = []; ensureRows(6); render(); });
+  $('#dlLocalBtn').addEventListener('click', () => $('#dlLocal').click());
   $('#dlLocal').addEventListener('change', (e) => {
     const files = [...(e.target.files || [])];
     e.target.value = '';

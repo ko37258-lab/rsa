@@ -78,6 +78,7 @@ export function underline(el, { delay = 0, duration = 500 } = {}) {
 export async function swapViews(outEl, inEl, dir = 1) {
   if (reduce() || !outEl) {
     if (outEl) outEl.hidden = true;
+    else document.querySelectorAll('.view').forEach((v) => { if (v !== inEl) v.hidden = true; });
     inEl.hidden = false;
     return;
   }
@@ -109,7 +110,14 @@ export function topline() {
 export function revealOnScroll(root) {
   const targets = root.querySelectorAll('[data-reveal]');
   if (!('IntersectionObserver' in window) || reduce()) {
-    targets.forEach((t) => t.classList.add('is-in'));
+    // 움직임 없이 최종 상태로: 제목의 *강조*도 변환해 별표가 그대로 보이지 않게
+    targets.forEach((t) => {
+      t.classList.add('is-in');
+      const title = t.querySelector('[data-kinetic-title]');
+      if (title) kinetic(title);
+      const ul = t.querySelector('[data-underline]');
+      if (ul) ul.style.transform = 'none';
+    });
     return;
   }
   const io = new IntersectionObserver((entries) => {

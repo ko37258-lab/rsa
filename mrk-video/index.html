@@ -36,7 +36,7 @@
 
   <main class="main">
     <!-- ───────────── 00 사례 보기 ───────────── -->
-    <section class="view view-showcase" id="view-showcase" data-view="showcase">
+    <section class="view view-showcase" id="view-showcase" data-view="showcase" hidden>
       <div class="hero">
         <div class="hero-copy">
           <p class="kicker">MR.K Video Studio</p>
@@ -58,6 +58,7 @@
         </div>
         <div class="hero-stage">
           <div class="phone"><canvas id="heroCanvas" width="540" height="960" aria-label="쇼츠 미리보기"></canvas><div class="phone-notch"></div></div>
+          <button type="button" class="btn icon hero-pause" id="heroPause" aria-label="미리보기 멈춤" aria-pressed="false">❚❚</button>
           <span class="chip float-chip float-a"><span class="chk">✓</span>용도지역 확인</span>
           <span class="chip float-chip float-b ok"><span class="chk">✓</span>자막 자동</span>
           <span class="chip float-chip float-c"><span class="chk">✓</span>MP4 저장</span>
@@ -73,7 +74,7 @@
       <article class="case" id="case-shorts" data-reveal data-case="1">
         <div class="case-head">
           <span class="case-no">사례 01</span>
-          <h2 data-kinetic-title>토지 사진 5장이
+          <h2 data-kinetic-title>토지 사진 4장이
 *쇼츠* 한 편이 됩니다</h2>
           <i class="rule" data-underline></i>
         </div>
@@ -115,7 +116,7 @@
             <span class="io-label out">나오는 것</span>
             <div class="style-wall" id="caseStyleWall"></div>
             <div class="chips">
-              <span class="chip" data-pop><span class="chk">✓</span>스타일 <b id="caseStyleCount">20</b>가지</span>
+              <span class="chip" data-pop><span class="chk">✓</span><span>스타일 <b id="caseStyleCount">20</b>가지</span></span>
               <span class="chip ok" data-pop><span class="chk">✓</span>전부 ZIP 저장</span>
             </div>
             <a class="btn accent case-cta" href="#shorts">스타일 골라 보기</a>
@@ -179,19 +180,19 @@
             <div class="panel-head">
               <h2 id="h-styles">잘 나가는 쇼츠 스타일 <span class="hint" id="styleCount"></span></h2>
               <div class="row wrap">
-                <button type="button" class="btn small ghost" id="viralToggle">빵터진 영상 찾기</button>
+                <button type="button" class="btn small ghost" id="viralToggle" aria-expanded="false" aria-controls="viralBox">빵터진 영상 찾기</button>
                 <button type="button" class="btn small accent" id="styleBatchBtn">20가지 전부 만들기</button>
               </div>
             </div>
             <div class="viral" id="viralBox" hidden>
               <div class="row wrap">
-                <input type="search" id="viralTopic" class="grow" placeholder="주제를 넣으세요. 예: 맹지, 재건축, 상가 투자, 청약">
+                <input type="search" id="viralTopic" class="grow" aria-label="찾을 주제" placeholder="주제를 넣으세요. 예: 맹지, 재건축, 상가 투자, 청약">
                 <button type="button" class="btn small" id="viralRun">찾기</button>
               </div>
               <p class="hint" id="viralHint">유튜브에서 조회수 높은 쇼츠를 찾아 보여 줍니다. 영상을 누르면 그 컨셉으로 AI 대본을 씁니다.</p>
               <div class="viral-grid" id="viralGrid"></div>
             </div>
-            <div class="style-strip" id="styleStrip" role="listbox" aria-label="스타일 고르기"></div>
+            <div class="style-strip" id="styleStrip" role="group" aria-label="스타일 고르기"></div>
             <div class="style-desc" id="styleDesc"></div>
           </section>
 
@@ -218,7 +219,7 @@
               <h2 id="h-script">대본으로 장면 만들기</h2>
               <span class="hint">한 줄이 한 장면 · <code>*강조*</code>는 강조색</span>
             </div>
-            <textarea id="scriptText" rows="5" placeholder="땅을 살 때 *용도지역*부터 확인하세요&#10;*도로*에 붙지 않은 땅은 건축이 어렵습니다"></textarea>
+            <textarea id="scriptText" rows="5" aria-labelledby="h-script" placeholder="땅을 살 때 *용도지역*부터 확인하세요&#10;*도로*에 붙지 않은 땅은 건축이 어렵습니다"></textarea>
             <div class="row wrap">
               <button type="button" class="btn small" id="applyScript">대본을 장면 자막에 넣기</button>
               <span class="hint">사진이 모자라면 남는 줄은 글자 장면이 됩니다.</span>
@@ -362,9 +363,9 @@
             <div class="panel-head"><h2 id="h-audio">소리</h2><span class="hint">mp3·m4a·wav</span></div>
             <div class="grid2">
               <label class="field"><span>배경음악</span><input type="file" id="bgmFile" accept="audio/*"></label>
-              <label class="field"><span>배경음악 크기 <output id="bgmVolOut"></output></span><input type="range" id="bgmVolume" min="0" max="1" step="0.05"></label>
+              <label class="field" for="bgmVolume"><span>배경음악 크기 <output id="bgmVolOut"></output></span><input type="range" id="bgmVolume" min="0" max="1" step="0.05"></label>
               <label class="field"><span>내레이션 녹음</span><input type="file" id="narrFile" accept="audio/*"></label>
-              <label class="field"><span>내레이션 크기 <output id="narrVolOut"></output></span><input type="range" id="narrVolume" min="0" max="1.5" step="0.05"></label>
+              <label class="field" for="narrVolume"><span>내레이션 크기 <output id="narrVolOut"></output></span><input type="range" id="narrVolume" min="0" max="1.5" step="0.05"></label>
             </div>
             <div class="row wrap">
               <span class="hint" id="audioInfo">소리 파일이 없으면 무음 영상이 만들어집니다.</span>
@@ -500,10 +501,10 @@
               <label class="field"><span>메인 맞춤</span>
                 <select id="cFit"><option value="contain">전체 보이기</option><option value="cover">꽉 채우기</option></select>
               </label>
-              <label class="field"><span>메인 여백 <output id="cPadOut"></output></span><input type="range" id="cPad" min="0" max="20" step="1"></label>
-              <label class="field"><span>서브 크기 <output id="cSubWOut"></output></span><input type="range" id="cSubW" min="10" max="70" step="1"></label>
-              <label class="field"><span>가로 위치 <output id="cSubXOut"></output></span><input type="range" id="cSubX" min="0" max="100" step="0.5"></label>
-              <label class="field"><span>세로 위치 <output id="cSubYOut"></output></span><input type="range" id="cSubY" min="0" max="100" step="0.5"></label>
+              <label class="field" for="cPad"><span>메인 여백 <output id="cPadOut"></output></span><input type="range" id="cPad" min="0" max="20" step="1"></label>
+              <label class="field" for="cSubW"><span>서브 크기 <output id="cSubWOut"></output></span><input type="range" id="cSubW" min="10" max="70" step="1"></label>
+              <label class="field" for="cSubX"><span>가로 위치 <output id="cSubXOut"></output></span><input type="range" id="cSubX" min="0" max="100" step="0.5"></label>
+              <label class="field" for="cSubY"><span>세로 위치 <output id="cSubYOut"></output></span><input type="range" id="cSubY" min="0" max="100" step="0.5"></label>
               <label class="field"><span>서브 테두리 (px)</span><input type="number" id="cBorder" min="0" max="40"></label>
               <label class="field"><span>서브 모서리 둥글기</span><input type="number" id="cRadius" min="0" max="200"></label>
               <label class="field check"><input type="checkbox" id="cShadow"><span>서브 그림자</span></label>
@@ -531,7 +532,7 @@
               <label class="field"><span>형식</span>
                 <select id="cFormat"><option value="jpg">JPG</option><option value="png">PNG</option><option value="webp">WEBP</option></select>
               </label>
-              <label class="field"><span>화질 <output id="cQualityOut"></output></span><input type="range" id="cQuality" min="0.5" max="1" step="0.01"></label>
+              <label class="field" for="cQuality"><span>화질 <output id="cQualityOut"></output></span><input type="range" id="cQuality" min="0.5" max="1" step="0.01"></label>
               <label class="field"><span>파일 이름 규칙</span><input type="text" id="cName" title="{name}=원래 이름, {n}=번호"></label>
               <label class="field"><span>저장 위치</span>
                 <select id="cSink"><option value="zip">ZIP 파일 1개</option><option value="folder">내 PC 폴더에 바로</option></select>
@@ -577,7 +578,8 @@
           <div class="row wrap">
             <button type="button" class="btn small ghost" id="dlSample">예시 채우기</button>
             <button type="button" class="btn small ghost" id="dlAddRows">행 5개 추가</button>
-            <label class="btn small ghost">PC 사진 추가<input type="file" id="dlLocal" accept="image/*" multiple hidden></label>
+            <button type="button" class="btn small ghost" id="dlLocalBtn">PC 사진 추가</button>
+            <input type="file" id="dlLocal" accept="image/*" multiple hidden>
             <button type="button" class="btn small ghost" id="dlClear">비우기</button>
           </div>
         </div>

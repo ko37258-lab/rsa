@@ -21,6 +21,11 @@ function moveIndicator(name) {
   ind.style.transform = `translateY(${a.offsetTop}px)`;
   ind.style.height = `${a.offsetHeight}px`;
   ind.style.opacity = '1';
+  // 좁은 화면(가로 메뉴)에서는 현재 메뉴가 보이게 메뉴 줄만 가로로 스크롤
+  const nav = a.parentElement;
+  if (nav.scrollWidth > nav.clientWidth + 1) {
+    nav.scrollTo({ left: a.offsetLeft - (nav.clientWidth - a.offsetWidth) / 2, behavior: 'smooth' });
+  }
 }
 
 /** 화면 들어올 때의 움직임: 제목 키네틱 + 패널 떠오르기 */
@@ -47,6 +52,8 @@ function show(name) {
   if (prev === 'shorts') pauseShorts();
   if (prev === 'showcase') pauseShowcase();
   const dir = VIEWS.indexOf(name) >= VIEWS.indexOf(prev || 'showcase') ? 1 : -1;
+  // 첫 진입(주소에 #shorts 같은 해시가 붙어 있을 때)에는 목표 화면 외 전부 숨긴다
+  if (!prev) for (const v of VIEWS) { const el = viewEl(v); if (el && v !== name) el.hidden = true; }
   switching = switching.then(async () => {
     await swapViews(prev ? viewEl(prev) : null, viewEl(name), dir);
     window.scrollTo({ top: 0, behavior: 'instant' });

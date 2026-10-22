@@ -4,7 +4,7 @@ import {
   $, clamp, debounce, formatTime, srtTime, uid, store, toast, wireDrop,
   imageFromFile, loadImage, safeFileName, canvasToBlob, readAsDataURL, drawImageFit,
 } from './util.js';
-import { FONTS, dims, buildTimeline, segmentAt, drawFrame, ensureFonts, buildSrt, plainText } from './shorts-render.js';
+import { FONTS, dims, buildTimeline, segmentAt, previewTime, drawFrame, ensureFonts, buildSrt, plainText } from './shorts-render.js';
 import { pickMime, exportProject, exportStyles } from './export.js';
 import { inArtifact, saveBlob, openSink, copyText, aiAvailable, generateScript, serverInfo, findViralShorts, youtubeSearchUrl } from './platform.js';
 import { SCRIPT_STYLES } from './script-prompt.js';
@@ -63,6 +63,7 @@ let resultBlob = null;
 let resultExt = 'mp4';
 let resultMeta = null; // { W, H, duration }
 let STYLES = [];
+let styleJob = 0; // 스타일 예시 장면을 받는 중 다른 스타일을 누르면 먼저 것은 버린다
 let viralRef = ''; // 빵터진 영상에서 고른 참고 제목
 
 function pickSettings(obj) {
@@ -130,6 +131,14 @@ function moveScene(i, d) {
   const arr = project.scenes;
   [arr[i], arr[j]] = [arr[j], arr[i]];
   changed(true);
+  focusSceneTool(arr[j].id, d < 0 ? '위로' : '아래로');
+}
+
+/** 목록을 다시 그린 뒤에도 키보드 초점이 같은 장면의 같은 버튼에 남게 합니다(장면이 없으면 '글자 장면 추가'로). */
+function focusSceneTool(id, title) {
+  const li = id ? $('#sceneList').querySelector(`li[data-id="${id}"]`) : null;
+  const b = li?.querySelector(`.scene-tools button[title="${title}"]`);
+  (b || $('#addTextScene')).focus({ preventScroll: true });
 }
 
 const KINDS = [['normal', '보통'], ['hook', '훅(첫 장면)'], ['answer', '정답·결론'], ['cta', '마무리']];
@@ -150,6 +159,7 @@ function renderScenes() {
     thumb.type = 'button';
     thumb.className = 'scene-thumb';
     thumb.title = '사진 바꾸기';
+    thumb.setAttribute('aria-label', `${i + 1}번 장면 ${s.img ? '사진 바꾸기' : '글자 장면 — 사진 넣기'}`);
     if (s.img) {
       const im = document.createElement('img');
       im.src = s.img.src;
@@ -221,7 +231,12 @@ function renderScenes() {
     tools.append(
       mk('↑', '위로', () => moveScene(i, -1)),
       mk('↓', '아래로', () => moveScene(i, 1)),
-      mk('✕', '지우기', () => { project.scenes.splice(i, 1); changed(true); }, 'danger'),
+      mk('✕', '지우기', () => {
+        const next = project.scenes[i + 1] || project.scenes[i - 1];
+        project.scenes.splice(i, 1);
+        changed(true);
+        focusSceneTool(next?.id, '지우기');
+      }, 'danger'),
     );
     li.append(no, thumb, body, tools);
     list.append(li);
@@ -389,12 +404,22 @@ function fitToNarration() {
 }
 
 // ── 스타일 갤러리 ─────────────────────────────────────
+/** 지금 설정·장면의 복사본(장면·엔딩은 얕게). 내보내기는 이 복사본으로 하므로 녹화 중 화면을 바꿔도 영상은 그대로 끝까지 만들어집니다. */
 function previewProject() {
-  return { ...project, scenes: project.scenes.map((s) => ({ ...s })) };
+  return { ...project, ending: { ...project.ending }, scenes: project.scenes.map((s) => ({ ...s })) };
 }
 
 function currentStyle() {
   return STYLES.find((s) => s.id === project.style) || null;
+}
+
+function exportLabel() {
+  const st = currentStyle();
+  return st ? `"${st.name.split(' — ')[0]}" 스타일로 영상 만들기` : '이 스타일로 영상 만들기';
+}
+
+function markStyleCards() {
+  for (const card of document.querySelectorAll('#styleStrip .style-card')) card.setAttribute('aria-pressed', String(card.dataset.id === project.style));
 }
 
 function renderStyleDesc() {
@@ -427,9 +452,8 @@ function renderStyleStrip() {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'style-card';
-    card.setAttribute('role', 'option');
     card.dataset.id = st.id;
-    card.setAttribute('aria-selected', String(project.style === st.id));
+    card.setAttribute('aria-pressed', String(project.style === st.id));
     const no = document.createElement('span');
     no.className = 'no';
     no.textContent = String(i + 1).padStart(2, '0');
@@ -468,8 +492,7 @@ function renderStripThumbs() {
       try {
         const p = st.apply({ ...base, scenes: base.scenes.map((s) => ({ ...s })) });
         const ptl = buildTimeline(p);
-        const t = clamp(1.4, 0, Math.max(0.05, ptl.total - 0.1));
-        drawFrame(c.getContext('2d'), p, c.width, c.height, t, ptl);
+        drawFrame(c.getContext('2d'), p, c.width, c.height, previewTime(ptl), ptl);
       } catch (e) { console.warn('style thumb', st.id, e); }
     }
     if (i < cards.length) requestAnimationFrame(step);
@@ -481,27 +504,35 @@ const scheduleStripRender = debounce(renderStripThumbs, 400);
 function applyStyle(st) {
   st.apply(project);
   project.style = st.id;
-  for (const card of document.querySelectorAll('#styleStrip .style-card')) card.setAttribute('aria-selected', String(card.dataset.id === st.id));
+  markStyleCards();
   const finish = () => {
     sizePreview();
     syncControls();
     renderStyleDesc();
     changed(true);
-    $('#exportBtn').textContent = `"${st.name.split(' — ')[0]}" 스타일로 영상 만들기`;
+    if (!exporting) $('#exportBtn').textContent = exportLabel(); // 녹화 중이면 '만들기 멈춤' 글자를 지키기
   };
-  // 예시 장면뿐이면 스타일의 예시 장면으로 바꿔 보여 준다
-  if (allSamples() && st.sample?.scenes?.length) loadStyleSample(st).then(finish);
-  else finish();
+  finish();
+  // 예시 장면뿐이면 스타일의 예시 장면으로 바꿔 보여 준다(연달아 눌렀으면 마지막에 누른 것만 반영)
+  const job = ++styleJob;
+  if (allSamples() && st.sample?.scenes?.length) {
+    loadStyleSample(st).then((scenes) => {
+      if (job !== styleJob) return;
+      project.scenes = scenes;
+      if (st.sample.title) { project.title = st.sample.title; $('#title').value = project.title; }
+      finish();
+    });
+  }
   toast(`스타일: ${st.name}`);
 }
 
+/** 스타일의 예시 장면을 만들어 돌려줍니다(project 는 건드리지 않음). */
 async function loadStyleSample(st) {
   const scenes = [];
   for (const s of st.sample.scenes) {
     scenes.push(newScene(s.img ? await sample(s.img) : null, s.caption, { duration: s.duration, kind: s.kind || 'normal', tag: s.tag, label: s.label, sample: true }));
   }
-  project.scenes = scenes;
-  if (st.sample.title) { project.title = st.sample.title; $('#title').value = project.title; }
+  return scenes;
 }
 
 // ── 빵터진 영상 찾기 ──────────────────────────────────
@@ -534,9 +565,13 @@ async function runViral() {
     if (!list.length) { hint.textContent = '찾은 영상이 없습니다. 주제를 더 넓게 써 보세요.'; return; }
     hint.textContent = `최근 1년 조회수 순 ${list.length}개. 영상을 누르면 그 컨셉으로 AI 대본을 씁니다.`;
     for (const v of list) {
-      const card = document.createElement('button');
-      card.type = 'button';
+      // 카드(div) 안에 "이 컨셉으로 대본 쓰기" 버튼과 "영상 열기" 링크를 따로 둔다(버튼 안에 링크를 넣지 않음)
+      const card = document.createElement('div');
       card.className = 'vcard';
+      const use = document.createElement('button');
+      use.type = 'button';
+      use.className = 'vuse';
+      use.setAttribute('aria-label', `${v.title} — 이 컨셉으로 대본 쓰기`);
       const im = document.createElement('img');
       im.src = v.thumb;
       im.alt = '';
@@ -554,9 +589,9 @@ async function runViral() {
       open.rel = 'noopener';
       open.className = 'hint';
       open.textContent = '영상 열기 ↗';
-      open.addEventListener('click', (e) => e.stopPropagation());
-      card.append(im, b, s, open);
-      card.addEventListener('click', () => useViral(v));
+      use.append(im, b, s);
+      use.addEventListener('click', () => useViral(v));
+      card.append(use, open);
       grid.append(card);
     }
     popIn(grid.children, { stagger: 40 });
@@ -576,14 +611,15 @@ async function useViral(v) {
 // ── 내보내기(한 편) ───────────────────────────────────
 async function exportVideo() {
   if (exporting) { exporting.abort.abort(); return; }
+  if (batch) return toast('20가지 전부 만들기가 진행 중입니다. 먼저 멈춰 주세요.');
   if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
   stopPlayback();
   const btn = $('#exportBtn');
   const bar = $('#exportProgress');
   const status = $('#exportStatus');
-  const label = btn.textContent;
   $('#exportResult').hidden = true;
   btn.textContent = '만들기 멈춤';
+  $('#styleBatchBtn').disabled = true; // 한 편과 20가지가 동시에 돌지 않게
   bar.hidden = false;
   bar.classList.add('rec');
   status.textContent = '글꼴과 사진을 준비하는 중…';
@@ -592,7 +628,7 @@ async function exportVideo() {
   try {
     const withAudio = !!(audio.bgm || audio.narr);
     const r = await exportProject({
-      project,
+      project: previewProject(),
       quality: project.quality,
       startAudio: withAudio ? startAudio : null,
       audioCtx: withAudio ? audioCtx() : null,
@@ -610,7 +646,8 @@ async function exportVideo() {
     else { console.error(e); status.textContent = `영상을 만들지 못했습니다: ${e.message || e}`; }
   } finally {
     exporting = null;
-    btn.textContent = label;
+    btn.textContent = exportLabel();
+    $('#styleBatchBtn').disabled = false;
     bar.classList.remove('rec');
     setTimeout(() => { bar.hidden = true; bar.firstElementChild.style.transform = 'scaleX(0)'; }, 600);
   }
@@ -625,6 +662,10 @@ function showResult(r) {
   v.src = URL.createObjectURL(resultBlob);
   $('#exportResult').hidden = false;
   renderUploadPanel();
+  // 고정된 미리보기 열이 길어졌을 때 결과 영상·저장 버튼이 바로 보이게(영상 크기가 정해진 뒤 한 번 더)
+  const reveal = () => $('#exportResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  reveal();
+  v.addEventListener('loadedmetadata', reveal, { once: true });
 }
 
 function videoFileName(ext = resultExt, suffix = '') {
@@ -635,9 +676,12 @@ function videoFileName(ext = resultExt, suffix = '') {
 // ── 내보내기(20가지 전부) ─────────────────────────────
 async function exportAllStyles() {
   if (batch) { batch.abort.abort(); return; }
+  if (exporting) return toast('한 편 만들기가 진행 중입니다. 먼저 멈춰 주세요.');
   if (!STYLES.length) return toast('스타일 데이터가 없습니다.');
   if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
   stopPlayback();
+  const snap = previewProject(); // 20편 모두 시작 시점의 장면·설정으로
+  $('#exportBtn').disabled = true;
   const panel = $('#batchPanel');
   const bar = $('#batchProgress');
   const status = $('#batchStatus');
@@ -658,7 +702,7 @@ async function exportAllStyles() {
     const st = STYLES[i];
     try {
       const [r] = await exportStyles({
-        project, styles: [st], quality: project.quality,
+        project: snap, styles: [st], quality: project.quality,
         startAudio: withAudio ? startAudio : null,
         audioCtx: withAudio ? audioCtx() : null,
         signal: abort.signal,
@@ -679,6 +723,7 @@ async function exportAllStyles() {
   status.textContent = results.length ? `${results.length}개 완성. 하나씩 저장하거나 ZIP으로 한 번에 저장하세요.` : '만든 영상이 없습니다.';
   zipBtn.disabled = !results.length;
   $('#styleBatchBtn').textContent = '20가지 전부 만들기';
+  $('#exportBtn').disabled = false;
   batch = null;
   if (results.length) { showResult(results[0]); toast(`${results.length}가지 스타일 영상이 완성됐습니다.`); }
 }
@@ -701,11 +746,13 @@ function renderBatchList(results) {
     play.type = 'button';
     play.className = 'btn small ghost';
     play.textContent = '보기';
+    play.setAttribute('aria-label', `${r.style.name} 보기`);
     play.addEventListener('click', () => { showResult(r); $('#resultVideo').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
     const save = document.createElement('button');
     save.type = 'button';
     save.className = 'btn small';
     save.textContent = '저장';
+    save.setAttribute('aria-label', `${r.style.name} 저장`);
     save.addEventListener('click', async () => {
       try { await saveBlob(r.blob, videoFileName(r.ext, `-${String(i + 1).padStart(2, '0')}-${r.style.id}`)); } catch (e) { toast(e.message); }
     });
@@ -845,8 +892,10 @@ async function openProject(file) {
     renderUploadInfo();
     sizePreview();
     changed(true);
-    for (const card of document.querySelectorAll('#styleStrip .style-card')) card.setAttribute('aria-selected', String(card.dataset.id === project.style));
+    markStyleCards();
     renderStyleDesc();
+    $('#exportBtn').textContent = exportLabel();
+    $('#scriptText').value = project.scenes.map((s) => s.caption).join('\n');
     toast('프로젝트를 열었습니다.');
   } catch (e) {
     toast(e.message || '프로젝트를 열지 못했습니다.');
@@ -1028,9 +1077,10 @@ export async function initShorts() {
   $('#styleBatchBtn').addEventListener('click', exportAllStyles);
   $('#batchStop').addEventListener('click', () => batch?.abort.abort());
   $('#batchZip').addEventListener('click', saveBatchZip);
-  $('#viralToggle').addEventListener('click', () => {
+  $('#viralToggle').addEventListener('click', (e) => {
     const box = $('#viralBox');
     box.hidden = !box.hidden;
+    e.currentTarget.setAttribute('aria-expanded', String(!box.hidden));
     if (!box.hidden) $('#viralTopic').focus();
   });
   $('#viralRun').addEventListener('click', runViral);
@@ -1054,7 +1104,7 @@ export async function initShorts() {
   if (project.style && currentStyle()) {
     currentStyle().apply(project);
     syncControls();
-    $('#exportBtn').textContent = `"${currentStyle().name.split(' — ')[0]}" 스타일로 영상 만들기`;
+    $('#exportBtn').textContent = exportLabel();
   }
   renderStyleStrip();
   changed(true);

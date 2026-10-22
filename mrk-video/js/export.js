@@ -110,10 +110,13 @@ export async function exportStyles({ project, styles, quality = '1080', startAud
   for (let i = 0; i < styles.length; i++) {
     if (signal?.aborted) break;
     const style = styles[i];
-    const p = style.apply(structuredClone({ ...project, scenes: project.scenes.map((s) => ({ ...s })) , logo: null }));
-    p.logo = project.logo;
-    // 장면의 이미지 객체는 structuredClone 이 못 복사하므로 다시 잇는다.
-    p.scenes.forEach((s, k) => { s.img = project.scenes[k]?.img || null; });
+    // 장면·엔딩은 얕게 복사한 뒤 스타일을 입힌다(apply 는 시각 설정만 덮어쓴다).
+    // structuredClone 은 장면의 이미지 객체(HTMLImageElement)를 복사하지 못해 쓰지 않는다.
+    const p = style.apply({
+      ...project,
+      ending: project.ending ? { ...project.ending } : project.ending,
+      scenes: project.scenes.map((s) => ({ ...s })),
+    });
     const r = await exportProject({
       project: p, quality, startAudio, audioCtx, signal,
       onProgress: (info) => onProgress({ index: i, count: styles.length, style, ...info, text: `${i + 1}/${styles.length} ${style.name} — ${info.text}` }),
