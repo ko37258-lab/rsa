@@ -29,6 +29,8 @@ export default async function handler(req, res) {
   if (b.provider !== 'fish') return res.status(400).json({ error: '이 서버는 Fish Audio 만 전달합니다. 제미나이·일레븐랩스는 브라우저에서 바로 부릅니다.' });
   const key = String(b.key || '').trim();
   if (key.length < 4 || key.length > 200) return res.status(400).json({ error: 'Fish Audio API 키를 넣어 주세요.' });
+  // 줄바꿈·전각·보이지 않는 글자가 섞인 키는 fetch 가 '잘못된 헤더 값' 으로 던져 연결 실패(502)처럼 보이므로 먼저 400 으로 알려 준다
+  if (!/^[\x21-\x7E]+$/.test(key)) return res.status(400).json({ error: 'API 키에 허용되지 않는 글자(공백·한글·줄바꿈 등)가 있습니다. 키를 다시 복사해 넣으세요.' });
   const voice = String(b.voice || '').trim();
   if (!VOICE_RE.test(voice)) return res.status(400).json({ error: '음성 모델 ID 는 영문·숫자 4~64자입니다.' });
   const model = b.model == null || b.model === '' ? 'drama-3' : String(b.model);
