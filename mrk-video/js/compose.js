@@ -235,7 +235,7 @@ async function runAll() {
         .replaceAll('{n}', String(i + 1).padStart(3, '0'));
       await sink.add(nameOf(`${safeFileName(stem, `image_${i + 1}`)}.${ext}`), blob);
       ok++;
-      bar.firstElementChild.style.width = `${(ok / mains.length) * 100}%`;
+      bar.firstElementChild.style.transform = `scaleX(${ok / mains.length})`;
       status.textContent = `${ok} / ${mains.length}장 합성`;
       await new Promise((r) => setTimeout(r, 0));
     }
@@ -246,7 +246,7 @@ async function runAll() {
     status.textContent = `중간에 멈췄습니다: ${e.message || e}`;
   } finally {
     btn.disabled = false;
-    setTimeout(() => { bar.hidden = true; bar.firstElementChild.style.width = '0'; }, 800);
+    setTimeout(() => { bar.hidden = true; bar.firstElementChild.style.transform = 'scaleX(0)'; }, 800);
   }
 }
 

@@ -253,7 +253,7 @@ function setStatus(r, s) {
 }
 
 function setProgress(done, total) {
-  $('#dlProgress').firstElementChild.style.width = total ? `${(done / total) * 100}%` : '0';
+  $('#dlProgress').firstElementChild.style.transform = `scaleX(${total ? done / total : 0})`;
   $('#dlProgressText').textContent = `${done} / ${total}`;
 }
 

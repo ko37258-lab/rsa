@@ -429,7 +429,7 @@ async function exportVideo() {
           return;
         }
         drawFrame(ctx, project, W, H, Math.max(0, t), timeline);
-        bar.firstElementChild.style.width = `${(Math.max(0, t) / timeline.total) * 100}%`;
+        bar.firstElementChild.style.transform = `scaleX(${Math.max(0, t) / timeline.total})`;
         status.textContent = `녹화 중 ${formatTime(Math.max(0, t))} / ${formatTime(timeline.total)} — 이 탭을 띄워 두세요.`;
         if (document.hidden) setTimeout(tick, 1000 / 30);
         else requestAnimationFrame(tick);
@@ -461,7 +461,7 @@ async function exportVideo() {
     exporting = null;
     btn.textContent = '영상 만들기';
     bar.classList.remove('rec');
-    setTimeout(() => { bar.hidden = true; bar.firstElementChild.style.width = '0'; }, 600);
+    setTimeout(() => { bar.hidden = true; bar.firstElementChild.style.transform = 'scaleX(0)'; }, 600);
   }
 }
 
