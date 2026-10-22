@@ -58,7 +58,7 @@ let uploadInfo = null; // AI가 만든 업로드용 제목·설명·해시태그
 let tl = buildTimeline(project);
 let curT = 0;
 let playing = null; // { t0, from, stopAudio }
-let playPrep = false; // 재생 직전 스타일 음악을 만드는 중(이때 ▶ 를 다시 누르면 취소)
+let playPrep = false; // 재생 직전 스타일 음악 루프를 만드는 중(▶ 는 '…' 로 잠김)
 let playJob = 0; // 준비 중 멈춤·화면 이동이 있었는지 가리는 번호
 let musicPreview = null; // 스타일 음악 미리듣기 { handle, moodId }
 let exporting = null; // { abort }
@@ -319,13 +319,20 @@ function seek(t) {
 async function startPlayback() {
   if (!tl.total || playing || playPrep) return;
   stopMusicPreview();
-  // 배경음악 파일이 없으면 스타일 음악을 먼저 만든다(캐시돼 있으면 바로). 그동안 ▶ 를 다시 누르면 취소.
+  // 배경음악 파일이 없으면 스타일 음악 루프를 먼저 만든다(분위기마다 한 번만, 그다음부터는 바로).
+  // 만드는 동안 ▶ 는 '…' 로 바꾸고 잠가 두어, 기다리다 한 번 더 누른 것이 조용히 취소되는 일이 없게 합니다.
   const job = ++playJob;
+  const btn = $('#playBtn');
   playPrep = true;
-  $('#playBtn').setAttribute('aria-label', '소리 준비 중 — 누르면 취소');
-  const bgm = await bgmSource(tl.total);
-  playPrep = false;
-  if (job !== playJob) return; // 준비 중에 멈췄거나 화면을 떠났다
+  btn.textContent = '…';
+  btn.disabled = true;
+  btn.setAttribute('aria-label', '소리 준비 중');
+  let bgm = null;
+  try { bgm = await bgmSource(); } finally {
+    playPrep = false;
+    btn.disabled = false;
+  }
+  if (job !== playJob) { btn.textContent = '▶'; btn.setAttribute('aria-label', '재생'); return; } // 준비 중에 멈췄거나 화면을 떠났다
   if (curT >= tl.total - 0.05) curT = 0;
   const from = curT;
   const stopAudio = startAudio(audioCtx().destination, from, tl.total, bgm);
@@ -381,12 +388,15 @@ function startAudio(dest, offset, total, bgm) {
     src.loop = !!bgm.loop;
     const g = ctx.createGain();
     const vol = project.bgmVolume;
-    g.gain.setValueAtTime(vol, now);
-    const fadeAt = now + Math.max(0, remain - 1.5);
+    // 시작은 0.25초 페이드인(루프 중간에서 시작해도 툭 끊기지 않게), 끝은 1.5초 페이드아웃
+    const fadeIn = Math.min(0.25, remain * 0.3);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(vol, now + fadeIn);
+    const fadeAt = now + Math.max(fadeIn, remain - 1.5);
     g.gain.setValueAtTime(vol, fadeAt);
     g.gain.linearRampToValueAtTime(0.0001, now + remain);
     src.connect(g).connect(dest);
-    // 파일은 반복이라 길이로 나눈 자리에서, 스타일 음악은 영상 길이에 맞춰 만들었으니 그 자리에서 시작
+    // 반복 소스(사용자 파일·스타일 음악 루프)는 길이로 나눈 자리에서, 한 번짜리 버퍼는 그 자리에서 시작
     const at = bgm.loop ? offset % src.buffer.duration : Math.min(offset, Math.max(0, src.buffer.duration - 0.01));
     src.start(now, at);
     src.stop(now + remain + 0.05);
@@ -429,19 +439,23 @@ function moodFor(style) {
 }
 const currentMood = () => moodFor(currentStyle());
 
+/** 스타일 음악 루프 길이(초). renderMood 가 코드 진행 한두 바퀴에 맞춰 반올림합니다. 미리듣기(playMood)와 같은 값이라 캐시를 함께 씁니다. */
+const STYLE_LOOP_SECONDS = 16;
+
 /**
- * 지금 영상에 깔릴 배경음악 소스. 사용자 파일이 있으면 그 파일(반복), 없으면 스타일 음악을 영상 길이+1초로 만들어 돌려줍니다
- * (renderMood 가 끝 1.2초 페이드아웃을 넣으므로 1초 여유를 두면 영상 끝에서 자연스럽게 꺼집니다). 만들지 못하면 null(음악 없이).
+ * 지금 영상에 깔릴 배경음악 소스. 사용자 파일이 있으면 그 파일(반복), 없으면 스타일 음악을 이음새 없는 루프로 만들어 돌려줍니다.
+ * 루프는 분위기마다 한 번만 만들어 캐시되므로(영상 길이·장면 길이와 무관) 첫 한 번만 몇 초 걸리고 그다음부터는 바로 시작하며,
+ * 메모리도 분위기당 루프 하나입니다. 반복과 끝 페이드아웃은 startAudio 가 맡습니다. 만들지 못하면 null(음악 없이).
  * @returns {Promise<{buffer: AudioBuffer, loop: boolean, name: string}|null>}
  */
-async function bgmSource(total, style = currentStyle()) {
+async function bgmSource(style = currentStyle()) {
   if (audio.bgm) return { buffer: audio.bgm.buffer, loop: true, name: audio.bgm.name };
   const mood = moodFor(style);
   if (!mood) return null;
   renderAudioInfo(`스타일 음악 「${mood.name}」 만드는 중…`);
   try {
-    const buffer = await renderMood(mood.id, total + 1, { sampleRate: audioCtx().sampleRate });
-    return { buffer, loop: false, name: mood.name };
+    const buffer = await renderMood(mood.id, STYLE_LOOP_SECONDS, { sampleRate: audioCtx().sampleRate, loop: true });
+    return { buffer, loop: true, name: mood.name };
   } catch (e) {
     console.warn('스타일 음악', e);
     toast(`스타일 음악을 만들지 못해 음악 없이 진행합니다: ${e.message || e}`);
@@ -634,7 +648,12 @@ function applyStyle(st) {
 async function loadStyleSample(st) {
   const scenes = [];
   for (const s of st.sample.scenes) {
-    scenes.push(newScene(s.img ? await sample(s.img) : null, s.caption, { duration: s.duration, kind: s.kind || 'normal', tag: s.tag, label: s.label, sample: true }));
+    scenes.push(newScene(s.img ? await sample(s.img) : null, s.caption, {
+      duration: s.duration, kind: s.kind || 'normal', tag: s.tag, label: s.label, sample: true,
+      // 비교(vs)·비포애프터의 둘째 사진과 숫자 카운트(counter)도 함께 — 빠지면 갤러리 설명(좌우 비교·카운트업)과 다른 영상이 됩니다
+      img2: s.img2 ? await sample(s.img2) : null,
+      counter: s.counter ? { ...s.counter } : undefined,
+    }));
   }
   return scenes;
 }
@@ -732,8 +751,8 @@ async function exportVideo() {
   exporting = { abort };
   try {
     const snap = previewProject();
-    // 배경음악 파일이 없으면 스타일 음악을 영상 길이에 맞춰 먼저 만든다(비동기). 그동안 멈춤을 눌렀으면 여기서 끝.
-    const bgm = await bgmSource(buildTimeline(snap).total);
+    // 배경음악 파일이 없으면 스타일 음악 루프를 먼저 만든다(분위기마다 한 번만, 비동기). 그동안 멈춤을 눌렀으면 여기서 끝.
+    const bgm = await bgmSource();
     if (abort.signal.aborted) throw new DOMException('내보내기를 멈췄습니다.', 'AbortError');
     status.textContent = '글꼴과 사진을 준비하는 중…';
     const withAudio = !!(bgm || audio.narr);
@@ -792,7 +811,6 @@ async function exportAllStyles() {
   stopPlayback();
   stopMusicPreview();
   const snap = previewProject(); // 모든 스타일을 시작 시점의 장면·설정으로
-  const snapTotal = buildTimeline(snap).total;
   $('#exportBtn').disabled = true;
   const panel = $('#batchPanel');
   const bar = $('#batchProgress');
@@ -812,9 +830,9 @@ async function exportAllStyles() {
     if (abort.signal.aborted) break;
     const st = STYLES[i];
     try {
-      // 배경음악 파일이 없고 '자동'이면 스타일마다 그 스타일이 추천하는 분위기로(파일이 있으면 모두 그 파일)
+      // 배경음악 파일이 없고 '자동'이면 스타일마다 그 스타일이 추천하는 분위기 루프로(분위기마다 한 번만 만듦. 파일이 있으면 모두 그 파일)
       status.textContent = `${i + 1}/${STYLES.length} ${st.name} — 소리 준비 중…`;
-      const bgm = await bgmSource(snapTotal, st);
+      const bgm = await bgmSource(st);
       if (abort.signal.aborted) break;
       const withAudio = !!(bgm || audio.narr);
       const [r] = await exportStyles({
@@ -981,7 +999,9 @@ async function saveProject() {
     uploadInfo,
     scenes: await Promise.all(project.scenes.map(async (s) => ({
       caption: s.caption, duration: s.duration, hint: s.hint || '', sample: !!s.sample, kind: s.kind || 'normal', tag: s.tag || '', label: s.label || '',
+      counter: s.counter || null,
       image: await imageToDataURL(s.img),
+      image2: await imageToDataURL(s.img2), // 비교(vs)·비포애프터의 둘째 사진
     }))),
   };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -1001,7 +1021,10 @@ async function openProject(file) {
     project.scenes = await Promise.all((data.scenes || []).map(async (s) => newScene(
       s.image ? await loadImage(s.image) : null,
       s.caption || '',
-      { duration: s.duration, hint: s.hint, sample: s.sample, kind: s.kind || 'normal', tag: s.tag, label: s.label },
+      {
+        duration: s.duration, hint: s.hint, sample: s.sample, kind: s.kind || 'normal', tag: s.tag, label: s.label,
+        counter: s.counter || undefined, img2: s.image2 ? await loadImage(s.image2) : null,
+      },
     )));
     uploadInfo = data.uploadInfo || null;
     syncControls();

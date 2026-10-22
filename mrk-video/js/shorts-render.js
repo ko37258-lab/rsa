@@ -328,6 +328,7 @@ function markedWords(text) {
 /**
  * 폭에 맞춰 줄을 나눕니다. 띄어쓰기 단위로 자르고, 한 단어가 너무 길면 글자 단위로 자릅니다.
  * 조각마다 wi(단어 번호)·ci(글자 위치)·ws(공백 여부)를 붙여 자막 애니메이션이 씁니다.
+ * wi 는 띄어쓰기(문단 시작) 기준으로만 늘어나므로 "*90%*가"·"*균열*·누수" 처럼 강조 뒤에 붙은 조사·조각은 강조어와 같은 단어입니다.
  * wsMul: 띄어쓰기 폭 배율(단어 칩 모양에서 칩 사이 틈)
  */
 function wrapRich(ctx, text, maxW, wsMul = 1) {
@@ -345,13 +346,15 @@ function wrapRich(ctx, text, maxW, wsMul = 1) {
       line = [];
       lineW = 0;
     };
+    let newWord = true; // 문단 시작·띄어쓰기 뒤에만 새 단어 번호(run 이 바뀌어도 공백 없이 이어지면 같은 단어)
     for (const run of parseRuns(paras[pi])) {
       for (const tok of run.text.split(/(\s+)/)) {
         if (!tok) continue;
         const ws = /^\s+$/.test(tok);
         const start = ci;
         ci += tok.length;
-        if (!ws) wi++;
+        if (ws) newWord = true;
+        else if (newWord) { wi++; newWord = false; }
         if (!line.length && ws) continue;
         const w = ctx.measureText(tok).width * (ws ? wsMul : 1);
         if (lineW + w <= maxW || !line.length) {
@@ -426,14 +429,21 @@ function makeState(anim, TL, size, env) {
   const dur = Math.max(0.5, anim.dur || 3);
   const N = Math.max(1, TL.words);
   if (mode === 'bounce') {
-    // 단어가 위에서 떨어져 바닥에서 한 번 튀며 자리 잡음(장면 앞 55% 안에 단어 분배, 단어마다 0.5초)
+    // 단어가 줄 위 글자 크기의 0.5 에서 떨어져 바닥에서 한 번 튀며 자리 잡음(장면 앞 55% 안에 단어 분배, 단어마다 0.5초).
+    // 낙하 거리를 줄 안에 두어 사진·카드 테두리·패널 경계 위로 나가지 않고(drawRichText 가 상자로 한 번 더 잘라 냄),
+    // 여러 줄이면 앞 줄 단어가 다 떨어진 뒤 다음 줄이 시작해 떨어지는 글자가 앞 줄 글자를 관통하지 않습니다.
+    const FALL = 0.5;
     const win = Math.max(0.3, dur * 0.55);
-    return (pc) => {
+    const L = Math.max(1, TL.lines.length);
+    // 줄 경계 간격 g: 단어 간격(spread/N) + g = FALL 이 되게 풉니다. 줄이 아주 많아 win 안에 못 넣으면 겹침을 조금 허용(spread ≥ 0)
+    const g = L > 1 ? clamp((FALL * N - win) / Math.max(1, N - L + 1), 0, win / (L - 1)) : 0;
+    const spread = win - g * (L - 1);
+    return (pc, li = 0) => {
       if (pc.ws) return VIS;
-      const x = (t - (pc.wi / N) * win) / 0.5;
+      const x = (t - ((pc.wi / N) * spread + li * g)) / FALL;
       if (x <= 0) return HIDE;
       if (x >= 1) return VIS;
-      return { alpha: Math.min(1, x * 5), dy: -(1 - easeOutBounce(x)) * size * 1.1, kind: 'read' };
+      return { alpha: Math.min(1, x * 2.5), dy: -(1 - easeOutBounce(x)) * size * 0.5, kind: 'read' };
     };
   }
   if (mode === 'slide') {
@@ -546,11 +556,12 @@ export function drawRichText(ctx, text, box, o) {
   // 블록 전체가 커지거나(pop·scale) 흐려지는 애니메이션
   let blockScale = 1;
   let blockAlpha = 1;
+  let popScale = null; // pop 묶음의 현재 배율(1.35→1). 줄 폭을 안 뒤 상자에 맞춰 blockScale 로 바꿉니다
   if (anim?.mode === 'pop') {
     const g = popGroup(text, anim);
     if (!g) return;
     text = g.text;
-    blockScale = g.scale;
+    popScale = g.scale;
     o = { ...o, size: o.size * 1.25, valign: 'center', maxLines: 3 };
     anim = null;
   } else if (anim?.mode === 'scale') {
@@ -575,15 +586,37 @@ export function drawRichText(ctx, text, box, o) {
   const left = o.align === 'left';
   const lineX = (ln) => (left ? lbox.x : lbox.x + (lbox.w - ln.w) / 2);
   const lineY = (i) => y0 + i * lh + lh / 2;
+  if (popScale != null) {
+    // pop 묶음은 상자 가운데를 중심으로 커지므로, 가장 긴 줄·전체 높이가 상자 밖으로 나가지 않는 최대 배율(≤1.35)까지만 커집니다
+    // (상자 폭에 꽉 찬 묶음은 1.35 배에서 화면 좌우가 잘렸음)
+    const cx = box.x + box.w / 2;
+    let peak = 1.35;
+    for (const ln of lines) {
+      const x0 = lineX(ln);
+      const x1 = x0 + ln.w;
+      if (x0 < cx) peak = Math.min(peak, (cx - box.x) / (cx - x0));
+      if (x1 > cx) peak = Math.min(peak, (box.x + box.w - cx) / (x1 - cx));
+    }
+    peak = Math.max(1, Math.min(peak, box.h / Math.max(1, blockH)));
+    blockScale = 1 + (popScale - 1) * ((peak - 1) / 0.35);
+  }
   const state = makeState(anim, TL, size, { lineX, u });
   const lineDx = state?.lineDx || null;
   const shift = (i, ln) => (lineDx ? lineDx(i, ln) : 0);
   const stateOf = (r, i, ln) => (state ? state(r, i, ln) : VIS);
-  /** 줄에서 가장 진한 글자 조각의 알파(줄 배경이 첫 글자와 함께 나타나게. 공백 조각은 항상 보이는 상태라 뺍니다) */
+  /**
+   * 줄에서 가장 진한 글자 조각의 알파(줄 배경이 첫 글자와 함께 나타나게. 공백 조각은 항상 보이는 상태라 뺍니다).
+   * 가라오케의 '아직 안 읽은'(dim) 글자는 보이는 것으로 쳐서 띠·알약·형광펜·밑줄이 55% 로 깔렸다가 튀지 않게 합니다(글자만 흐림).
+   */
   const lineAlpha = (ln, i) => {
     if (!state) return 1;
     let a = 0;
-    for (const r of ln.runs) { if (r.ws) continue; a = Math.max(a, stateOf(r, i, ln).alpha); if (a >= 1) break; }
+    for (const r of ln.runs) {
+      if (r.ws) continue;
+      const st = stateOf(r, i, ln);
+      a = Math.max(a, st.kind === 'dim' ? 1 : st.alpha);
+      if (a >= 1) break;
+    }
     return a;
   };
   const accent = o.accent || o.hl;
@@ -605,6 +638,12 @@ export function drawRichText(ctx, text, box, o) {
   ctx.textAlign = 'left';
   ctx.lineJoin = 'round';
   ctx.font = fontCss(TL.weight, size);
+  // 튕기며 떨어지는 자막은 떨어지는 동안 상자 밖(사진·카드 테두리·패널 경계)으로 나가지 않게 상자(좌우 글자 크기, 아래 0.5 만 여유)로 잘라 냅니다
+  if (anim?.mode === 'bounce') {
+    ctx.beginPath();
+    ctx.rect(box.x - size, box.y, box.w + size * 2, box.h + size * 0.5);
+    ctx.clip();
+  }
 
   // ── 1) 배경 ──
   if (style === 'box' || style === 'pill') {
@@ -670,7 +709,7 @@ export function drawRichText(ctx, text, box, o) {
       for (const g of wordGroups(ln)) {
         const st = stateOf(g.runs[0], i, ln);
         if (st.alpha <= 0) continue;
-        ctx.globalAlpha = baseAlpha * st.alpha;
+        ctx.globalAlpha = baseAlpha * (st.kind === 'dim' ? 1 : st.alpha); // 가라오케의 안 읽은 단어도 칩은 꽉 차게(글자만 흐림)
         ctx.fillStyle = g.hl ? accent : (o.chipColor || 'rgba(0,0,0,0.62)');
         roundRectPath(ctx, x0 + g.x - px, y + st.dy - ch / 2 + size * 0.03, g.w + px * 2, ch, size * 0.3);
         ctx.fill();
@@ -725,11 +764,20 @@ export function drawRichText(ctx, text, box, o) {
   }
 
   // ── 2) 글자 레이어 ──
-  // 밝은 글자엔 검은 테두리, 어두운 글자엔 흰 테두리
-  const strokeColor = o.strokeColor || (brightGlyph ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.9)');
+  // 밝은 글자엔 검은 테두리, 사진 위 어두운 글자엔 흰 테두리. 밝은 면(흰 패널·밝은 띠) 위 어두운 글자는 흰 테두리가 면에 묻혀
+  // '글씨만'과 똑같이 보였으므로 강조색 테두리(강조 단어는 잉크색 테두리로 뒤집어 강조색 속에 묻히지 않게), 강조색마저 어두우면 얇은 반투명 검정 테두리
+  let strokeColor = o.strokeColor;
+  let strokeHl;
+  let strokeW = Math.max(2, size * 0.17);
+  if (!strokeColor) {
+    if (brightGlyph) strokeColor = 'rgba(0,0,0,0.92)';
+    else if (!o.brightBg) strokeColor = 'rgba(255,255,255,0.9)';
+    else if (isBright(accent)) { strokeColor = rgba(accent, 0.9); strokeHl = rgba(isBright(ink) ? '#111111' : ink, 0.9); }
+    else { strokeColor = 'rgba(0,0,0,0.25)'; strokeW = Math.max(1.5, size * 0.08); }
+  }
   // 흐림 그림자(shadowBlur)는 비싸서, 살짝 어긋난 어두운 글씨로 대신합니다(1080p 30fps 를 지키기 위함).
   const layers = [];
-  if (style === 'outline') layers.push({ kind: 'stroke', color: strokeColor, width: Math.max(2, size * 0.17) });
+  if (style === 'outline') layers.push({ kind: 'stroke', color: strokeColor, hlColor: strokeHl, width: strokeW });
   else if (style === 'plain' || style === 'underline') { if (o.shadow !== false && brightGlyph) layers.push({ kind: 'shadow', color: 'rgba(0,0,0,0.38)', dx: size * 0.035, dy: size * 0.05 }); }
   else if (style === 'neon') {
     // 넓은 반투명 강조색 스트로크 2겹이 빛무리. 강조 단어(강조색 글자)는 빛무리를 반대색(흰/잉크)으로 뒤집어 강조색 속에 묻히지 않게.
@@ -1457,7 +1505,8 @@ function ovTicker(ctx, e) {
     ctx.restore();
   }
   if (p.dateLabel) chip(ctx, String(p.dateLabel), W - pad * 0.5, top + pad * 0.5 + 26 * u, { size: 28 * u, weight: '700', bg: 'rgba(0,0,0,0.62)', color: '#ffffff', h: 50 * u, padX: 18 * u, align: 'right', radius: 10 * u });
-  if (!e.scene.img) return; // 사진 없는 장면의 자막은 자막 칸이 아니라 패널 가운데라 티커와 겹치지 않음
+  // 사진 없는 장면·훅 배경 장면(full/blur 훅)의 자막은 자막 칸이 아니라 화면 가운데(L.hook)라 티커와 겹치지 않음 — 상자를 내리면 훅 말풍선이 맨 아래로 떨어짐
+  if (!e.scene.img || hasHookBg(e.p, e.scene)) return;
   const cap = L.cap;
   if (cap.y + cap.h > y - 10 * u) return { box: { x: cap.x, y: cap.y, w: cap.w, h: Math.max(60 * u, y - 16 * u - cap.y) } };
 }
@@ -1603,7 +1652,8 @@ function ovDots(ctx, e) {
   }
   ctx.fillStyle = overPhoto ? '#ffffff' : onColor(bg, p);
   ctx.fillText(label, x + 6 * u, y);
-  if (!e.scene.img) return; // 사진 없는 장면의 자막은 패널·카드 가운데라 점과 겹치지 않음
+  // 사진 없는 장면·훅 배경 장면(full/blur 훅)의 자막은 패널·카드·화면 가운데(L.hook 은 아래 150u 를 비워 둠)라 점과 겹치지 않음
+  if (!e.scene.img || hasHookBg(e.p, e.scene)) return;
   const cap = L.cap;
   if (cap.y + cap.h > y - 24 * u) return { box: { x: cap.x, y: cap.y, w: cap.w, h: Math.max(60 * u, y - 30 * u - cap.y) } };
 }

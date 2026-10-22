@@ -15,8 +15,10 @@ const BASE = process.env.MRK_BASE || 'http://127.0.0.1:5173';
 const OUT = path.join(__dirname, 'out');
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
-// 정적 서버엔 없는 것들: 예시 사진 탐색(없으면 그림으로 대체하도록 설계됨)과 Vercel 함수 /api/health 의 404 는 예상된 것
+// 정적 서버엔 없는 것들: 예시 사진 탐색(없으면 그림으로 대체하도록 설계됨)과 Vercel 함수 /api/health 의 404, 그리고 이 크로미움이 못 여는 H.264 안내 영상
+// (caption-sheet.cjs 와 같은 예외)
 const EXPECTED_404 = /\/assets\/samples\/[^/]+\.jpg$|\/api\/health$/;
+const EXPECTED_FAIL = /\/assets\/video\/[^/]+\.mp4$/;
 
 function watch(page, bucket, tag, expected) {
   const pending404 = [];
@@ -32,7 +34,10 @@ function watch(page, bucket, tag, expected) {
     bucket.push(`[${tag}] console.error: ${m.text()}`);
   });
   page.on('pageerror', (e) => bucket.push(`[${tag}] pageerror: ${e.message}`));
-  page.on('requestfailed', (r) => bucket.push(`[${tag}] requestfailed: ${r.url()} ${r.failure()?.errorText || ''}`));
+  page.on('requestfailed', (r) => {
+    if (EXPECTED_FAIL.test(r.url())) { expected.push(`[${tag}] requestfailed(예상됨, H.264 미지원): ${r.url()}`); return; }
+    bucket.push(`[${tag}] requestfailed: ${r.url()} ${r.failure()?.errorText || ''}`);
+  });
 }
 
 function savePng(dataUrl, file) {

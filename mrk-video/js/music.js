@@ -58,6 +58,7 @@ const VOICES = {
   choir: { partials: [[1, 0.35, 'sine'], [2, 1, 'sawtooth'], [2, 0.7, 'triangle']], octave: -1, unison: { count: 2, cents: 7 }, a: 0.6, d: 0.3, s: 0.85, r: 0.8, vib: { rate: 4.4, cents: 12 }, filter: { freq: 1200, q: 0.8 } },
   lead: { partials: [[1, 1, 'triangle'], [2, 0.2, 'sine']], a: 0.01, d: 0.2, s: 0.7, r: 0.1, filter: { freq: 3000, q: 0.7 } },
   uke: { partials: [[1, 1, 'triangle'], [2, 0.5, 'triangle'], [3, 0.12, 'sine']], a: 0.002, d: 0.32, s: 0, r: 0.04, filter: { freq: 3200, q: 1.5, env: 2.0, fall: 0.08 } },
+  // ticker·beep 는 Track.blip() 이 표본으로 그립니다(아래 두 항목은 참고용 원형 — 엔벨로프·필터 값이 blip 호출과 같음)
   ticker: { partials: [[1, 1, 'sine']], a: 0.002, d: 0.05, s: 0, r: 0.02 },
   beep: { partials: [[1, 1, 'square']], a: 0.003, d: 0.14, s: 0, r: 0.03, filter: { freq: 2600, q: 0.7 } },
 };
@@ -328,6 +329,36 @@ class Track {
     this.used = true;
   }
 
+  /**
+   * 짧은 삐 소리(뉴스 티커·경고 비프). 음마다 Oscillator·Gain·Filter 노드를 만들면 긴 곡에서 노드 수가 수백 개로 늘어
+   * 렌더가 길이에 대해 초선형으로 느려지므로 표본으로 바로 그립니다. 엔벨로프는 Synth.tone 과 같은 모양(a → d 지수 감쇠 → dur 뒤 r 해제).
+   * wave='square' 는 홀수 배음 5개 합(1·3·5·7·9) + 로우패스 2.6kHz(VOICES.beep 와 같은 느낌).
+   */
+  blip(t, { hz = 880, wave = 'sine', a = 0.002, d = 0.05, dur = 0.02, r = 0.02, level = 0.1, pan = 0 } = {}) {
+    const sr = this.sr;
+    if (hz > sr * 0.45) return;
+    const off = Math.max(a + 0.005, dur);
+    const n = Math.ceil((off + r) * sr);
+    const w = (2 * Math.PI * hz) / sr;
+    const DEC = Math.log(1e4) / d; // tone() 의 exponentialRamp(peak → 1e-4, d초) 와 같은 감쇠율
+    const lp = wave === 'square' ? new Biquad('lowpass', 2600, 0.7, sr) : null;
+    const square = (ph) => {
+      let v = 0;
+      for (let h = 1; h <= 9; h += 2) { if (hz * h > sr * 0.45) break; v += Math.sin(ph * h) / h; }
+      return v;
+    };
+    this.add(t, n, (k) => {
+      const s = k / sr;
+      let env;
+      if (s < a) env = s / a;
+      else if (s < off) env = Math.exp(-(s - a) * DEC);
+      else env = Math.exp(-(off - a) * DEC) * Math.max(0, 1 - (s - off) / r);
+      const ph = w * k;
+      const v = lp ? lp.run(square(ph)) : Math.sin(ph);
+      return v * env;
+    }, level, pan);
+  }
+
   // 킥: 사인 피치 드롭 + 짧은 클릭
   kick(t, { level = 1, pitch = 150, drop = 45, decay = 0.28 } = {}) {
     const sr = this.sr; let ph = 0;
@@ -491,6 +522,7 @@ class Synth {
     const frames = Math.ceil(seconds * ctx.sampleRate);
     this.drums = new Track(ctx.sampleRate, frames, rng);
     this.fxTrack = new Track(ctx.sampleRate, frames, rng);
+    this.blips = new Track(ctx.sampleRate, frames, rng); // 티커·비프처럼 짧고 많은 음(노드 대신 표본)
 
     // 마스터: 합 → (로파이 톤) → 컴프레서 → 출력
     this.sum = ctx.createGain();
@@ -570,6 +602,7 @@ class Synth {
     };
     attach(this.drums, { name: 'drums', rev: this.recipe.drums?.rev ?? 0.15 });
     attach(this.fxTrack, { name: 'fx', rev: 0.4 });
+    attach(this.blips, { name: 'blips', rev: 0.2 });
   }
 
   /** 음정 악기 한 음. dur 는 서스테인 길이(초). */
@@ -839,12 +872,13 @@ function scheduleMood(synth, mood, recipe, seconds, rng) {
 
 // 부가 효과: 마디마다 호출됩니다.
 const EXTRAS = {
-  // 뉴스 티커: 고음 사인 16분음표 펄스, 좌우 번갈아
+  // 뉴스 티커: 고음 사인 16분음표 펄스, 좌우 번갈아(마디마다 16음이라 노드 대신 표본 트랙에 그림)
   ticker({ synth, bar, at, chordRoot, seconds }) {
     for (let i = 0; i < 16; i++) {
       const t = at(bar, i, 0);
       if (t >= seconds) continue;
-      synth.tone(t, 0.02, chordRoot + 36 + (i % 4 === 0 ? 0 : i % 4 === 2 ? 7 : 12), 'ticker', { level: 0.11, pan: i % 2 ? 0.5 : -0.5, rev: 0.1 });
+      const midi = chordRoot + 36 + (i % 4 === 0 ? 0 : i % 4 === 2 ? 7 : 12);
+      synth.blips.blip(t, { hz: midiToHz(midi), a: 0.002, d: 0.05, dur: 0.02, r: 0.02, level: 0.11, pan: i % 2 ? 0.5 : -0.5 });
     }
   },
   // 뉴스 금관 스팁: 두 마디마다 첫 박, 네 마디마다 3박에 한 번 더
@@ -875,14 +909,16 @@ const EXTRAS = {
     synth.tone(t0, stepSec * 2, chordRoot + 24, 'bell', { level: 0.35, pan: 0.3, rev: 0.5 });
     synth.tone(t0 + stepSec * 2, stepSec * 2, chordRoot + 31, 'bell', { level: 0.3, pan: -0.3, rev: 0.5 });
   },
-  // 경고 비프: 박마다, 마디에 따라 두 음 번갈아
+  // 경고 비프: 박마다, 마디에 따라 두 음 번갈아(짧은 사각파라 노드 대신 표본 트랙에 그림)
   beep({ synth, bar, at, seconds }) {
     const midi = bar % 2 ? 78 : 81; // F#5 / A5
+    const hz = midiToHz(midi);
     for (let i = 0; i < 16; i += 4) {
       const t = at(bar, i, 0);
       if (t >= seconds) continue;
-      synth.tone(t, 0.1, midi, 'beep', { level: 0.16, pan: i % 8 ? 0.4 : -0.4, rev: 0.3 });
-      if (i === 0 || i === 8) synth.tone(t + 0.16, 0.08, midi, 'beep', { level: 0.12, pan: i % 8 ? 0.4 : -0.4, rev: 0.3 });
+      const pan = i % 8 ? 0.4 : -0.4;
+      synth.blips.blip(t, { hz, wave: 'square', a: 0.003, d: 0.14, dur: 0.1, r: 0.03, level: 0.16, pan });
+      if (i === 0 || i === 8) synth.blips.blip(t + 0.16, { hz, wave: 'square', a: 0.003, d: 0.14, dur: 0.08, r: 0.03, level: 0.12, pan });
     }
   },
   // 경고 하강음: 두 마디마다 반음 내려가는 금관
