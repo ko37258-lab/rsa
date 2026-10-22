@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<base href="../">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>스타일 시트 점검</title>
+<style>
+  @font-face {
+    font-family: 'Pretendard Variable';
+    font-weight: 45 920;
+    font-style: normal;
+    font-display: block;
+    src: url('./assets/fonts/PretendardVariable.woff2') format('woff2-variations');
+  }
+  body { margin: 0; background: #1a1c22; color: #eee; font: 14px 'Pretendard Variable', sans-serif; padding: 16px; }
+  canvas { max-width: 100%; display: block; margin-top: 12px; border: 1px solid #333; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<p>렌더 엔진 점검 페이지. tests/style-sheet.cjs 가 열어서 window.sheet.* 를 호출합니다.</p>
+<pre id="log"></pre>
+<div id="out"></div>
+<script type="module">
+import { drawFrame, buildTimeline, dims, ensureFonts, OVERLAYS } from './js/shorts-render.js';
+import { STYLES, styleProject } from './js/styles.js';
+import { sample, SHORTS_CASE } from './js/samples.js';
+
+const log = (m) => { document.getElementById('log').textContent += m + '\n'; };
+
+// 사양서 어휘 전체
+export const VOCAB = {
+  template: ['band', 'blur', 'full', 'split', 'card', 'dark'],
+  captionAnim: ['none', 'words', 'karaoke', 'type', 'pop'],
+  captionStyle: ['outline', 'box', 'plain', 'pill'],
+  overlay: Object.keys(OVERLAYS),
+  transition: ['fade', 'slide', 'zoom', 'none', 'wipe'],
+  titleMode: ['band', 'hook', 'none'],
+  motion: ['auto', 'in', 'out', 'none'],
+  aspect: ['9:16', '1:1', '16:9'],
+};
+
+const BASE = {
+  aspect: '9:16', template: 'band', font: '900', captionSize: 68, captionStyle: 'outline', captionAnim: 'none', overlay: 'none',
+  motion: 'auto', transition: 'fade', titleMode: 'band', textColor: '#ffffff', highlightColor: '#ffd43b', bandColor: '#0b0d14',
+  panelColor: '#ffffff', inkColor: '#111111', showProgress: true,
+  title: SHORTS_CASE.title, channel: 'MR.K 고상철', dateLabel: '2026.10.22',
+  ending: { enabled: true, text: '*구독*하고\n땅 공부 같이 해요', sub: 'MR.K 고상철 · 부동산 AI', duration: 2.2 },
+  logo: null, scenes: [],
+};
+
+/** 모든 장면 필드를 한 번씩 쓰는 점검용 장면 */
+async function richScenes() {
+  const [a, b, c, d] = await Promise.all(['s01-land-zoning', 's02-landlocked', 's03-permit-site', 's05-apartment'].map((id) => sample(id)));
+  return [
+    { caption: '이거 모르고 땅 사면\n*손해*봅니다', img: a, kind: 'hook', duration: 2.4, tag: '2026', label: '경기 양평' },
+    { caption: '*용도지역*부터 확인하세요', img: b, img2: c, duration: 3, tag: '3.2억', label: '맹지', counter: { from: 0, to: 1200, suffix: '만원' } },
+    { caption: '세 가지만 지켜도\n*토지투자* 실패가 줄어듭니다', img: null, duration: 3.2, tag: '2027', counter: { from: 10, to: 87, suffix: '%' } },
+    { caption: '정답은 *도로*입니다', img: d, kind: 'answer', duration: 2.6, tag: '정답' },
+    { caption: '궁금한 땅은\n*MR.K*에게 물어보세요', img: a, kind: 'cta', duration: 2.6 },
+  ];
+}
+
+/** 스타일의 sample 장면(이미지 id → Image) 또는 점검용 장면 */
+async function scenesFor(style) {
+  if (style.sample?.scenes?.length) {
+    const out = [];
+    for (const s of style.sample.scenes) out.push({ ...s, img: s.img ? await sample(s.img) : null, img2: s.img2 ? await sample(s.img2) : null });
+    return out;
+  }
+  return richScenes();
+}
+
+function projectFor(style, scenes) {
+  const base = { ...BASE, scenes, title: style.sample?.title || BASE.title };
+  return styleProject(base, style);
+}
+
+function frameTimes(tl) {
+  const second = tl.segs[1] || tl.segs[0];
+  return [1.6, (second.start + second.end) / 2];
+}
+
+function cellDims(aspect, cellW) {
+  const d = dims(aspect);
+  const s = cellW / d.W;
+  return { W: Math.round(d.W * s), H: Math.round(d.H * s) };
+}
+
+/**
+ * 스타일 목록 → 격자 시트 PNG(dataURL). 각 스타일마다 t=1.6초, 두 번째 장면 중간 2장.
+ * 돌려주는 값: { dataUrl, errors: [{style, t, message}], cells }
+ */
+async function renderSheet(styles, { cellW = 540, cellH = 960, cols = 0 } = {}) {
+  const errors = [];
+  const cells = [];
+  for (const st of styles) {
+    const scenes = await scenesFor(st);
+    const p = projectFor(st, scenes);
+    await ensureFonts(p);
+    const tl = buildTimeline(p);
+    for (const t of frameTimes(tl)) {
+      const c = document.createElement('canvas');
+      const { W, H } = cellDims(p.aspect, cellW);
+      c.width = W; c.height = H;
+      try { drawFrame(c.getContext('2d'), p, W, H, t, tl); }
+      catch (e) { errors.push({ style: st.id, t, message: String(e && e.stack || e) }); }
+      cells.push({ canvas: c, label: `${st.name || st.id} · t=${t.toFixed(1)}`, sub: `${p.template}/${p.captionAnim}/${p.overlay}/${p.transition}/${p.titleMode}` });
+    }
+  }
+  const n = cells.length;
+  const C = cols || Math.min(8, Math.max(2, Math.ceil(Math.sqrt(n * 1.6))));
+  const R = Math.ceil(n / C);
+  const labelH = 54;
+  const gap = 14;
+  const sheet = document.createElement('canvas');
+  sheet.width = C * (cellW + gap) + gap;
+  sheet.height = R * (cellH + labelH + gap) + gap;
+  const g = sheet.getContext('2d');
+  g.fillStyle = '#15171c';
+  g.fillRect(0, 0, sheet.width, sheet.height);
+  cells.forEach((cell, i) => {
+    const x = gap + (i % C) * (cellW + gap);
+    const y = gap + Math.floor(i / C) * (cellH + labelH + gap);
+    g.fillStyle = '#000';
+    g.fillRect(x, y, cellW, cellH);
+    g.drawImage(cell.canvas, x, y);
+    g.fillStyle = '#eee';
+    g.font = '700 20px "Pretendard Variable", sans-serif';
+    g.textBaseline = 'top';
+    g.fillText(cell.label, x, y + cellH + 8);
+    g.fillStyle = '#9aa';
+    g.font = '500 16px "Pretendard Variable", sans-serif';
+    g.fillText(cell.sub, x, y + cellH + 32);
+  });
+  document.getElementById('out').replaceChildren(sheet);
+  return { dataUrl: sheet.toDataURL('image/png'), errors, cells: n };
+}
+
+/** 어휘 점검용 스타일 20개: template/captionAnim/captionStyle/overlay/transition/titleMode/motion 을 모두 한 번씩 */
+function vocabStyles() {
+  const V = VOCAB;
+  const dark = ['#0b0d14', '#14213d', '#1b1b1b', '#0f2a1f'];
+  const bright = ['#e9e7e2', '#fff7d6', '#eaf2ff', '#ffffff'];
+  const hls = ['#ffd43b', '#1fcf62', '#e8473c', '#2f6cff', '#ff8a00'];
+  const out = [];
+  for (let i = 0; i < 20; i++) {
+    const brightBg = i % 2 === 1;
+    out.push({
+      id: `vocab-${String(i + 1).padStart(2, '0')}`,
+      name: `어휘 ${i + 1}`,
+      visual: {
+        aspect: i === 18 ? '1:1' : i === 19 ? '16:9' : '9:16',
+        template: V.template[i % 6],
+        captionAnim: V.captionAnim[i % 5],
+        captionStyle: V.captionStyle[i % 4],
+        overlay: V.overlay[i % V.overlay.length],
+        transition: V.transition[i % 5],
+        titleMode: V.titleMode[i % 3],
+        motion: V.motion[i % 4],
+        bandColor: brightBg ? bright[i % 4] : dark[i % 4],
+        panelColor: brightBg ? '#ffffff' : '#1f2433',
+        textColor: '#ffffff',
+        inkColor: '#111111',
+        highlightColor: hls[i % 5],
+        font: ['700', '800', '900'][i % 3],
+        captionSize: 56 + (i % 4) * 12,
+        showProgress: i % 3 !== 2,
+      },
+    });
+  }
+  return out;
+}
+
+/** 1080×1920 프레임 1장 평균 그리기 시간(ms). 스타일별로 frames 장을 고르게 그립니다. */
+async function measurePerf(styles, frames = 40) {
+  const c = document.createElement('canvas');
+  const results = [];
+  for (const st of styles) {
+    const scenes = await scenesFor(st);
+    const p = projectFor(st, scenes);
+    await ensureFonts(p);
+    const { W, H } = dims(p.aspect);
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    const tl = buildTimeline(p);
+    // 캐시 예열: 모든 장면의 흐림·격자 캐시를 먼저 만들어 두고(한 번만 드는 비용) 실제 프레임 시간을 잽니다
+    for (let k = 0; k < frames; k++) drawFrame(ctx, p, W, H, (tl.total * (k + 0.5)) / frames, tl);
+    ctx.getImageData(0, 0, 1, 1);
+    const t0 = performance.now();
+    for (let k = 0; k < frames; k++) drawFrame(ctx, p, W, H, (tl.total * (k + 0.5)) / frames, tl);
+    ctx.getImageData(0, 0, 1, 1); // 그리기 큐를 비워 실제 시간을 잽니다
+    const ms = (performance.now() - t0) / frames;
+    results.push({ style: st.id, template: p.template, overlay: p.overlay, captionAnim: p.captionAnim, ms: Math.round(ms * 100) / 100 });
+  }
+  const avg = results.reduce((s, r) => s + r.ms, 0) / Math.max(1, results.length);
+  return { avg: Math.round(avg * 100) / 100, max: Math.max(...results.map((r) => r.ms)), results };
+}
+
+/** 모든 어휘 조합을 한 프레임씩 — 예외가 하나라도 나면 errors 에 담습니다(그림은 작게 270×480) */
+async function sweepAll() {
+  const scenes = await richScenes();
+  const errors = [];
+  let count = 0;
+  const c = document.createElement('canvas');
+  for (const template of VOCAB.template) for (const overlay of VOCAB.overlay) for (const captionAnim of VOCAB.captionAnim) for (const transition of VOCAB.transition) {
+    const titleMode = VOCAB.titleMode[count % 3];
+    const captionStyle = VOCAB.captionStyle[count % 4];
+    const p = { ...BASE, scenes, template, overlay, captionAnim, transition, titleMode, captionStyle, bandColor: count % 2 ? '#e9e7e2' : '#0b0d14' };
+    const tl = buildTimeline(p);
+    const { W, H } = { W: 270, H: 480 };
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    for (const t of [0.6, 2.5, 3.9, 5.3, 8.0, tl.total - 0.1]) {
+      try { drawFrame(ctx, p, W, H, t, tl); }
+      catch (e) { errors.push({ template, overlay, captionAnim, transition, titleMode, captionStyle, t, message: String(e && e.stack || e) }); }
+    }
+    count++;
+  }
+  return { combos: count, errors };
+}
+
+window.sheet = { STYLES, VOCAB, renderSheet, vocabStyles, measurePerf, sweepAll };
+window.sheetReady = true;
+log(`스타일 ${STYLES.length}개 준비됨`);
+</script>
+</body>
+</html>

@@ -6,6 +6,9 @@ import { store } from './util.js';
 
 export const inArtifact = typeof window.claude?.use === 'function';
 
+// 서버 함수 위치: 단독 배포면 ./api/, ko372.com 안(/mrk-video/)이면 /api/mrk-video/
+export const API = /\/mrk-video\//.test(location.pathname) ? '/api/mrk-video/' : 'api/';
+
 const capCache = new Map();
 function useCap(name) {
   if (!inArtifact) return Promise.resolve(null);
@@ -16,11 +19,11 @@ function useCap(name) {
 /** 서버 함수(api/health)가 있는지 한 번만 확인합니다. */
 let serverP;
 export function serverInfo() {
-  if (inArtifact) return Promise.resolve({ ai: false, proxy: false, needsCode: false });
-  serverP ??= fetch('api/health', { cache: 'no-store' })
+  if (inArtifact) return Promise.resolve({ ai: false, proxy: false, needsCode: false, youtube: false });
+  serverP ??= fetch(API + 'health', { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
-    .then((j) => ({ ai: !!j?.ai, proxy: !!j?.proxy, needsCode: !!j?.needsCode }))
-    .catch(() => ({ ai: false, proxy: false, needsCode: false }));
+    .then((j) => ({ ai: !!j?.ai, proxy: !!j?.proxy, needsCode: !!j?.needsCode, youtube: !!j?.youtube }))
+    .catch(() => ({ ai: false, proxy: false, needsCode: false, youtube: false }));
   return serverP;
 }
 
@@ -130,7 +133,7 @@ export async function generateScript(params) {
       throw new Error(msg || 'AI 대본을 만들지 못했습니다. 주제를 조금 바꿔 다시 시도해 보세요.');
     }
   }
-  const res = await fetch('api/ai', {
+  const res = await fetch(API + 'ai', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-access-code': accessCode() },
     body: JSON.stringify(p),
@@ -162,7 +165,7 @@ export async function fetchImageBlob(url, signal) {
       ? '이 미리보기 화면에서는 외부 이미지에 접근할 수 없습니다. 인터넷 배포 버전에서 써 주세요.'
       : '사이트가 직접 받기를 막았습니다(CORS). 서버 프록시가 있는 배포 버전에서 다시 시도하세요.');
   }
-  const r = await fetch('api/proxy?url=' + encodeURIComponent(url), {
+  const r = await fetch(API + 'proxy?url=' + encodeURIComponent(url), {
     headers: { 'x-access-code': accessCode() },
     signal,
   });
@@ -172,3 +175,37 @@ export async function fetchImageBlob(url, signal) {
   }
   return r.blob();
 }
+
+/** 유튜브에서 주제로 조회수 높은 쇼츠를 찾습니다(서버에 YOUTUBE_API_KEY 가 있을 때). 없으면 null. */
+export async function findViralShorts(topic, { max = 12 } = {}) {
+  const info = await serverInfo();
+  if (!info.youtube) return null;
+  const yt = API === 'api/' ? 'api/youtube' : '/api/youtube';
+  const after = new Date(Date.now() - 365 * 864e5).toISOString();
+  const q = new URLSearchParams({ ep: 'search', part: 'snippet', type: 'video', videoDuration: 'short', order: 'viewCount', maxResults: String(max), regionCode: 'KR', relevanceLanguage: 'ko', publishedAfter: after, q: `${topic} #shorts` });
+  const sr = await fetch(`${yt}?${q}`, { headers: { 'x-access-code': accessCode() } });
+  const sj = await sr.json().catch(() => ({}));
+  if (!sr.ok) throw new Error(sj?.error?.message || `유튜브 검색 실패 (${sr.status})`);
+  const items = (sj.items || []).filter((it) => it.id?.videoId);
+  if (!items.length) return [];
+  const ids = items.map((it) => it.id.videoId).join(',');
+  const vr = await fetch(`${yt}?${new URLSearchParams({ ep: 'videos', part: 'statistics,snippet', id: ids })}`, { headers: { 'x-access-code': accessCode() } });
+  const vj = await vr.json().catch(() => ({}));
+  const stats = Object.fromEntries((vj.items || []).map((v) => [v.id, v]));
+  return items.map((it) => {
+    const v = stats[it.id.videoId];
+    return {
+      id: it.id.videoId,
+      title: it.snippet.title,
+      channel: it.snippet.channelTitle,
+      thumb: it.snippet.thumbnails?.high?.url || it.snippet.thumbnails?.medium?.url || '',
+      views: Number(v?.statistics?.viewCount || 0),
+      likes: Number(v?.statistics?.likeCount || 0),
+      publishedAt: it.snippet.publishedAt,
+      url: `https://www.youtube.com/shorts/${it.id.videoId}`,
+      description: v?.snippet?.description || '',
+    };
+  }).sort((a, b) => b.views - a.views);
+}
+
+export const youtubeSearchUrl = (topic) => `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' #shorts')}&sp=CAMSAhAB`;

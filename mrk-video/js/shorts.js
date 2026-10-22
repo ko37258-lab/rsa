@@ -1,37 +1,46 @@
-// 01 숏폼 영상 만들기 — 화면 조작, 미리보기 재생, 소리, 영상 내보내기
+// 01 숏폼 영상 만들기 — 스타일 갤러리, 장면 편집, 미리보기 재생, 소리, 내보내기(한 편 / 20가지 전부), 바로 올리기
 
 import {
   $, clamp, debounce, formatTime, srtTime, uid, store, toast, wireDrop,
-  imageFromFile, loadImage, makeSampleImage, safeFileName, canvasToBlob, readAsDataURL, drawImageFit,
+  imageFromFile, loadImage, safeFileName, canvasToBlob, readAsDataURL, drawImageFit,
 } from './util.js';
 import { FONTS, dims, buildTimeline, segmentAt, drawFrame, ensureFonts, buildSrt, plainText } from './shorts-render.js';
-import { inArtifact, saveBlob, copyText, aiAvailable, generateScript } from './platform.js';
+import { pickMime, exportProject, exportStyles } from './export.js';
+import { inArtifact, saveBlob, openSink, copyText, aiAvailable, generateScript, serverInfo, findViralShorts, youtubeSearchUrl } from './platform.js';
 import { SCRIPT_STYLES } from './script-prompt.js';
+import { sample, SHORTS_CASE } from './samples.js';
+import { popIn } from './motion.js';
 
 const SETTINGS_KEYS = [
-  'aspect', 'template', 'font', 'captionSize', 'captionStyle', 'motion', 'transition',
-  'textColor', 'highlightColor', 'bandColor', 'showProgress', 'title', 'channel', 'ending',
-  'bgmVolume', 'narrVolume', 'quality',
+  'aspect', 'template', 'font', 'captionSize', 'captionStyle', 'captionAnim', 'overlay', 'titleMode', 'motion', 'transition',
+  'textColor', 'highlightColor', 'bandColor', 'panelColor', 'inkColor', 'showProgress', 'title', 'channel', 'ending',
+  'bgmVolume', 'narrVolume', 'quality', 'style',
 ];
 
 const DEFAULTS = {
   aspect: '9:16',
   template: 'band',
-  font: 'Black Han Sans',
+  font: '900',
   captionSize: 68,
   captionStyle: 'outline',
+  captionAnim: 'none',
+  overlay: 'none',
+  titleMode: 'band',
   motion: 'auto',
   transition: 'fade',
   textColor: '#ffffff',
   highlightColor: '#ffd43b',
   bandColor: '#0b0d14',
+  panelColor: '#ffffff',
+  inkColor: '#111111',
   showProgress: true,
-  title: '공법의 신이 알려주는\n*토지투자* 3원칙',
+  title: SHORTS_CASE.title,
   channel: 'MR.K 고상철',
   ending: { enabled: true, text: '*구독*하고\n땅 공부 같이 해요', sub: 'MR.K 고상철 · 부동산 AI', duration: 2.5 },
   bgmVolume: 0.35,
   narrVolume: 1,
   quality: '1080',
+  style: '',
 };
 
 const project = {
@@ -47,9 +56,14 @@ let uploadInfo = null; // AI가 만든 업로드용 제목·설명·해시태그
 let tl = buildTimeline(project);
 let curT = 0;
 let playing = null; // { t0, from, stopAudio }
-let exporting = null; // { cancel }
+let exporting = null; // { abort }
+let batch = null; // { abort, results }
+let lastBatch = []; // 마지막으로 만든 20가지 결과
 let resultBlob = null;
 let resultExt = 'mp4';
+let resultMeta = null; // { W, H, duration }
+let STYLES = [];
+let viralRef = ''; // 빵터진 영상에서 고른 참고 제목
 
 function pickSettings(obj) {
   const out = {};
@@ -66,7 +80,7 @@ function defaultDuration(scene) {
 }
 
 function newScene(img = null, caption = '', extra = {}) {
-  const s = { id: uid(), img, caption, duration: 3, ...extra };
+  const s = { id: uid(), img, caption, duration: 3, kind: 'normal', ...extra };
   if (extra.duration == null) s.duration = defaultDuration(s);
   return s;
 }
@@ -105,6 +119,7 @@ function applyLines(lines, hints = []) {
       project.scenes.push(newScene(null, line, { hint: hints[i] || '' }));
     }
   });
+  if (project.scenes[0] && project.scenes[0].kind === 'normal') project.scenes[0].kind = 'hook';
   changed(true);
   toast(`대본 ${lines.length}줄을 장면 자막에 넣었습니다.`);
 }
@@ -116,6 +131,8 @@ function moveScene(i, d) {
   [arr[i], arr[j]] = [arr[j], arr[i]];
   changed(true);
 }
+
+const KINDS = [['normal', '보통'], ['hook', '훅(첫 장면)'], ['answer', '정답·결론'], ['cta', '마무리']];
 
 function renderScenes() {
   const list = $('#sceneList');
@@ -163,12 +180,24 @@ function renderScenes() {
     dur.value = s.duration;
     dur.setAttribute('aria-label', `${i + 1}번 장면 길이(초)`);
     dur.addEventListener('input', () => { s.duration = clamp(Number(dur.value) || 3, 0.5, 30); changed(false); });
-    meta.append(dur, document.createTextNode('초'));
+    const kind = document.createElement('select');
+    kind.setAttribute('aria-label', `${i + 1}번 장면 종류`);
+    for (const [v, l] of KINDS) kind.append(new Option(l, v));
+    kind.value = s.kind || 'normal';
+    kind.addEventListener('input', () => { s.kind = kind.value; changed(false); });
+    const tag = document.createElement('input');
+    tag.type = 'text';
+    tag.value = s.tag || '';
+    tag.placeholder = '태그(가격·날짜)';
+    tag.style.width = '110px';
+    tag.setAttribute('aria-label', `${i + 1}번 장면 태그`);
+    tag.addEventListener('input', () => { s.tag = tag.value; changed(false); });
+    meta.append(dur, document.createTextNode('초'), kind, tag);
     if (s.sample) {
-      const tag = document.createElement('span');
-      tag.className = 'tag';
-      tag.textContent = '예시';
-      meta.append(tag);
+      const t = document.createElement('span');
+      t.className = 'tag';
+      t.textContent = '예시';
+      meta.append(t);
     }
     if (s.hint) {
       const hint = document.createElement('span');
@@ -197,10 +226,7 @@ function renderScenes() {
     li.append(no, thumb, body, tools);
     list.append(li);
   });
-  const total = tl.total;
-  $('#sceneSummary').textContent = project.scenes.length
-    ? `${project.scenes.length}개 장면 · 총 ${total.toFixed(1)}초`
-    : '';
+  $('#sceneSummary').textContent = project.scenes.length ? `${project.scenes.length}개 장면 · 총 ${tl.total.toFixed(1)}초` : '';
   markCurrentScene();
 }
 
@@ -213,7 +239,6 @@ replaceInput.addEventListener('change', async () => {
   try {
     replaceTarget.img = await imageFromFile(f);
     replaceTarget.sample = false;
-    if (replaceTarget.duration == null) replaceTarget.duration = 3;
     changed(true);
   } catch (e) { toast(e.message); }
 });
@@ -233,13 +258,13 @@ function markCurrentScene() {
 function changed(structural) {
   tl = buildTimeline(project);
   if (structural) renderScenes();
-  else {
-    $('#sceneSummary').textContent = project.scenes.length ? `${project.scenes.length}개 장면 · 총 ${tl.total.toFixed(1)}초` : '';
-  }
+  else $('#sceneSummary').textContent = project.scenes.length ? `${project.scenes.length}개 장면 · 총 ${tl.total.toFixed(1)}초` : '';
   curT = Math.min(curT, Math.max(0, tl.total - 0.01));
   persist();
   refreshFonts();
   draw();
+  scheduleStripRender();
+  $('#fitToNarr').disabled = !audio.narr || !project.scenes.length;
 }
 
 const refreshFonts = debounce(async () => { await ensureFonts(project); draw(); }, 250);
@@ -250,15 +275,16 @@ const pv = () => $('#previewCanvas');
 function sizePreview() {
   const { W, H } = dims(project.aspect, '1080');
   const c = pv();
-  const scale = 0.5;
-  const w = Math.round(W * scale);
-  const h = Math.round(H * scale);
+  const w = Math.round(W * 0.5);
+  const h = Math.round(H * 0.5);
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
 }
 
 function draw() {
   const c = pv();
-  drawFrame(c.getContext('2d'), project, c.width, c.height, curT, tl);
+  try {
+    drawFrame(c.getContext('2d'), project, c.width, c.height, curT, tl);
+  } catch (e) { console.error('draw', e); }
   $('#timecode').textContent = `${formatTime(curT)} / ${formatTime(tl.total)}`;
   if (!playing) $('#scrub').value = tl.total ? Math.round((curT / tl.total) * 1000) : 0;
   markCurrentScene();
@@ -362,112 +388,411 @@ function fitToNarration() {
   toast(`장면 길이를 내레이션 ${target.toFixed(1)}초에 맞췄습니다(자막 글자 수 비율).`);
 }
 
-// ── 내보내기 ─────────────────────────────────────────
-function pickMime(withAudio) {
-  if (typeof MediaRecorder === 'undefined') return null;
-  const list = withAudio
-    ? ['video/mp4;codecs=avc1.640033,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
-    : ['video/mp4;codecs=avc1.640033', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-  return list.find((m) => MediaRecorder.isTypeSupported(m)) || null;
+// ── 스타일 갤러리 ─────────────────────────────────────
+function previewProject() {
+  return { ...project, scenes: project.scenes.map((s) => ({ ...s })) };
 }
 
-async function exportVideo() {
-  if (exporting) { exporting.cancel(); return; }
-  if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
-  const withAudio = !!(audio.bgm || audio.narr);
-  const mime = pickMime(withAudio);
-  if (!mime || !HTMLCanvasElement.prototype.captureStream) {
-    return toast('이 브라우저는 영상 녹화를 지원하지 않습니다. 크롬이나 엣지 최신 버전을 써 주세요.');
+function currentStyle() {
+  return STYLES.find((s) => s.id === project.style) || null;
+}
+
+function renderStyleDesc() {
+  const box = $('#styleDesc');
+  box.textContent = '';
+  const st = currentStyle();
+  if (!st) {
+    box.textContent = STYLES.length ? '스타일을 누르면 미리보기가 그 형식으로 바뀝니다.' : '스타일 데이터를 불러오지 못했습니다. 세부 조절로 직접 꾸밀 수 있습니다.';
+    return;
   }
+  const b = document.createElement('b');
+  b.textContent = st.name;
+  const why = document.createElement('span');
+  why.textContent = `${st.ref?.format || ''} — ${st.ref?.why || st.tagline || ''}`;
+  const plat = document.createElement('span');
+  plat.textContent = `잘 맞는 곳: ${(st.platforms || []).map(platformLabel).join(' · ')}`;
+  const a = document.createElement('a');
+  a.href = youtubeSearchUrl(st.ref?.search || st.name);
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = '이 형식의 잘 나가는 영상 보기 ↗';
+  box.append(b, why, plat, a);
+}
+
+function renderStyleStrip() {
+  const strip = $('#styleStrip');
+  strip.textContent = '';
+  $('#styleCount').textContent = STYLES.length ? `${STYLES.length}가지` : '';
+  STYLES.forEach((st, i) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'style-card';
+    card.setAttribute('role', 'option');
+    card.dataset.id = st.id;
+    card.setAttribute('aria-selected', String(project.style === st.id));
+    const no = document.createElement('span');
+    no.className = 'no';
+    no.textContent = String(i + 1).padStart(2, '0');
+    const c = document.createElement('canvas');
+    c.width = 216;
+    c.height = 384;
+    const name = document.createElement('b');
+    name.textContent = st.name;
+    const tag = document.createElement('small');
+    tag.textContent = st.tagline || st.ref?.format || '';
+    const pick = document.createElement('span');
+    pick.className = 'pick';
+    pick.textContent = '✓';
+    card.append(no, c, name, tag, pick);
+    card.addEventListener('click', () => applyStyle(st));
+    strip.append(card);
+  });
+  renderStyleDesc();
+  renderStripThumbs();
+}
+
+let stripJob = 0;
+function renderStripThumbs() {
+  const job = ++stripJob;
+  const cards = [...document.querySelectorAll('#styleStrip .style-card')];
+  const base = previewProject();
+  let i = 0;
+  const step = () => {
+    if (job !== stripJob) return;
+    const t0 = performance.now();
+    while (i < cards.length && performance.now() - t0 < 12) {
+      const card = cards[i++];
+      const st = STYLES.find((s) => s.id === card.dataset.id);
+      const c = card.querySelector('canvas');
+      if (!st || !c) continue;
+      try {
+        const p = st.apply({ ...base, scenes: base.scenes.map((s) => ({ ...s })) });
+        const ptl = buildTimeline(p);
+        const t = clamp(1.4, 0, Math.max(0.05, ptl.total - 0.1));
+        drawFrame(c.getContext('2d'), p, c.width, c.height, t, ptl);
+      } catch (e) { console.warn('style thumb', st.id, e); }
+    }
+    if (i < cards.length) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+const scheduleStripRender = debounce(renderStripThumbs, 400);
+
+function applyStyle(st) {
+  st.apply(project);
+  project.style = st.id;
+  for (const card of document.querySelectorAll('#styleStrip .style-card')) card.setAttribute('aria-selected', String(card.dataset.id === st.id));
+  const finish = () => {
+    sizePreview();
+    syncControls();
+    renderStyleDesc();
+    changed(true);
+    $('#exportBtn').textContent = `"${st.name.split(' — ')[0]}" 스타일로 영상 만들기`;
+  };
+  // 예시 장면뿐이면 스타일의 예시 장면으로 바꿔 보여 준다
+  if (allSamples() && st.sample?.scenes?.length) loadStyleSample(st).then(finish);
+  else finish();
+  toast(`스타일: ${st.name}`);
+}
+
+async function loadStyleSample(st) {
+  const scenes = [];
+  for (const s of st.sample.scenes) {
+    scenes.push(newScene(s.img ? await sample(s.img) : null, s.caption, { duration: s.duration, kind: s.kind || 'normal', tag: s.tag, label: s.label, sample: true }));
+  }
+  project.scenes = scenes;
+  if (st.sample.title) { project.title = st.sample.title; $('#title').value = project.title; }
+}
+
+// ── 빵터진 영상 찾기 ──────────────────────────────────
+function fmtViews(n) {
+  if (n >= 1e8) return `${(n / 1e8).toFixed(1)}억`;
+  if (n >= 1e4) return `${Math.round(n / 1e4)}만`;
+  return String(n);
+}
+
+async function runViral() {
+  const topic = $('#viralTopic').value.trim();
+  if (!topic) { $('#viralTopic').focus(); return toast('주제를 넣어 주세요.'); }
+  const grid = $('#viralGrid');
+  const hint = $('#viralHint');
+  grid.textContent = '';
+  hint.textContent = '찾는 중…';
+  try {
+    const list = await findViralShorts(topic);
+    if (list === null) {
+      hint.textContent = '이 환경에는 유튜브 검색이 없어 유튜브 검색 결과를 새 탭으로 엽니다. 마음에 드는 영상 제목을 AI 대본 주제 칸에 붙여 넣으면 그 컨셉으로 대본을 씁니다.';
+      const a = document.createElement('a');
+      a.className = 'btn small accent';
+      a.href = youtubeSearchUrl(topic);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = `유튜브에서 "${topic}" 인기 쇼츠 보기 ↗`;
+      grid.append(a);
+      return;
+    }
+    if (!list.length) { hint.textContent = '찾은 영상이 없습니다. 주제를 더 넓게 써 보세요.'; return; }
+    hint.textContent = `최근 1년 조회수 순 ${list.length}개. 영상을 누르면 그 컨셉으로 AI 대본을 씁니다.`;
+    for (const v of list) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'vcard';
+      const im = document.createElement('img');
+      im.src = v.thumb;
+      im.alt = '';
+      im.loading = 'lazy';
+      const b = document.createElement('b');
+      b.textContent = v.title;
+      const s = document.createElement('small');
+      const views = document.createElement('span');
+      views.className = 'views';
+      views.textContent = `${fmtViews(v.views)}회`;
+      s.append(views, document.createTextNode(` · ${v.channel}`));
+      const open = document.createElement('a');
+      open.href = v.url;
+      open.target = '_blank';
+      open.rel = 'noopener';
+      open.className = 'hint';
+      open.textContent = '영상 열기 ↗';
+      open.addEventListener('click', (e) => e.stopPropagation());
+      card.append(im, b, s, open);
+      card.addEventListener('click', () => useViral(v));
+      grid.append(card);
+    }
+    popIn(grid.children, { stagger: 40 });
+  } catch (e) {
+    hint.textContent = e.message || '유튜브 검색에 실패했습니다.';
+  }
+}
+
+async function useViral(v) {
+  viralRef = `${v.title} (${v.channel}, ${fmtViews(v.views)}회)`;
+  $('#aiTopic').value = `${$('#viralTopic').value.trim()} — "${v.title}" 컨셉으로`;
+  toast('이 영상 컨셉을 참고합니다. AI 대본을 쓰면 비슷한 구성으로 나옵니다.');
+  if (await aiAvailable()) runAI();
+  else $('#aiTopic').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ── 내보내기(한 편) ───────────────────────────────────
+async function exportVideo() {
+  if (exporting) { exporting.abort.abort(); return; }
+  if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
   stopPlayback();
   const btn = $('#exportBtn');
   const bar = $('#exportProgress');
   const status = $('#exportStatus');
+  const label = btn.textContent;
   $('#exportResult').hidden = true;
   btn.textContent = '만들기 멈춤';
   bar.hidden = false;
   bar.classList.add('rec');
   status.textContent = '글꼴과 사진을 준비하는 중…';
-
-  let cancelled = false;
-  exporting = { cancel: () => { cancelled = true; } };
-  let stopAudio = () => {};
+  const abort = new AbortController();
+  exporting = { abort };
   try {
-    await ensureFonts(project);
-    const { W, H } = dims(project.aspect, project.quality);
-    const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext('2d');
-    const timeline = buildTimeline(project);
-    drawFrame(ctx, project, W, H, 0, timeline);
-
-    const stream = canvas.captureStream(30);
-    let dest = null;
-    if (withAudio) {
-      dest = audioCtx().createMediaStreamDestination();
-      dest.stream.getAudioTracks().forEach((tr) => stream.addTrack(tr));
-    }
-    const rec = new MediaRecorder(stream, {
-      mimeType: mime,
-      videoBitsPerSecond: project.quality === '720' ? 5_000_000 : 10_000_000,
-      audioBitsPerSecond: 160_000,
+    const withAudio = !!(audio.bgm || audio.narr);
+    const r = await exportProject({
+      project,
+      quality: project.quality,
+      startAudio: withAudio ? startAudio : null,
+      audioCtx: withAudio ? audioCtx() : null,
+      signal: abort.signal,
+      onProgress: ({ t, total, text }) => {
+        bar.firstElementChild.style.transform = `scaleX(${t / total})`;
+        status.textContent = `${text} — 이 탭을 띄워 두세요.`;
+      },
     });
-    const chunks = [];
-    rec.ondataavailable = (e) => { if (e.data?.size) chunks.push(e.data); };
-    const stopped = new Promise((r) => { rec.onstop = r; });
-    rec.start(250);
-    if (dest) stopAudio = startAudio(dest, 0, timeline.total);
-    const t0 = performance.now() + 50;
-
-    await new Promise((resolve) => {
-      const tick = () => {
-        const t = (performance.now() - t0) / 1000;
-        if (cancelled || t >= timeline.total) {
-          drawFrame(ctx, project, W, H, timeline.total, timeline);
-          resolve();
-          return;
-        }
-        drawFrame(ctx, project, W, H, Math.max(0, t), timeline);
-        bar.firstElementChild.style.transform = `scaleX(${Math.max(0, t) / timeline.total})`;
-        status.textContent = `녹화 중 ${formatTime(Math.max(0, t))} / ${formatTime(timeline.total)} — 이 탭을 띄워 두세요.`;
-        if (document.hidden) setTimeout(tick, 1000 / 30);
-        else requestAnimationFrame(tick);
-      };
-      tick();
-    });
-    await new Promise((r) => setTimeout(r, 200));
-    rec.stop();
-    stopAudio();
-    await stopped;
-    stream.getTracks().forEach((tr) => tr.stop());
-    if (cancelled) {
-      status.textContent = '만들기를 멈췄습니다.';
-      return;
-    }
-    resultExt = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
-    resultBlob = new Blob(chunks, { type: mime.split(';')[0] });
-    const v = $('#resultVideo');
-    if (v.src) URL.revokeObjectURL(v.src);
-    v.src = URL.createObjectURL(resultBlob);
-    $('#exportResult').hidden = false;
-    status.textContent = `완성: ${resultExt.toUpperCase()} · ${W}×${H} · ${(resultBlob.size / 1048576).toFixed(1)}MB`;
+    showResult(r);
+    status.textContent = `완성: ${r.ext.toUpperCase()} · ${r.W}×${r.H} · ${(r.blob.size / 1048576).toFixed(1)}MB · ${formatTime(r.duration)}`;
     toast('영상이 완성됐습니다. “영상 파일 저장”을 누르세요.');
   } catch (e) {
-    console.error(e);
-    status.textContent = `영상을 만들지 못했습니다: ${e.message || e}`;
+    if (e?.name === 'AbortError') status.textContent = '만들기를 멈췄습니다.';
+    else { console.error(e); status.textContent = `영상을 만들지 못했습니다: ${e.message || e}`; }
   } finally {
-    stopAudio();
     exporting = null;
-    btn.textContent = '영상 만들기';
+    btn.textContent = label;
     bar.classList.remove('rec');
     setTimeout(() => { bar.hidden = true; bar.firstElementChild.style.transform = 'scaleX(0)'; }, 600);
   }
 }
 
-function videoFileName() {
+function showResult(r) {
+  resultExt = r.ext;
+  resultBlob = r.blob;
+  resultMeta = { W: r.W, H: r.H, duration: r.duration };
+  const v = $('#resultVideo');
+  if (v.src) URL.revokeObjectURL(v.src);
+  v.src = URL.createObjectURL(resultBlob);
+  $('#exportResult').hidden = false;
+  renderUploadPanel();
+}
+
+function videoFileName(ext = resultExt, suffix = '') {
   const first = plainText(project.title).split('\n').map((s) => s.trim()).filter(Boolean).join(' ');
-  return `${safeFileName(first || 'MRK-shorts')}.${resultExt}`;
+  return `${safeFileName(first || 'MRK-shorts')}${suffix}.${ext}`;
+}
+
+// ── 내보내기(20가지 전부) ─────────────────────────────
+async function exportAllStyles() {
+  if (batch) { batch.abort.abort(); return; }
+  if (!STYLES.length) return toast('스타일 데이터가 없습니다.');
+  if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
+  stopPlayback();
+  const panel = $('#batchPanel');
+  const bar = $('#batchProgress');
+  const status = $('#batchStatus');
+  const zipBtn = $('#batchZip');
+  panel.hidden = false;
+  $('#batchList').textContent = '';
+  zipBtn.disabled = true;
+  $('#batchHint').textContent = '';
+  const abort = new AbortController();
+  batch = { abort, results: [] };
+  $('#styleBatchBtn').textContent = '멈춤';
+  status.textContent = `${STYLES.length}가지 × ${tl.total.toFixed(0)}초 ≈ ${formatTime(tl.total * STYLES.length)} 걸립니다. 이 탭을 띄워 두세요.`;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const withAudio = !!(audio.bgm || audio.narr);
+  // 한 스타일씩 돌려서, 중간에 멈춰도 그때까지 만든 것은 남깁니다.
+  for (let i = 0; i < STYLES.length; i++) {
+    if (abort.signal.aborted) break;
+    const st = STYLES[i];
+    try {
+      const [r] = await exportStyles({
+        project, styles: [st], quality: project.quality,
+        startAudio: withAudio ? startAudio : null,
+        audioCtx: withAudio ? audioCtx() : null,
+        signal: abort.signal,
+        onProgress: ({ t, total }) => {
+          bar.firstElementChild.style.transform = `scaleX(${(i + t / total) / STYLES.length})`;
+          status.textContent = `${i + 1}/${STYLES.length} ${st.name} — ${formatTime(t)} / ${formatTime(total)}`;
+        },
+      });
+      if (r) { batch.results.push(r); renderBatchList(batch.results); }
+    } catch (e) {
+      if (e?.name === 'AbortError') break;
+      console.error(e);
+      toast(`${st.name}: ${e.message || e}`);
+    }
+  }
+  const results = batch.results;
+  lastBatch = results;
+  status.textContent = results.length ? `${results.length}개 완성. 하나씩 저장하거나 ZIP으로 한 번에 저장하세요.` : '만든 영상이 없습니다.';
+  zipBtn.disabled = !results.length;
+  $('#styleBatchBtn').textContent = '20가지 전부 만들기';
+  batch = null;
+  if (results.length) { showResult(results[0]); toast(`${results.length}가지 스타일 영상이 완성됐습니다.`); }
+}
+
+function renderBatchList(results) {
+  const list = $('#batchList');
+  list.textContent = '';
+  results.forEach((r, i) => {
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    const no = document.createElement('span');
+    no.className = 'tag';
+    no.textContent = String(i + 1).padStart(2, '0');
+    const name = document.createElement('b');
+    name.textContent = r.style.name;
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = `${(r.blob.size / 1048576).toFixed(1)}MB`;
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'btn small ghost';
+    play.textContent = '보기';
+    play.addEventListener('click', () => { showResult(r); $('#resultVideo').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'btn small';
+    save.textContent = '저장';
+    save.addEventListener('click', async () => {
+      try { await saveBlob(r.blob, videoFileName(r.ext, `-${String(i + 1).padStart(2, '0')}-${r.style.id}`)); } catch (e) { toast(e.message); }
+    });
+    item.append(no, name, meta, play, save);
+    list.append(item);
+  });
+  if (results.length) popIn([list.lastElementChild]);
+}
+
+async function saveBatchZip() {
+  const results = lastBatch;
+  if (!results.length) return;
+  let sink;
+  try {
+    sink = await openSink('zip', videoFileName('zip', `-스타일${results.length}가지`));
+  } catch (e) { return toast(e.message || 'ZIP을 만들지 못했습니다.'); }
+  $('#batchHint').textContent = 'ZIP을 묶는 중…';
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    await sink.add(`${String(i + 1).padStart(2, '0')}-${r.style.id}.${r.ext}`, r.blob);
+  }
+  await sink.add('업로드용-글.txt', new Blob([uploadTextOf()], { type: 'text/plain' }));
+  await sink.add('자막.srt', new Blob([buildSrt(project, srtTime)], { type: 'text/plain' }));
+  try {
+    const saved = await sink.finish();
+    $('#batchHint').textContent = saved === false ? '저장을 취소했습니다.' : `${results.length}개를 ZIP으로 저장했습니다.`;
+  } catch (e) { $('#batchHint').textContent = e.message; }
+}
+
+// ── 바로 올리기 ───────────────────────────────────────
+const PLATFORMS = [
+  { key: 'youtube', name: '유튜브 쇼츠', color: '#ff0033', ic: 'YT', max: 60, size: 256, url: 'https://www.youtube.com/upload' },
+  { key: 'instagram', name: '인스타그램 릴스', color: '#e1306c', ic: 'IG', max: 90, size: 1024, url: 'https://www.instagram.com/' },
+  { key: 'tiktok', name: '틱톡', color: '#111111', ic: 'TT', max: 600, size: 4096, url: 'https://www.tiktok.com/upload' },
+  { key: 'facebook', name: '페이스북 릴스', color: '#1877f2', ic: 'FB', max: 90, size: 4096, url: 'https://www.facebook.com/reels/create' },
+  { key: 'threads', name: '쓰레드', color: '#222222', ic: 'TH', max: 300, size: 1024, url: 'https://www.threads.net/' },
+];
+const platformLabel = (k) => PLATFORMS.find((p) => p.key === k)?.name || k;
+
+function renderUploadPanel() {
+  const panel = $('#uploadPanel');
+  const box = $('#plats');
+  panel.hidden = false;
+  box.textContent = '';
+  const dur = resultMeta?.duration ?? tl.total;
+  const sizeMB = resultBlob ? resultBlob.size / 1048576 : 0;
+  const vertical = project.aspect === '9:16';
+  for (const p of PLATFORMS) {
+    const row = document.createElement('div');
+    row.className = 'plat';
+    const ic = document.createElement('span');
+    ic.className = 'pi';
+    ic.style.background = p.color;
+    ic.textContent = p.ic;
+    const txt = document.createElement('div');
+    const b = document.createElement('b');
+    b.textContent = p.name;
+    const s = document.createElement('small');
+    const problems = [];
+    if (!vertical) problems.push('세로(9:16)가 아님');
+    if (dur > p.max) problems.push(`길이 ${formatTime(dur)} > ${p.max}초`);
+    if (sizeMB > p.size) problems.push(`용량 ${sizeMB.toFixed(0)}MB 초과`);
+    s.className = problems.length ? 'warn' : 'ok';
+    s.textContent = problems.length ? problems.join(' · ') : `규격 맞음 · ${formatTime(dur)} · ${resultExt.toUpperCase()}`;
+    txt.append(b, s);
+    const a = document.createElement('a');
+    a.className = 'btn';
+    a.href = p.url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = '업로드 화면 열기 ↗';
+    row.append(ic, txt, a);
+    box.append(row);
+  }
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn small accent';
+  copy.textContent = '제목·설명·해시태그 복사';
+  copy.addEventListener('click', async () => toast((await copyText(uploadTextOf())) ? '복사했습니다. 업로드 화면에 붙여 넣으세요.' : '복사하지 못했습니다.'));
+  box.append(copy);
+}
+
+function uploadTextOf() {
+  const title = plainText(project.title).replace(/\n/g, ' ').trim();
+  if (uploadInfo) return [plainText(uploadInfo.title || title).replace(/\n/g, ' '), '', uploadInfo.description || '', '', (uploadInfo.hashtags || []).join(' ')].join('\n').trim();
+  const words = project.scenes.flatMap((s) => (s.caption.match(/\*([^*]+)\*/g) || []).map((w) => '#' + w.replace(/\*/g, '').replace(/\s+/g, '')));
+  return [title, '', `${project.channel} — 부동산 공법·토지·부동산 AI`, '', [...new Set(['#부동산', '#공법의신', '#쇼츠', ...words])].join(' ')].join('\n');
 }
 
 // ── 프로젝트 저장/열기 ────────────────────────────────
@@ -486,13 +811,14 @@ async function imageToDataURL(img, max = 1600) {
 async function saveProject() {
   const data = {
     app: 'mrk-video',
-    version: 1,
+    version: 2,
     savedAt: new Date().toISOString(),
     settings: pickSettings(project),
     logo: project.logo ? await imageToDataURL(project.logo, 600) : null,
     uploadInfo,
     scenes: await Promise.all(project.scenes.map(async (s) => ({
-      caption: s.caption, duration: s.duration, hint: s.hint || '', sample: !!s.sample, image: await imageToDataURL(s.img),
+      caption: s.caption, duration: s.duration, hint: s.hint || '', sample: !!s.sample, kind: s.kind || 'normal', tag: s.tag || '', label: s.label || '',
+      image: await imageToDataURL(s.img),
     }))),
   };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -512,13 +838,15 @@ async function openProject(file) {
     project.scenes = await Promise.all((data.scenes || []).map(async (s) => newScene(
       s.image ? await loadImage(s.image) : null,
       s.caption || '',
-      { duration: s.duration, hint: s.hint, sample: s.sample },
+      { duration: s.duration, hint: s.hint, sample: s.sample, kind: s.kind || 'normal', tag: s.tag, label: s.label },
     )));
     uploadInfo = data.uploadInfo || null;
     syncControls();
     renderUploadInfo();
     sizePreview();
     changed(true);
+    for (const card of document.querySelectorAll('#styleStrip .style-card')) card.setAttribute('aria-selected', String(card.dataset.id === project.style));
+    renderStyleDesc();
     toast('프로젝트를 열었습니다.');
   } catch (e) {
     toast(e.message || '프로젝트를 열지 못했습니다.');
@@ -530,7 +858,7 @@ function renderUploadInfo() {
   const box = $('#uploadInfo');
   if (!uploadInfo) { box.hidden = true; return; }
   box.hidden = false;
-  $('#uploadText').textContent = [plainText(uploadInfo.title).replace(/\n/g, ' '), '', uploadInfo.description, '', uploadInfo.hashtags.join(' ')].join('\n').trim();
+  $('#uploadText').textContent = uploadTextOf();
 }
 
 async function runAI() {
@@ -541,8 +869,12 @@ async function runAI() {
   btn.disabled = true;
   status.textContent = 'AI가 대본을 쓰는 중… (보통 10~40초)';
   try {
+    const st = currentStyle();
     const r = await generateScript({
       topic, style: $('#aiStyle').value, scenes: $('#aiScenes').value, channel: project.channel,
+      styleName: st?.name || '',
+      styleHint: st ? `${st.hook ? '훅: ' + st.hook + '. ' : ''}장면 뼈대: ${(st.beats || []).join(' → ')}. ${st.prompt || ''}` : '',
+      reference: viralRef,
     });
     if (r.title) project.title = r.title;
     $('#title').value = project.title;
@@ -561,9 +893,9 @@ async function runAI() {
 // ── 설정 입력 연결 ─────────────────────────────────────
 const BINDINGS = [
   ['aspect', 'aspect'], ['template', 'template'], ['font', 'font'],
-  ['captionSize', 'captionSize', Number], ['captionStyle', 'captionStyle'], ['motion', 'motion'],
-  ['transition', 'transition'], ['textColor', 'textColor'], ['highlightColor', 'highlightColor'],
-  ['bandColor', 'bandColor'], ['showProgress', 'showProgress', 'check'], ['title', 'title'],
+  ['captionSize', 'captionSize', Number], ['captionStyle', 'captionStyle'], ['captionAnim', 'captionAnim'], ['overlay', 'overlay'], ['titleMode', 'titleMode'],
+  ['motion', 'motion'], ['transition', 'transition'], ['textColor', 'textColor'], ['highlightColor', 'highlightColor'],
+  ['bandColor', 'bandColor'], ['panelColor', 'panelColor'], ['inkColor', 'inkColor'], ['showProgress', 'showProgress', 'check'], ['title', 'title'],
   ['channel', 'channel'], ['quality', 'quality'],
   ['bgmVolume', 'bgmVolume', Number], ['narrVolume', 'narrVolume', Number],
 ];
@@ -574,8 +906,14 @@ const ENDING_BINDINGS = [
 function syncControls() {
   for (const [id, key, kind] of BINDINGS) {
     const el = document.getElementById(id);
-    if (kind === 'check') el.checked = !!project[key];
-    else el.value = project[key];
+    if (!el) continue;
+    if (kind === 'check') { el.checked = !!project[key]; continue; }
+    el.value = project[key] ?? DEFAULTS[key];
+    if (el.tagName === 'SELECT' && el.value !== String(project[key] ?? '')) {
+      // 저장된 값이 목록에 없으면(예전 글꼴 이름 등) 기본값으로
+      el.value = String(DEFAULTS[key]);
+      project[key] = DEFAULTS[key];
+    }
   }
   for (const [id, key, kind] of ENDING_BINDINGS) {
     const el = document.getElementById(id);
@@ -589,6 +927,7 @@ function syncControls() {
 function wireControls() {
   for (const [id, key, kind] of BINDINGS) {
     const el = document.getElementById(id);
+    if (!el) continue;
     el.addEventListener('input', () => {
       project[key] = kind === 'check' ? el.checked : kind ? kind(el.value) : el.value;
       if (key === 'aspect') sizePreview();
@@ -609,9 +948,12 @@ function wireControls() {
 export async function initShorts() {
   const fontSel = $('#font');
   for (const f of FONTS) fontSel.append(new Option(f.label, f.id));
+  if (!FONTS.some((f) => f.id === project.font)) project.font = FONTS[0]?.id ?? '900';
   const styleSel = $('#aiStyle');
   for (const [k, v] of Object.entries(SCRIPT_STYLES)) styleSel.append(new Option(v, k));
   document.body.append(replaceInput);
+
+  try { ({ STYLES } = await import('./styles.js')); } catch (e) { console.warn('styles.js 없음', e); STYLES = []; }
 
   syncControls();
   wireControls();
@@ -667,7 +1009,7 @@ export async function initShorts() {
   $('#saveVideo').addEventListener('click', async () => {
     if (!resultBlob) return;
     try {
-      if (await saveBlob(resultBlob, videoFileName())) toast('영상 파일을 저장했습니다.');
+      if (await saveBlob(resultBlob, videoFileName())) toast('영상 파일을 저장했습니다. “바로 올리기”에서 플랫폼을 고르세요.');
     } catch (e) { toast(e.message); }
   });
   $('#copySrt').addEventListener('click', async () => {
@@ -677,12 +1019,22 @@ export async function initShorts() {
   // .srt는 아티팩트 저장 허용 형식이 아니라서 그 화면에서는 복사만 제공합니다.
   $('#saveSrt').hidden = inArtifact;
   $('#saveSrt').addEventListener('click', async () => {
-    const name = videoFileName().replace(/\.(mp4|webm)$/, '.srt');
-    try { await saveBlob(new Blob([buildSrt(project, srtTime)], { type: 'text/plain' }), name); } catch (e) { toast(e.message); }
+    try { await saveBlob(new Blob([buildSrt(project, srtTime)], { type: 'text/plain' }), videoFileName('srt')); } catch (e) { toast(e.message); }
   });
   $('#copyUpload').addEventListener('click', async () => {
     toast((await copyText($('#uploadText').textContent)) ? '업로드용 글을 복사했습니다.' : '복사하지 못했습니다.');
   });
+
+  $('#styleBatchBtn').addEventListener('click', exportAllStyles);
+  $('#batchStop').addEventListener('click', () => batch?.abort.abort());
+  $('#batchZip').addEventListener('click', saveBatchZip);
+  $('#viralToggle').addEventListener('click', () => {
+    const box = $('#viralBox');
+    box.hidden = !box.hidden;
+    if (!box.hidden) $('#viralTopic').focus();
+  });
+  $('#viralRun').addEventListener('click', runViral);
+  $('#viralTopic').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runViral(); } });
 
   $('#projSaveBtn').addEventListener('click', saveProject);
   $('#projOpenBtn').addEventListener('click', () => $('#projFile').click());
@@ -692,22 +1044,27 @@ export async function initShorts() {
     if (f) openProject(f);
   });
 
-  // 첫 화면: 예시 장면(사진은 코드로 그린 그림)
-  const [land, road, permit, city] = await Promise.all(['land', 'road', 'permit', 'city'].map((k) => makeSampleImage(k, 1200, 1200)));
-  project.scenes = [
-    newScene(land, '땅을 살 때는\n*용도지역*부터 확인하세요', { sample: true, duration: 3 }),
-    newScene(road, '*도로*에 붙지 않은 맹지는\n건축이 어렵습니다', { sample: true, duration: 3 }),
-    newScene(permit, '*개발행위허가*가 나는 땅인지\n꼭 알아보세요', { sample: true, duration: 3 }),
-    newScene(null, '세 가지만 지켜도\n*토지투자* 실패가 줄어듭니다', { sample: true }),
-    newScene(city, '궁금한 땅은\n*MR.K*에게 물어보세요', { sample: true, duration: 3 }),
-  ];
+  // 첫 화면: 예시 장면(실사 예시 이미지, 없으면 그림)
+  const scenes = [];
+  for (const s of SHORTS_CASE.scenes) {
+    scenes.push(newScene(s.img ? await sample(s.img) : null, s.caption, { sample: true, duration: s.duration, kind: 'normal' }));
+  }
+  if (scenes[0]) scenes[0].kind = 'hook';
+  project.scenes = scenes;
+  if (project.style && currentStyle()) {
+    currentStyle().apply(project);
+    syncControls();
+    $('#exportBtn').textContent = `"${currentStyle().name.split(' — ')[0]}" 스타일로 영상 만들기`;
+  }
+  renderStyleStrip();
   changed(true);
   curT = 1.2;
   await ensureFonts(project);
   draw();
-  if (document.fonts?.ready) document.fonts.ready.then(draw);
+  if (document.fonts?.ready) document.fonts.ready.then(() => { draw(); renderStripThumbs(); });
 
   if (await aiAvailable()) $('#aiBox').hidden = false;
+  serverInfo().then((info) => { if (!info.youtube) $('#viralToggle').textContent = '빵터진 영상 찾기 ↗'; });
 }
 
 export function pauseShorts() { stopPlayback(); }

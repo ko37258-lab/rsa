@@ -25,15 +25,20 @@ export function normalizeScriptParams(input = {}) {
   const n = Number.parseInt(input.scenes, 10);
   const scenes = Number.isFinite(n) ? Math.min(12, Math.max(3, n)) : 6;
   const channel = String(input.channel ?? 'MR.K 고상철').trim().slice(0, 40) || 'MR.K 고상철';
-  return { topic, style, scenes, channel };
+  const styleName = String(input.styleName ?? '').trim().slice(0, 60);
+  const styleHint = String(input.styleHint ?? '').trim().slice(0, 600);
+  const reference = String(input.reference ?? '').trim().slice(0, 300);
+  return { topic, style, scenes, channel, styleName, styleHint, reference };
 }
 
-export function buildScriptPrompt({ topic, style, scenes, channel }) {
+export function buildScriptPrompt({ topic, style, scenes, channel, styleName = '', styleHint = '', reference = '' }) {
+  const styleBlock = styleName ? `\n영상 스타일(형식): ${styleName}\n${styleHint}\n장면 순서는 이 형식의 뼈대를 따른다. 첫 장면은 훅.` : '';
+  const refBlock = reference ? `\n참고한 잘 나가는 영상: "${reference}"\n이 영상의 훅·구성·말투를 분석해 비슷한 컨셉으로 쓰되, 문장과 사례는 새로 만든다(베끼지 않는다). 주제가 다르면 그 컨셉을 우리 주제에 맞게 옮긴다.` : '';
   return `너는 유튜브 쇼츠(60초 이하 세로 영상) 대본 작가다.
 채널: ${channel} — 28년간 부동산공법을 가르쳐 "공법의 신"으로 불리는 부동산 전문가 채널. 말투는 쉽고 명쾌하며, 핵심을 3가지 안팎으로 정리하는 강의 스타일이다.
 
 주제: ${topic}
-영상 유형: ${SCRIPT_STYLES[style]} — ${STYLE_GUIDE[style]}
+영상 유형: ${SCRIPT_STYLES[style]} — ${STYLE_GUIDE[style]}${styleBlock}${refBlock}
 장면 수: 정확히 ${scenes}개
 
 규칙

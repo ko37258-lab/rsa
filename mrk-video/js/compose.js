@@ -1,12 +1,13 @@
 // 02 대표 이미지 합성 — 메인 사진 + 서브 사진 + 문구 뱃지를 정사각형 캔버스에 일괄 합성
 
 import {
-  $, clamp, debounce, store, toast, wireDrop, imageFromFile, makeSampleImage,
+  $, clamp, debounce, store, toast, wireDrop, imageFromFile,
   drawImageFit, roundRectPath, canvasToBlob, baseName, safeFileName, uniqueNamer, MIME_BY_EXT,
 } from './util.js';
 import { openSink, canPickFolder } from './platform.js';
+import { sample, COMPOSE_CASE } from './samples.js';
 
-const DEFAULTS = {
+export const COMPOSE_DEFAULTS = {
   size: 1000,
   bg: '#ffffff',
   fit: 'contain',
@@ -30,6 +31,7 @@ const DEFAULTS = {
   sink: 'zip',
 };
 
+const DEFAULTS = COMPOSE_DEFAULTS;
 const cfg = { ...DEFAULTS, ...store.get('compose', {}) };
 const mains = []; // { name, img, sample? }
 const subs = [];
@@ -43,7 +45,7 @@ function subFor(i) {
 }
 
 /** 한 장 합성. 미리보기와 저장이 같은 함수를 씁니다. */
-function drawComposite(ctx, S, main, sub, o = cfg) {
+export function drawComposite(ctx, S, main, sub, o = cfg) {
   ctx.save();
   ctx.fillStyle = o.bg;
   ctx.fillRect(0, 0, S, S);
@@ -90,7 +92,7 @@ function drawBadge(ctx, S, o) {
   const k = S / 1000;
   const size = 54 * k;
   ctx.save();
-  ctx.font = `${Math.round(size)}px "Black Han Sans", "Noto Sans KR", sans-serif`;
+  ctx.font = `900 ${Math.round(size)}px "Pretendard Variable", Pretendard, sans-serif`;
   ctx.textBaseline = 'middle';
   const tw = ctx.measureText(o.badgeText).width;
   const bw = tw + size * 1.1;
@@ -303,10 +305,12 @@ export async function initCompose() {
   $('#cRun').addEventListener('click', runAll);
   wireDrag();
 
-  // 예시 사진으로 첫 화면 채우기
-  const [m1, m2, s1] = await Promise.all([makeSampleImage('product', 1000, 1000), makeSampleImage('land', 1000, 1000), makeSampleImage('tag', 600, 600)]);
-  mains.push({ name: '예시-상품.jpg', img: m1, sample: true }, { name: '예시-토지.jpg', img: m2, sample: true });
-  subs.push({ name: '예시-구성품.jpg', img: s1, sample: true });
+  // 예시 사진으로 첫 화면 채우기(실사 예시가 있으면 그것을, 없으면 그림)
+  const ms = await Promise.all(COMPOSE_CASE.mains.map((id) => sample(id)));
+  const ss = await Promise.all(COMPOSE_CASE.subs.map((id) => sample(id)));
+  ms.forEach((img) => mains.push({ name: img.dataset.name, img, sample: true }));
+  ss.forEach((img) => subs.push({ name: img.dataset.name, img, sample: true }));
+  if (!cfg.badgeText) cfg.badgeText = COMPOSE_CASE.badge;
   draw();
   document.fonts?.ready?.then(draw);
 }

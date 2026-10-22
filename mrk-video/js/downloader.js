@@ -5,6 +5,7 @@ import {
   MIME_BY_EXT, EXT_BY_MIME, uid,
 } from './util.js';
 import { inArtifact, canPickFolder, openSink, fetchImageBlob, serverInfo } from './platform.js';
+import { DOWNLOAD_CASE } from './samples.js';
 
 const DEFAULTS = {
   rename: true, prefix: 'mrk', suffix: 'main',
@@ -292,13 +293,9 @@ export async function initDownloader() {
   $('#dlW').disabled = $('#dlH').disabled = !opt.resize;
 
   $('#dlSample').addEventListener('click', () => {
-    const sample = [
-      ['A1001', 'https://picsum.photos/id/1018/1200/1200.jpg'],
-      ['A1002', 'https://picsum.photos/id/1015/1200/900.jpg'],
-      ['A1003', 'https://picsum.photos/id/1043/900/1200.jpg'],
-    ];
+    // 같은 폴더의 예시 이미지를 절대 주소로(어느 환경에서든 같은 출처라 바로 받아집니다)
     rows = rows.filter((r) => r.file || r.url || r.code);
-    for (const [code, url] of sample) rows.push({ ...blankRow(), code, url });
+    for (const [code, url] of DOWNLOAD_CASE) rows.push({ ...blankRow(), code, url: new URL(url, location.href).href });
     ensureRows(6);
     render();
   });
@@ -322,7 +319,7 @@ export async function initDownloader() {
   const notice = $('#dlNotice');
   if (inArtifact) {
     notice.hidden = false;
-    notice.textContent = '이 미리보기 화면에서는 외부 사이트 이미지를 받을 수 없습니다. “PC 사진 추가”로 내 사진을 일괄 변환하는 기능은 그대로 쓸 수 있고, 주소로 받는 기능은 인터넷 배포 버전에서 동작합니다.';
+    notice.textContent = '이 미리보기 화면에서는 외부 사이트 이미지를 받을 수 없습니다(예시 이미지와 “PC 사진 추가”는 동작합니다). 다른 사이트 주소로 받는 기능은 인터넷 배포 버전에서 동작합니다.';
   } else if (!info.proxy) {
     notice.hidden = false;
     notice.textContent = '서버 프록시 없이 실행 중입니다. 다른 사이트 이미지 중 직접 받기를 막아 둔 곳(CORS)은 실패할 수 있습니다. Vercel로 배포하면 서버 프록시가 함께 켜집니다.';

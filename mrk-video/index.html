@@ -6,24 +6,26 @@
 <!-- ARTIFACT:BEGIN -->
 <title>MR.K 영상만들기</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="사진과 대본으로 쇼츠 영상을 만들고, 상품 대표 이미지를 일괄 합성·다운로드하는 웹 도구">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23161a29'/%3E%3Cpath d='M20 16h8v13l11-13h10L36 31l14 17H39L28 34v14h-8z' fill='%23ffd43b'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Gowun+Dodum&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Jua&family=Nanum+Myeongjo:wght@800&family=Noto+Sans+KR:wght@500;900&display=swap">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="사진과 대본으로 잘 나가는 쇼츠 형식 20가지 영상을 만들고, 상품 대표 이미지를 일괄 합성·다운로드하는 MR.K 웹 도구">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f1222'/%3E%3Cpath d='M20 16h8v13l11-13h10L36 31l14 17H39L28 34v14h-8z' fill='%231a7dff'/%3E%3C/svg%3E">
+<link rel="preload" href="assets/fonts/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- ARTIFACT:END -->
 </head>
 <body>
 <!-- ARTIFACT:BODY -->
+<div id="topline" aria-hidden="true"></div>
 <div class="app">
   <aside class="side">
-    <a class="brand" href="#shorts">
+    <a class="brand" href="#showcase">
       <span class="brand-mark" aria-hidden="true">K</span>
       <span class="brand-text">MR.K <b>영상만들기</b></span>
     </a>
     <nav class="nav" aria-label="기능">
+      <i class="nav-ind" aria-hidden="true"></i>
+      <a href="#showcase" data-view="showcase"><span class="nav-k">00</span>사례 보기</a>
       <a href="#shorts" data-view="shorts"><span class="nav-k">01</span>숏폼 영상 만들기</a>
       <a href="#compose" data-view="compose"><span class="nav-k">02</span>대표 이미지 합성</a>
       <a href="#download" data-view="download"><span class="nav-k">03</span>이미지 일괄 다운로드</a>
@@ -33,12 +35,135 @@
   </aside>
 
   <main class="main">
+    <!-- ───────────── 00 사례 보기 ───────────── -->
+    <section class="view view-showcase" id="view-showcase" data-view="showcase">
+      <div class="hero">
+        <div class="hero-copy">
+          <p class="kicker">MR.K Video Studio</p>
+          <h1 class="hero-title" data-kinetic>사진 넣고
+대본 쓰면
+*쇼츠*가 나옵니다.</h1>
+          <p class="lede">잘 나가는 쇼츠 형식 20가지를 스타일로 골라, 같은 내용을 20가지 영상으로 만들고 바로 올립니다. 사진·소리는 서버로 가지 않고 이 브라우저 안에서 처리됩니다.</p>
+          <div class="hero-chips" id="heroChips">
+            <span class="chip" data-pop><span class="chk">✓</span>스타일 20가지</span>
+            <span class="chip" data-pop><span class="chk">✓</span>자막·제목 자동</span>
+            <span class="chip" data-pop><span class="chk">✓</span>배경음악·내레이션</span>
+            <span class="chip ok" data-pop><span class="chk">✓</span>MP4 바로 저장</span>
+            <span class="chip" data-pop><span class="chk">✓</span>AI 대본</span>
+          </div>
+          <div class="hero-actions">
+            <a class="btn accent" href="#shorts">바로 만들어 보기</a>
+            <a class="btn ghost" href="#case-shorts" id="toCases">사례 3가지 보기</a>
+          </div>
+        </div>
+        <div class="hero-stage">
+          <div class="phone"><canvas id="heroCanvas" width="540" height="960" aria-label="쇼츠 미리보기"></canvas><div class="phone-notch"></div></div>
+          <span class="chip float-chip float-a"><span class="chk">✓</span>용도지역 확인</span>
+          <span class="chip float-chip float-b ok"><span class="chk">✓</span>자막 자동</span>
+          <span class="chip float-chip float-c"><span class="chk">✓</span>MP4 저장</span>
+        </div>
+      </div>
+
+      <div class="case-nav">
+        <div class="dots" id="caseDots"><i class="dot on"></i><i class="dot"></i><i class="dot"></i></div>
+        <span class="case-count">사례 <b id="caseIdx">1</b> / 3</span>
+        <span class="case-label">실제 결과 미리보기</span>
+      </div>
+
+      <article class="case" id="case-shorts" data-reveal data-case="1">
+        <div class="case-head">
+          <span class="case-no">사례 01</span>
+          <h2 data-kinetic-title>토지 사진 5장이
+*쇼츠* 한 편이 됩니다</h2>
+          <i class="rule" data-underline></i>
+        </div>
+        <div class="case-grid">
+          <div class="case-io" data-rise>
+            <span class="io-label">넣는 것</span>
+            <div class="photo-strip" id="caseShortsPhotos"></div>
+            <ul class="script-lines" id="caseShortsLines"></ul>
+          </div>
+          <div class="case-arrow" data-rise>→</div>
+          <div class="case-io case-out" data-rise>
+            <span class="io-label out">나오는 것</span>
+            <div class="phone"><canvas id="caseShortsCanvas" width="540" height="960" aria-label="쇼츠 결과"></canvas></div>
+            <div class="chips">
+              <span class="chip" data-pop><span class="chk">✓</span>자막 강조</span>
+              <span class="chip" data-pop><span class="chk">✓</span>장면 전환</span>
+              <span class="chip ok" data-pop><span class="chk">✓</span>1080×1920 MP4</span>
+            </div>
+            <a class="btn accent case-cta" href="#shorts">이 사례로 시작하기</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="case" id="case-styles" data-reveal data-case="2">
+        <div class="case-head">
+          <span class="case-no">사례 02</span>
+          <h2 data-kinetic-title>같은 내용이
+*20가지 스타일*로 나옵니다</h2>
+          <i class="rule" data-underline></i>
+        </div>
+        <div class="case-grid">
+          <div class="case-io" data-rise>
+            <span class="io-label">넣는 것</span>
+            <ul class="script-lines" id="caseStyleLines"></ul>
+            <p class="hint">잘 나가는 쇼츠 형식(강의형·속보형·TOP3·오해vs진실·체크리스트…)을 스타일로 넣어 두었습니다. 스타일을 고르면 같은 장면이 그 형식으로 바뀝니다.</p>
+          </div>
+          <div class="case-arrow" data-rise>→</div>
+          <div class="case-io case-out" data-rise>
+            <span class="io-label out">나오는 것</span>
+            <div class="style-wall" id="caseStyleWall"></div>
+            <div class="chips">
+              <span class="chip" data-pop><span class="chk">✓</span>스타일 <b id="caseStyleCount">20</b>가지</span>
+              <span class="chip ok" data-pop><span class="chk">✓</span>전부 ZIP 저장</span>
+            </div>
+            <a class="btn accent case-cta" href="#shorts">스타일 골라 보기</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="case" id="case-compose" data-reveal data-case="3">
+        <div class="case-head">
+          <span class="case-no">사례 03</span>
+          <h2 data-kinetic-title>상품·매물 사진을
+*대표 이미지*로 한꺼번에</h2>
+          <i class="rule" data-underline></i>
+        </div>
+        <div class="case-grid">
+          <div class="case-io" data-rise>
+            <span class="io-label">넣는 것</span>
+            <div class="io-pair" id="caseComposePair"></div>
+            <div class="mini-table" id="caseDlTable">
+              <div class="mrow head"><span>코드</span><span>이미지 주소</span><span></span></div>
+            </div>
+          </div>
+          <div class="case-arrow" data-rise>→</div>
+          <div class="case-io case-out" data-rise>
+            <span class="io-label out">나오는 것</span>
+            <div class="case-result"><canvas id="caseComposeCanvas" width="600" height="600" aria-label="합성 결과"></canvas></div>
+            <div class="file-stack" id="caseFiles"></div>
+            <div class="row wrap">
+              <a class="btn accent case-cta" href="#compose">합성해 보기</a>
+              <a class="btn ghost case-cta" href="#download">일괄 다운로드</a>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <div class="logo-reveal" data-reveal>
+        <div class="big">MR.K <b>영상만들기</b></div>
+        <p>공법의 신 고상철 · 부동산 AI 작업실 · ko372.com</p>
+      </div>
+    </section>
+
     <!-- ───────────── 01 숏폼 영상 만들기 ───────────── -->
-    <section class="view" id="view-shorts" data-view="shorts">
+    <section class="view" id="view-shorts" data-view="shorts" hidden>
       <header class="view-head">
         <div>
-          <h1>숏폼 영상 만들기</h1>
-          <p>사진과 대본을 넣으면 자막·제목·배경음악이 들어간 쇼츠 영상을 만듭니다. 브라우저 안에서 처리되어 파일이 서버로 올라가지 않습니다.</p>
+          <p class="kicker">01 — Shorts</p>
+          <h1 data-kinetic>숏폼 *영상* 만들기</h1>
+          <p class="lede">사진과 대본을 넣고 스타일을 고르면 자막·제목·배경음악이 들어간 쇼츠가 나옵니다. 20가지 스타일로 한꺼번에 만들어 바로 올릴 수도 있습니다.</p>
         </div>
         <div class="head-actions">
           <button type="button" class="btn ghost" id="projOpenBtn">프로젝트 열기</button>
@@ -49,6 +174,27 @@
 
       <div class="studio">
         <div class="studio-controls">
+          <!-- 스타일 -->
+          <section class="panel style-panel" aria-labelledby="h-styles">
+            <div class="panel-head">
+              <h2 id="h-styles">잘 나가는 쇼츠 스타일 <span class="hint" id="styleCount"></span></h2>
+              <div class="row wrap">
+                <button type="button" class="btn small ghost" id="viralToggle">빵터진 영상 찾기</button>
+                <button type="button" class="btn small accent" id="styleBatchBtn">20가지 전부 만들기</button>
+              </div>
+            </div>
+            <div class="viral" id="viralBox" hidden>
+              <div class="row wrap">
+                <input type="search" id="viralTopic" class="grow" placeholder="주제를 넣으세요. 예: 맹지, 재건축, 상가 투자, 청약">
+                <button type="button" class="btn small" id="viralRun">찾기</button>
+              </div>
+              <p class="hint" id="viralHint">유튜브에서 조회수 높은 쇼츠를 찾아 보여 줍니다. 영상을 누르면 그 컨셉으로 AI 대본을 씁니다.</p>
+              <div class="viral-grid" id="viralGrid"></div>
+            </div>
+            <div class="style-strip" id="styleStrip" role="listbox" aria-label="스타일 고르기"></div>
+            <div class="style-desc" id="styleDesc"></div>
+          </section>
+
           <!-- 장면 -->
           <section class="panel" aria-labelledby="h-scenes">
             <div class="panel-head">
@@ -70,7 +216,7 @@
           <section class="panel" aria-labelledby="h-script">
             <div class="panel-head">
               <h2 id="h-script">대본으로 장면 만들기</h2>
-              <span class="hint">한 줄이 한 장면 · <code>*강조*</code>는 노란 글씨</span>
+              <span class="hint">한 줄이 한 장면 · <code>*강조*</code>는 강조색</span>
             </div>
             <textarea id="scriptText" rows="5" placeholder="땅을 살 때 *용도지역*부터 확인하세요&#10;*도로*에 붙지 않은 땅은 건축이 어렵습니다"></textarea>
             <div class="row wrap">
@@ -93,7 +239,7 @@
               </div>
               <div class="row wrap">
                 <button type="button" class="btn small accent" id="aiRun">AI로 대본 쓰기</button>
-                <span class="hint" id="aiStatus">법령·수치는 올리기 전에 꼭 확인하세요.</span>
+                <span class="hint" id="aiStatus">고른 스타일의 대본 뼈대를 따릅니다. 법령·수치는 올리기 전에 꼭 확인하세요.</span>
               </div>
             </div>
           </section>
@@ -102,7 +248,7 @@
           <section class="panel" aria-labelledby="h-brand">
             <div class="panel-head"><h2 id="h-brand">제목 · 채널</h2></div>
             <div class="grid2">
-              <label class="field span2"><span>영상 제목 (화면 위쪽 고정, 줄바꿈 가능)</span>
+              <label class="field span2"><span>영상 제목 (줄바꿈 가능, <code>*강조*</code>)</span>
                 <textarea id="title" rows="2"></textarea>
               </label>
               <label class="field"><span>채널 이름</span>
@@ -114,9 +260,9 @@
             </div>
           </section>
 
-          <!-- 스타일 -->
+          <!-- 스타일 세부 조절 -->
           <section class="panel" aria-labelledby="h-style">
-            <div class="panel-head"><h2 id="h-style">화면 구성</h2></div>
+            <div class="panel-head"><h2 id="h-style">화면 세부 조절</h2><span class="hint">스타일을 고르면 여기 값이 바뀝니다. 손으로 더 다듬을 수 있습니다.</span></div>
             <div class="grid3">
               <label class="field"><span>화면 비율</span>
                 <select id="aspect">
@@ -130,20 +276,53 @@
                   <option value="band">위 제목 · 가운데 사진</option>
                   <option value="blur">흐린 배경 · 사진 전체</option>
                   <option value="full">사진 꽉 채우기</option>
+                  <option value="split">위 사진 · 아래 글 패널</option>
+                  <option value="card">사진 카드</option>
+                  <option value="dark">글자 중심</option>
                 </select>
               </label>
-              <label class="field"><span>글꼴</span>
+              <label class="field"><span>글꼴 굵기 (Pretendard)</span>
                 <select id="font"></select>
               </label>
-              <label class="field"><span>자막 크기</span>
-                <input type="range" id="captionSize" min="40" max="110" step="2">
+              <label class="field"><span>자막 등장</span>
+                <select id="captionAnim">
+                  <option value="none">한 번에</option>
+                  <option value="words">단어씩 떠오르기</option>
+                  <option value="karaoke">가라오케 강조</option>
+                  <option value="type">타자기</option>
+                  <option value="pop">틱톡식 팝</option>
+                </select>
               </label>
               <label class="field"><span>자막 모양</span>
                 <select id="captionStyle">
                   <option value="outline">테두리 글씨</option>
                   <option value="box">검은 띠 위 글씨</option>
                   <option value="plain">글씨만</option>
+                  <option value="pill">강조색 알약</option>
                 </select>
+              </label>
+              <label class="field"><span>장식</span>
+                <select id="overlay">
+                  <option value="none">없음</option>
+                  <option value="news">속보 띠</option>
+                  <option value="warning">경고 테이프</option>
+                  <option value="steps">STEP 진행</option>
+                  <option value="number">번호 배지</option>
+                  <option value="check">체크 칩</option>
+                  <option value="pin">지도 핀</option>
+                  <option value="price">가격 태그</option>
+                  <option value="quote">따옴표</option>
+                  <option value="quiz">퀴즈</option>
+                  <option value="ticker">뉴스 티커</option>
+                  <option value="date">날짜 라벨</option>
+                  <option value="comment">댓글 말풍선</option>
+                  <option value="vs">비교</option>
+                  <option value="counter">숫자 카운트</option>
+                  <option value="dots">점 진행</option>
+                </select>
+              </label>
+              <label class="field"><span>자막 크기</span>
+                <input type="range" id="captionSize" min="40" max="110" step="2">
               </label>
               <label class="field"><span>사진 움직임</span>
                 <select id="motion">
@@ -158,12 +337,22 @@
                   <option value="fade">부드럽게 겹치기</option>
                   <option value="slide">옆으로 밀기</option>
                   <option value="zoom">확대되며 등장</option>
+                  <option value="wipe">사선 와이프</option>
                   <option value="none">바로 바꾸기</option>
+                </select>
+              </label>
+              <label class="field"><span>제목 표시</span>
+                <select id="titleMode">
+                  <option value="band">항상 위에</option>
+                  <option value="hook">첫 장면만 크게</option>
+                  <option value="none">표시 안 함</option>
                 </select>
               </label>
               <label class="field color"><span>글자색</span><input type="color" id="textColor"></label>
               <label class="field color"><span>강조색</span><input type="color" id="highlightColor"></label>
               <label class="field color"><span>바탕색</span><input type="color" id="bandColor"></label>
+              <label class="field color"><span>패널색</span><input type="color" id="panelColor"></label>
+              <label class="field color"><span>밝은 배경 글자색</span><input type="color" id="inkColor"></label>
               <label class="field check"><input type="checkbox" id="showProgress"><span>아래쪽 진행 막대</span></label>
             </div>
           </section>
@@ -219,7 +408,7 @@
                 <output id="mimeOut" class="out">확인 중</output>
               </label>
             </div>
-            <button type="button" class="btn accent wide" id="exportBtn">영상 만들기</button>
+            <button type="button" class="btn accent wide" id="exportBtn">이 스타일로 영상 만들기</button>
             <div class="progress" id="exportProgress" hidden><i></i></div>
             <p class="hint" id="exportStatus">영상 길이만큼 시간이 걸립니다. 만드는 동안 이 탭을 띄워 두세요.</p>
             <div id="exportResult" hidden>
@@ -230,6 +419,22 @@
                 <button type="button" class="btn small ghost" id="saveSrt">자막 파일 저장</button>
               </div>
             </div>
+          </div>
+
+          <div class="panel" id="batchPanel" hidden>
+            <div class="panel-head"><h2>20가지 스타일 영상</h2><button type="button" class="btn small ghost" id="batchStop">멈춤</button></div>
+            <div class="progress" id="batchProgress"><i></i></div>
+            <p class="hint" id="batchStatus"></p>
+            <div class="result-list" id="batchList"></div>
+            <div class="row wrap">
+              <button type="button" class="btn small accent" id="batchZip" disabled>ZIP으로 모두 저장</button>
+              <span class="hint" id="batchHint"></span>
+            </div>
+          </div>
+
+          <div class="panel" id="uploadPanel" hidden>
+            <div class="panel-head"><h2>바로 올리기</h2><span class="hint">저장한 영상을 각 플랫폼 업로드 화면에서 선택하면 됩니다.</span></div>
+            <div class="plats" id="plats"></div>
           </div>
 
           <div class="panel upload-info" id="uploadInfo" hidden>
@@ -244,8 +449,9 @@
     <section class="view" id="view-compose" data-view="compose" hidden>
       <header class="view-head">
         <div>
-          <h1>대표 이미지 합성</h1>
-          <p>메인 사진 위에 서브 사진(구성품·라벨·로고)을 같은 자리에 얹어 정사각형 대표 이미지를 한꺼번에 만듭니다. 미리보기에서 서브 사진을 끌어 위치를 옮길 수 있습니다.</p>
+          <p class="kicker">02 — Compose</p>
+          <h1 data-kinetic>대표 *이미지* 합성</h1>
+          <p class="lede">메인 사진 위에 서브 사진(구성품·라벨·로고)을 같은 자리에 얹어 정사각형 대표 이미지를 한꺼번에 만듭니다. 미리보기에서 서브 사진을 끌어 위치를 옮길 수 있습니다.</p>
         </div>
       </header>
 
@@ -357,8 +563,9 @@
     <section class="view" id="view-download" data-view="download" hidden>
       <header class="view-head">
         <div>
-          <h1>이미지 일괄 다운로드</h1>
-          <p>상품 코드와 이미지 주소를 엑셀에서 복사해 붙여 넣으면, 크기·용량·파일 이름을 맞춰 한꺼번에 내려받습니다. PC에 있는 사진도 같은 규칙으로 일괄 변환할 수 있습니다.</p>
+          <p class="kicker">03 — Download</p>
+          <h1 data-kinetic>이미지 *일괄* 다운로드</h1>
+          <p class="lede">상품 코드와 이미지 주소를 엑셀에서 복사해 붙여 넣으면, 크기·용량·파일 이름을 맞춰 한꺼번에 내려받습니다. PC에 있는 사진도 같은 규칙으로 일괄 변환할 수 있습니다.</p>
         </div>
       </header>
 
@@ -441,26 +648,31 @@
 
     <!-- ───────────── 안내 ───────────── -->
     <section class="view prose" id="view-guide" data-view="guide" hidden>
-      <header class="view-head"><div><h1>사용 안내</h1><p>이 화면에서 지금 쓸 수 있는 기능과 각 기능을 쓰는 순서입니다.</p></div></header>
+      <header class="view-head"><div><p class="kicker">Guide</p><h1 data-kinetic>사용 *안내*</h1><p class="lede">이 화면에서 지금 쓸 수 있는 기능과 각 기능을 쓰는 순서입니다.</p></div></header>
+      <section class="panel guide-video" id="guideVideo" hidden>
+        <div class="panel-head"><h2>사용법 영상</h2><span class="hint">1분 30초 · 소리를 켜고 보세요</span></div>
+        <video id="guideVideoEl" controls playsinline preload="metadata"></video>
+      </section>
       <section class="panel">
         <h2>지금 이 환경</h2>
         <ul class="status-list" id="envList"></ul>
       </section>
       <section class="panel">
         <h2>쇼츠 한 편 만드는 순서</h2>
-        <ol>
-          <li><b>사진 넣기</b> — 매물·현장·강의 자료 사진을 순서대로 넣습니다.</li>
-          <li><b>대본 넣기</b> — 한 줄에 한 장면씩 씁니다. 강조할 단어는 <code>*별표*</code>로 감쌉니다. AI 대본 만들기가 켜져 있으면 주제만 넣어도 됩니다.</li>
-          <li><b>제목·채널</b> — 위쪽에 계속 떠 있을 제목과 채널 이름을 정합니다.</li>
-          <li><b>소리</b> — 배경음악과 내레이션 녹음을 넣고, 필요하면 “장면 길이를 내레이션에 맞추기”를 누릅니다.</li>
-          <li><b>영상 만들기</b> — 미리보기로 확인한 뒤 만들고, 영상과 자막(SRT)을 저장합니다.</li>
-        </ol>
+        <div class="guide-steps" id="guideSteps">
+          <div class="gstep"><span class="n">01</span><b>스타일 고르기</b><p>잘 나가는 쇼츠 형식 20가지 중 하나를 누릅니다. 미리보기가 바로 그 형식으로 바뀝니다.</p></div>
+          <div class="gstep"><span class="n">02</span><b>사진 넣기</b><p>매물·현장·강의 자료 사진을 순서대로 넣습니다. 사진이 없어도 글자 장면으로 만들 수 있습니다.</p></div>
+          <div class="gstep"><span class="n">03</span><b>대본 넣기</b><p>한 줄에 한 장면씩 씁니다. 강조할 단어는 <code>*별표*</code>로 감쌉니다. AI 대본이 켜져 있으면 주제만 넣어도 됩니다.</p></div>
+          <div class="gstep"><span class="n">04</span><b>소리 넣기</b><p>배경음악·내레이션 녹음을 넣고, 필요하면 “장면 길이를 내레이션에 맞추기”를 누릅니다.</p></div>
+          <div class="gstep"><span class="n">05</span><b>영상 만들기</b><p>이 스타일로 한 편, 또는 20가지 전부를 ZIP으로 만듭니다. 영상 길이만큼 시간이 걸립니다.</p></div>
+          <div class="gstep"><span class="n">06</span><b>바로 올리기</b><p>“바로 올리기”에서 유튜브·인스타·틱톡·페이스북·쓰레드 업로드 화면을 열고, 복사한 제목·해시태그를 붙여 넣습니다.</p></div>
+        </div>
       </section>
       <section class="panel">
         <h2>알아 두면 좋은 점</h2>
         <ul>
-          <li>영상은 실제 길이만큼 녹화하듯 만들어집니다. 30초 영상이면 약 30초가 걸립니다.</li>
-          <li>크롬·엣지 최신 버전에서는 MP4로, 그 밖의 브라우저에서는 WEBM으로 저장됩니다. 유튜브는 두 형식 모두 올라갑니다.</li>
+          <li>영상은 실제 길이만큼 녹화하듯 만들어집니다. 30초 영상이면 약 30초, 20가지 전부면 그 20배가 걸립니다.</li>
+          <li>크롬·엣지 최신 버전에서는 MP4로, 그 밖의 브라우저에서는 WEBM으로 저장됩니다. 유튜브·인스타·틱톡 모두 MP4를 받습니다.</li>
           <li>사진·소리 파일은 서버로 올라가지 않고 이 브라우저 안에서만 처리됩니다.</li>
           <li>“프로젝트 저장”은 사진과 글을 한 파일(.json)로 묶습니다. 소리 파일은 들어가지 않으니 다시 넣어 주세요.</li>
         </ul>
