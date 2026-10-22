@@ -11,6 +11,7 @@ import { SCRIPT_STYLES } from './script-prompt.js';
 import { sample, SHORTS_CASE } from './samples.js';
 import { popIn } from './motion.js';
 import { MOODS, renderMood, playMood } from './music.js';
+import { PROVIDERS, providerOf, synthesize, MAX_TEXT } from './tts.js';
 
 const SETTINGS_KEYS = [
   'aspect', 'template', 'font', 'captionSize', 'captionStyle', 'captionAnim', 'overlay', 'titleMode', 'motion', 'transition',
@@ -70,6 +71,13 @@ let resultMeta = null; // { W, H, duration }
 let STYLES = [];
 let styleJob = 0; // 스타일 예시 장면을 받는 중 다른 스타일을 누르면 먼저 것은 버린다
 let viralRef = ''; // 빵터진 영상에서 고른 참고 제목
+
+// 내레이션 만들기(tts.js) 설정 — 프로젝트 .json 에는 넣지 않고 store 'tts' 에만 저장합니다. voice 는 서비스별로 따로 둡니다.
+// API 키는 '이 브라우저에 기억' 이 켜졌을 때만 store 'ttsKeys' 에 서비스별로 저장하고, 끄면 지웁니다.
+const tts = { provider: 'gemini', voice: {}, model: 'drama-3', speed: 1, ...store.get('tts', {}) };
+if (!tts.voice || typeof tts.voice !== 'object') tts.voice = {};
+let ttsResult = null; // 마지막으로 만든 음성 { blob, ext } — "파일로 저장" 용
+let ttsTextEdited = false; // 사용자가 대본 칸을 직접 고쳤으면 장면이 바뀌어도 덮어쓰지 않는다
 
 function pickSettings(obj) {
   const out = {};
@@ -285,6 +293,7 @@ function changed(structural) {
   draw();
   scheduleStripRender();
   $('#fitToNarr').disabled = !audio.narr || !project.scenes.length;
+  if (structural) syncTtsText(); // 장면이 바뀌면 내레이션 대본 칸도(사용자가 손대지 않았을 때만)
 }
 
 const refreshFonts = debounce(async () => { await ensureFonts(project); draw(); }, 250);
@@ -424,7 +433,8 @@ function renderAudioInfo(busy = '') {
     const mood = currentMood();
     if (mood) parts.push(`스타일 음악: ${mood.name}${project.styleMusic === 'auto' ? ' (자동)' : ''}`);
   }
-  if (audio.narr) parts.push(`내레이션 ${audio.narr.name} (${formatTime(audio.narr.buffer.duration)})`);
+  // 만든 음성(made)은 이름에 '내레이션' 이 이미 들어 있습니다: "내레이션 (제미나이)"
+  if (audio.narr) parts.push(`${audio.narr.made ? '' : '내레이션 '}${audio.narr.name} (${formatTime(audio.narr.buffer.duration)})`);
   $('#audioInfo').textContent = parts.length ? parts.join(' · ') : '스타일 음악을 꺼 두었습니다. 소리 파일이 없으면 무음 영상이 만들어집니다.';
   $('#fitToNarr').disabled = !audio.narr || !project.scenes.length;
 }
@@ -1080,6 +1090,143 @@ async function runAI() {
   }
 }
 
+// ── 내레이션 만들기(tts.js) ───────────────────────────
+const ttsProvider = () => providerOf(tts.provider);
+const saveTts = () => store.set('tts', tts);
+
+/** 장면 자막을 별표 없는 글로 한 줄씩 대본 칸에 넣습니다. 사용자가 손댄 뒤에는 force 일 때만 덮어씁니다. */
+function syncTtsText(force = false) {
+  const ta = $('#ttsText');
+  if (!ta || (ttsTextEdited && !force)) return;
+  ta.value = project.scenes
+    .map((s) => plainText(s.caption).replace(/\s*\n\s*/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+  ttsTextEdited = false;
+}
+
+/** 상태 칸의 기본 안내 — 아티팩트(Claude 미리보기)·서버 없는 Fish Audio 는 미리 알려 줍니다. */
+function ttsNote() {
+  const st = $('#ttsStatus');
+  if (inArtifact) { st.textContent = 'Claude 미리보기에서는 음성 생성이 안 됩니다. ko372.com 에서 써 주세요.'; return; }
+  st.textContent = '';
+  if (ttsProvider().id !== 'fish') return;
+  serverInfo().then((info) => {
+    if (ttsProvider().id === 'fish' && !info.tts) st.textContent = 'Fish Audio 는 인터넷 배포 버전(ko372.com)에서만 됩니다. 제미나이나 일레븐랩스를 골라 주세요.';
+  });
+}
+
+/** 서비스에 맞게 키 힌트·목소리 칸(제미나이는 고르기, 나머지는 ID 글자 칸)·엔진 칸·속도 안내·기억된 키를 바꿉니다. */
+function renderTtsProvider() {
+  const p = ttsProvider();
+  $('#ttsProvider').value = p.id;
+  $('#ttsKeyHint').textContent = p.keyHint;
+  $('#l-ttsVoice').textContent = p.voiceLabel || '목소리';
+  const saved = typeof tts.voice[p.id] === 'string' ? tts.voice[p.id] : '';
+  let el;
+  if (p.voices) {
+    el = document.createElement('select');
+    for (const v of p.voices) el.append(new Option(v.name, v.id));
+    el.value = p.voices.some((v) => v.id === saved) ? saved : p.voices[0].id;
+  } else {
+    el = document.createElement('input');
+    el.type = 'text';
+    el.autocomplete = 'off';
+    el.spellcheck = false;
+    el.placeholder = p.voiceLabel || '';
+    el.value = saved || p.defaultVoice || '';
+  }
+  el.id = 'ttsVoice';
+  el.setAttribute('aria-labelledby', 'l-ttsVoice');
+  el.addEventListener('input', () => { tts.voice[p.id] = el.value.trim(); saveTts(); });
+  $('#ttsVoice').replaceWith(el);
+  tts.voice[p.id] = el.value.trim();
+
+  const modelSel = $('#ttsModel');
+  $('#ttsModelField').hidden = !p.models;
+  if (p.models) {
+    modelSel.replaceChildren(...p.models.map((m) => new Option(m.name, m.id)));
+    modelSel.value = p.models.some((m) => m.id === tts.model) ? tts.model : p.models[0].id;
+    tts.model = modelSel.value;
+  }
+  $('#ttsSpeedHint').textContent = p.id === 'fish' ? '' : '속도는 Fish Audio 에만 적용됩니다.';
+
+  const keys = store.get('ttsKeys', {});
+  const k = keys && typeof keys[p.id] === 'string' ? keys[p.id] : '';
+  $('#ttsKey').value = k;
+  $('#ttsRemember').checked = !!k;
+  saveTts();
+  ttsNote();
+}
+
+/** 기억 체크에 따라 지금 서비스의 키를 저장하거나 지웁니다. 체크가 꺼져 있으면 아무것도 남기지 않습니다. */
+function rememberTtsKey() {
+  const p = ttsProvider();
+  const keys = store.get('ttsKeys', {});
+  const next = keys && typeof keys === 'object' ? { ...keys } : {};
+  const k = $('#ttsKey').value.trim();
+  if ($('#ttsRemember').checked && k) next[p.id] = k;
+  else delete next[p.id];
+  store.set('ttsKeys', next);
+}
+
+async function runTts() {
+  const p = ttsProvider();
+  const st = $('#ttsStatus');
+  const btn = $('#ttsRun');
+  if (btn.disabled) return;
+  if (exporting || batch) return toast('영상을 만드는 중에는 내레이션을 만들 수 없습니다. 먼저 멈춰 주세요.');
+  const key = $('#ttsKey').value.trim();
+  const voice = $('#ttsVoice').value.trim();
+  const text = $('#ttsText').value.trim();
+  if (!key) { st.textContent = `${p.name} API 키를 넣어 주세요. (${p.keyHint})`; $('#ttsKey').focus(); return; }
+  if (!voice) { st.textContent = p.voiceLabel ? `${p.voiceLabel}를 넣어 주세요.` : '목소리를 골라 주세요.'; $('#ttsVoice').focus(); return; }
+  if (!text) { st.textContent = '대본이 비어 있습니다. "대본 다시 가져오기"를 누르거나 직접 적어 주세요.'; $('#ttsText').focus(); return; }
+  if (text.length > MAX_TEXT) { st.textContent = `대본이 너무 깁니다 (${text.length.toLocaleString()}자). ${MAX_TEXT.toLocaleString()}자 이하로 줄여 주세요.`; return; }
+  btn.disabled = true;
+  $('#ttsSave').hidden = true;
+  st.textContent = '만드는 중… (10~40초)';
+  try {
+    const { blob, mime } = await synthesize({ provider: p.id, key, voice, model: tts.model, text, speed: tts.speed });
+    const buffer = await loadAudioFile(blob);
+    audio.narr = { name: `내레이션 (${p.short})`, buffer, made: true };
+    $('#narrFile').value = '';
+    renderAudioInfo();
+    ttsResult = { blob, ext: mime === 'audio/wav' ? 'wav' : 'mp3' };
+    $('#ttsSave').hidden = false;
+    st.textContent = `완성 — ${formatTime(buffer.duration)}. 내레이션 자리에 넣었습니다.`;
+    toast("내레이션을 넣었습니다. 필요하면 '장면 길이를 내레이션에 맞추기'를 누르세요.");
+  } catch (e) {
+    st.textContent = e?.message || '음성을 만들지 못했습니다. 다시 시도하세요.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function wireTts() {
+  $('#ttsProvider').addEventListener('input', () => { tts.provider = $('#ttsProvider').value; renderTtsProvider(); });
+  $('#ttsModel').addEventListener('input', () => { tts.model = $('#ttsModel').value; saveTts(); });
+  const speed = $('#ttsSpeed');
+  const showSpeed = () => { $('#ttsSpeedOut').textContent = `${Number(tts.speed).toFixed(2)}×`; };
+  speed.value = String(tts.speed);
+  tts.speed = Number(speed.value); // 범위 밖 값은 슬라이더가 잘라 준다
+  showSpeed();
+  speed.addEventListener('input', () => { tts.speed = Number(speed.value); showSpeed(); saveTts(); });
+  $('#ttsKey').addEventListener('input', rememberTtsKey);
+  $('#ttsRemember').addEventListener('change', rememberTtsKey);
+  $('#ttsText').addEventListener('input', () => { ttsTextEdited = true; });
+  $('#ttsFromScenes').addEventListener('click', () => { syncTtsText(true); toast('장면 자막을 대본 칸에 다시 넣었습니다.'); });
+  $('#ttsRun').addEventListener('click', runTts);
+  $('#ttsSave').addEventListener('click', async () => {
+    if (!ttsResult) return;
+    try {
+      if (await saveBlob(ttsResult.blob, `내레이션.${ttsResult.ext}`)) toast('내레이션 파일을 저장했습니다.');
+    } catch (e) { toast(e.message); }
+  });
+  if (!PROVIDERS.some((p) => p.id === tts.provider)) tts.provider = PROVIDERS[0].id;
+  renderTtsProvider();
+}
+
 // ── 설정 입력 연결 ─────────────────────────────────────
 const BINDINGS = [
   ['aspect', 'aspect'], ['template', 'template'], ['font', 'font'],
@@ -1151,6 +1298,7 @@ export async function initShorts() {
 
   syncControls();
   wireControls();
+  wireTts();
   sizePreview();
 
   wireDrop($('#sceneDrop'), addImageFiles);

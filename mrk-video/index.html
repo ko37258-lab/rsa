@@ -380,6 +380,46 @@
               <label class="field"><span>내레이션 녹음</span><input type="file" id="narrFile" accept="audio/*"></label>
               <label class="field" for="narrVolume"><span>내레이션 크기 <output id="narrVolOut"></output></span><input type="range" id="narrVolume" min="0" max="1.5" step="0.05"></label>
             </div>
+            <!-- 내레이션 만들기: 제미나이·일레븐랩스·Fish Audio API 키로 대본을 목소리로 만들어 내레이션 자리에 넣습니다(js/tts.js · js/shorts.js).
+                 목소리 칸(#ttsVoice)은 서비스에 따라 shorts.js 가 select(제미나이)/글자 칸(나머지)으로 바꿉니다. 엔진 칸은 Fish Audio 일 때만 보입니다. -->
+            <details class="tts" id="ttsBox">
+              <summary>내레이션 만들기 (API 키로 음성 생성)</summary>
+              <div class="tts-body">
+                <div class="grid2">
+                  <label class="field"><span>서비스</span>
+                    <select id="ttsProvider">
+                      <option value="gemini">제미나이 (Google)</option>
+                      <option value="elevenlabs">일레븐랩스</option>
+                      <option value="fish">Fish Audio</option>
+                    </select>
+                  </label>
+                  <label class="field"><span>API 키 <small class="hint" id="ttsKeyHint"></small></span>
+                    <input type="password" id="ttsKey" autocomplete="off" spellcheck="false" placeholder="각 서비스에서 발급한 키">
+                  </label>
+                  <label class="field check span2"><input type="checkbox" id="ttsRemember"><span>API 키를 이 브라우저에 기억</span></label>
+                  <div class="field" id="ttsVoiceField"><span id="l-ttsVoice">목소리</span>
+                    <select id="ttsVoice" aria-labelledby="l-ttsVoice"></select>
+                  </div>
+                  <label class="field" id="ttsModelField" hidden><span>엔진</span>
+                    <select id="ttsModel"></select>
+                  </label>
+                  <label class="field" for="ttsSpeed"><span>속도 <output id="ttsSpeedOut"></output></span>
+                    <input type="range" id="ttsSpeed" min="0.8" max="1.3" step="0.05" value="1">
+                    <small class="hint" id="ttsSpeedHint"></small>
+                  </label>
+                  <label class="field span2"><span>대본 (한 줄씩 이어 읽음)</span>
+                    <textarea id="ttsText" rows="4" maxlength="3000" placeholder="장면 자막이 자동으로 들어옵니다. 고쳐도 됩니다."></textarea>
+                  </label>
+                </div>
+                <div class="row wrap">
+                  <button type="button" class="btn small accent" id="ttsRun">음성 만들기</button>
+                  <button type="button" class="btn small ghost" id="ttsFromScenes">대본 다시 가져오기</button>
+                  <button type="button" class="btn small" id="ttsSave" hidden>파일로 저장</button>
+                  <span class="hint" id="ttsStatus" aria-live="polite"></span>
+                </div>
+                <p class="hint">키는 이 브라우저에서 각 서비스로 바로 보내지고(Fish Audio 는 이 사이트 서버가 한 번 전달만), 서버에 저장되지 않습니다.</p>
+              </div>
+            </details>
             <!-- 스타일 음악: 배경음악 파일이 없을 때 스타일에 맞는 분위기를 코드로 만들어 깔아 줍니다(목록은 shorts.js 가 MOODS 로 채움) -->
             <div class="field music-field">
               <span id="l-styleMusic">스타일 음악</span>

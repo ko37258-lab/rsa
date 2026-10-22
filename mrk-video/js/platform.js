@@ -16,14 +16,15 @@ function useCap(name) {
   return capCache.get(name);
 }
 
-/** 서버 함수(api/health)가 있는지 한 번만 확인합니다. */
+/** 서버 함수(api/health)가 있는지 한 번만 확인합니다. tts 는 Fish Audio 내레이션 중계(api/tts) 가능 여부(기본 false). */
+const NO_SERVER = { ai: false, proxy: false, needsCode: false, youtube: false, tts: false };
 let serverP;
 export function serverInfo() {
-  if (inArtifact) return Promise.resolve({ ai: false, proxy: false, needsCode: false, youtube: false });
+  if (inArtifact) return Promise.resolve({ ...NO_SERVER });
   serverP ??= fetch(API + 'health', { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
-    .then((j) => ({ ai: !!j?.ai, proxy: !!j?.proxy, needsCode: !!j?.needsCode, youtube: !!j?.youtube }))
-    .catch(() => ({ ai: false, proxy: false, needsCode: false, youtube: false }));
+    .then((j) => ({ ai: !!j?.ai, proxy: !!j?.proxy, needsCode: !!j?.needsCode, youtube: !!j?.youtube, tts: !!j?.tts }))
+    .catch(() => ({ ...NO_SERVER }));
   return serverP;
 }
 
@@ -141,6 +142,23 @@ export async function generateScript(params) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `AI 서버 오류 (${res.status})`);
   return normalizeScriptResult(data);
+}
+
+/**
+ * Fish Audio 내레이션 중계(api/tts). Fish 는 브라우저 CORS 를 막으므로 서버가 한 번 전달만 하고 mp3 를 그대로 돌려줍니다.
+ * body = { provider:'fish', key, voice, model, text, speed }. 서버는 키를 저장하지 않습니다.
+ */
+export async function ttsRelay(body) {
+  const res = await fetch(API + 'tts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-access-code': accessCode() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error || `음성 서버 오류 (${res.status})`);
+  }
+  return res.blob();
 }
 
 /** 외부 이미지 주소 → Blob. 먼저 직접 받고, 막히면 서버 프록시(api/proxy)로 받습니다. */
