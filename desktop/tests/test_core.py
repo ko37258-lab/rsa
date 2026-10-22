@@ -204,6 +204,9 @@ def test_same_hotkey_spelling():
 def test_clipboard_snapshot_roundtrip_without_windows(monkeypatch):
     from mrk_typeless import clipboard
 
+    # Windows 러너에서도 글만 떠 두는 길을 시험합니다 (진짜 클립보드는 건드리지 않음)
+    monkeypatch.setattr(clipboard, "_snapshot_windows", lambda: None)
+    monkeypatch.setattr(clipboard, "_restore_windows", lambda snap: False)
     store = {"text": "원래 글"}
     monkeypatch.setattr(clipboard, "get_text", lambda: store["text"])
     monkeypatch.setattr(clipboard, "set_text", lambda t: store.__setitem__("text", t))
@@ -230,3 +233,33 @@ def test_history_respects_toggle_cap_and_trims(tmp_path, monkeypatch):
     assert len(json.loads(lines[-1])["raw"]) == config_module.HISTORY_RAW_LIMIT + 1
     config_module.clear_history()
     assert not path.exists()
+
+
+def test_text_cleanup_edge_cases():
+    text, removed = local_cleanup("확인했습니다 음.")
+    assert text == "확인했습니다." and removed == 1
+    text, removed = local_cleanup("정말 정말 감사합니다 하나 하나 확인해요 그 그 상가")
+    assert text == "정말 정말 감사합니다 하나 하나 확인해요 그 상가" and removed == 1
+    assert sanitize_dictation("가족 👨\u200d👩\u200d👧 사진") == "가족 👨\u200d👩\u200d👧 사진"
+    assert sanitize_dictation("클로\u200b드") == "클로드"
+    text, count = apply_replacements("토지 공법에 신경 써야 합니다", DEFAULT_DICTIONARY["replacements"])
+    assert text == "토지 공법에 신경 써야 합니다" and count == 0
+    text, _ = apply_replacements("건폐률은 60", [{"from": "건폐률", "to": ""}, ["bad"], {"from": None, "to": "x"}])
+    assert text == "건폐률은 60"
+
+
+def test_dictionary_with_malformed_rules_is_reported_not_crashed(tmp_path, monkeypatch):
+    path = tmp_path / "dictionary.json"
+    monkeypatch.setattr(config_module, "DICTIONARY_PATH", path)
+    monkeypatch.setattr(config_module, "APP_DIR", tmp_path)
+    path.write_text(json.dumps({"terms": ["용어"], "replacements": [["건폐률", "건폐율"], {"from": "a", "to": "b"}]}), encoding="utf-8")
+    d, problem = config_module.load_dictionary()
+    assert d["replacements"] == [{"from": "a", "to": "b"}] and problem and "1개" in problem
+
+
+def test_version_files_agree():
+    from pathlib import Path
+
+    from mrk_typeless import __version__
+
+    assert (Path(__file__).resolve().parents[1] / "VERSION").read_text().strip() == __version__

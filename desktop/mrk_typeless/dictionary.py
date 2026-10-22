@@ -28,7 +28,6 @@ DEFAULT_DICTIONARY = {
         {"from": "지구 단위 계획", "to": "지구단위계획"},
         {"from": "개발 행위 허가", "to": "개발행위허가"},
         {"from": "미스터 홈즈", "to": "미스터홈즈"},
-        {"from": "공법에 신", "to": "공법의 신"},
     ],
 }
 
@@ -37,8 +36,13 @@ def apply_replacements(text: str, replacements: list[dict]) -> tuple[str, int]:
     """바꿔쓰기 규칙을 글자 그대로 적용하고, 바꾼 횟수를 함께 돌려줍니다."""
     count = 0
     for rule in replacements:
-        src, dst = rule.get("from", ""), rule.get("to", "")
-        if not src.strip() or src == dst:
+        if not isinstance(rule, dict):
+            continue
+        src, dst = rule.get("from"), rule.get("to")
+        if not isinstance(src, str) or not isinstance(dst, str):
+            continue
+        # 아직 바른 표기를 안 적은 규칙은 적용하지 않습니다 (적용하면 그 말이 통째로 지워짐).
+        if not src.strip() or not dst.strip() or src == dst:
             continue
         count += text.count(src)
         text = text.replace(src, dst)

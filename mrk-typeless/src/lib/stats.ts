@@ -3,8 +3,17 @@
 export const TYPING_CHARS_PER_MIN = 120;
 export const SPEAKING_CHARS_PER_MIN = 350;
 
+const segmenter = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter("ko", { granularity: "grapheme" }) : null;
+
+/** 공백을 뺀 글자 수. 이모지(👨‍👩‍👧)나 풀어 쓴 한글도 눈에 보이는 한 글자로 셉니다. */
 export function countChars(text: string): number {
-  return text.replace(/\s/g, "").length;
+  const s = text.normalize("NFC").replace(/\s/g, "");
+  if (segmenter) {
+    let n = 0;
+    for (const _ of segmenter.segment(s)) n++;
+    return n;
+  }
+  return [...s].length;
 }
 
 export function estimateSavedMs(resultText: string, rawText: string, spokenMs?: number): number {

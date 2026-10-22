@@ -4,6 +4,14 @@
 
 const FILLER = /^(음+|으+음+|어+|으+|아+|에+|흠+|um+|uh+|erm+|hmm+)$/i;
 const EDGE_PUNCT = /^[\s"'“”‘’(]+|[\s,.…!?~"'“”‘’)]+$/g;
+const SENTENCE_END = /[.!?…]+$/;
+// 일부러 겹쳐 말하는 부사: "정말 정말", "하나 하나"는 더듬은 말이 아닙니다.
+const REDUPLICATED = new Set(["정말", "하나", "따로", "매일", "빨리", "자주", "가끔", "조금", "많이", "아주", "너무", "각각", "천천히", "차근차근", "꼭", "잘", "더", "또", "다시"]);
+
+/** 바로 이어서 반복한 말 가운데 더듬은 말로 볼 것: 짧은 말(두 글자 이하)이면서 겹쳐 쓰는 부사가 아닌 것 */
+function isStutter(core: string): boolean {
+  return core.length <= 2 && !REDUPLICATED.has(core);
+}
 
 function bare(token: string): string {
   return token.replace(EDGE_PUNCT, "");
@@ -24,10 +32,13 @@ export function markFillers(raw: string): MarkedToken[][] {
       const core = bare(text);
       if (core && FILLER.test(core)) {
         tokens.push({ text, removed: true });
+        // "확인했습니다 음." → 마침표는 앞 말에 남깁니다.
+        const tail = SENTENCE_END.exec(text)?.[0];
+        if (tail && lastKept >= 0 && !SENTENCE_END.test(tokens[lastKept].text)) tokens[lastKept].text += tail;
         continue;
       }
       const prev = lastKept >= 0 ? tokens[lastKept] : undefined;
-      if (prev && core && bare(prev.text).toLowerCase() === core.toLowerCase()) {
+      if (prev && core && isStutter(core) && bare(prev.text).toLowerCase() === core.toLowerCase()) {
         // "그 그 상가", "제가 제가" 처럼 바로 이어서 반복한 말: 앞의 것을 지움
         prev.removed = true;
       }

@@ -39,7 +39,6 @@ export const DEFAULT_DICTIONARY: Dictionary = {
     { from: "지구 단위 계획", to: "지구단위계획" },
     { from: "개발 행위 허가", to: "개발행위허가" },
     { from: "미스터 홈즈", to: "미스터홈즈" },
-    { from: "공법에 신", to: "공법의 신" },
   ],
 };
 
@@ -48,7 +47,8 @@ export function applyReplacements(text: string, replacements: Replacement[]): { 
   let count = 0;
   let out = text;
   for (const { from, to } of replacements) {
-    if (!from.trim() || from === to) continue;
+    // 아직 바른 표기를 안 적은 규칙은 적용하지 않습니다 (적용하면 그 말이 통째로 지워짐).
+    if (!from.trim() || !to.trim() || from === to) continue;
     const parts = out.split(from);
     count += parts.length - 1;
     out = parts.join(to);

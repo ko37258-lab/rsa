@@ -30,6 +30,7 @@ export function addToHistory(list: HistoryItem[], item: HistoryItem): HistoryIte
     prev !== undefined &&
     prev.kind === "dictation" &&
     item.kind === "dictation" &&
+    prev.mode === item.mode &&
     item.createdAt - prev.createdAt < CONTINUE_WINDOW_MS &&
     item.raw.startsWith(prev.raw);
   return [item, ...(continues ? list.slice(1) : list)].slice(0, HISTORY_LIMIT);

@@ -134,7 +134,17 @@ def load_dictionary() -> tuple[dict, str | None]:
     except (OSError, ValueError) as e:
         return DEFAULT_DICTIONARY, f"{DICTIONARY_PATH.name}: {e}"
     if isinstance(stored, dict) and isinstance(stored.get("terms"), list):
-        return {"terms": stored.get("terms", []), "replacements": stored.get("replacements") or []}, None
+        terms = [t for t in stored["terms"] if isinstance(t, str)]
+        rules = stored.get("replacements") or []
+        if isinstance(rules, list):
+            good = [r for r in rules if isinstance(r, dict) and isinstance(r.get("from"), str) and isinstance(r.get("to"), str)]
+            bad = len(rules) - len(good)
+        else:
+            good, bad = [], 1
+        problem = None
+        if bad:
+            problem = f'{DICTIONARY_PATH.name}: 바꿔쓰기 규칙 {bad}개의 형식이 잘못되어 건너뜁니다 ({{"from": "들린 말", "to": "바른 표기"}} 꼴이어야 함)'
+        return {"terms": terms, "replacements": good}, problem
     return DEFAULT_DICTIONARY, f"{DICTIONARY_PATH.name}: 'terms' 목록이 없습니다"
 
 
@@ -143,8 +153,17 @@ def same_hotkey(a: str, b: str) -> bool:
     try:
         import keyboard
 
-        return keyboard.parse_hotkey(a) == keyboard.parse_hotkey(b)
-    except Exception:
+        # parse_hotkey는 적은 순서대로 돌려주므로, 한 단계 안의 키는 정렬해서 견줍니다 ('h+windows' == 'windows+h').
+        def canon(combo: str):
+            steps = []
+            for step in keyboard.parse_hotkey(combo):
+                keys = [tuple(sorted(k)) if isinstance(k, (list, tuple)) else (k,) for k in step]
+                steps.append(tuple(sorted(keys)))
+            return tuple(steps)
+
+        return canon(a) == canon(b)
+    except Exception:  # noqa: BLE001 - keyboard를 쓸 수 없는 환경(테스트)에서는 글자로 비교
+
         def norm(combo: str) -> str:
             keys = (k.strip().lower() for k in combo.split("+"))
             return "+".join(sorted("windows" if k in ("win", "windows", "super", "cmd") else k for k in keys))

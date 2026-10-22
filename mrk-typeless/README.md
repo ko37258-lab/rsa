@@ -55,7 +55,7 @@ npm run build:artifact   # → dist-artifact/mrk-typeless.html
 
 ### ② 내 컴퓨터에서 실행 — 마이크 받아쓰기까지 전부
 
-[Node.js](https://nodejs.org/) 20 이상이 필요합니다.
+[Node.js](https://nodejs.org/) 20.19 이상 또는 22.12 이상(LTS 권장)이 필요합니다.
 
 ```bash
 cd mrk-typeless
@@ -73,7 +73,7 @@ npm run build   # → dist/ 폴더
 
 `dist/` 폴더를 Vercel·Netlify 같은 정적 호스팅에 올리면 됩니다. 마이크는 **HTTPS 주소**(또는 localhost)에서만 동작합니다.
 
-현재 배포: **https://mrk-typeless.vercel.app** (Vercel 프로젝트 `mrk-typeless`, 루트 디렉터리 `mrk-typeless`, Vercel 로그인한 본인만 접속)
+현재 배포: **https://mrk-typeless.vercel.app** (Vercel 프로젝트 `mrk-typeless`, 루트 디렉터리 `mrk-typeless`). 이 주소는 누구나 열 수 있고, 학생 안내 링크도 이 주소를 씁니다. Vercel 로그인은 미리보기·자동 생성 주소에만 걸려 있습니다. 배포는 git 연동 없이 이 세션에서 Vercel API로 하므로, 커밋한 뒤 따로 배포해야 사이트가 바뀝니다.
 
 ---
 

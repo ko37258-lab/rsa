@@ -147,3 +147,34 @@ describe("sanitizeDictation", () => {
     expect(sanitizeDictation("서울 — 부산 노선, 2021–2025년")).toBe("서울 — 부산 노선, 2021–2025년");
   });
 });
+
+
+describe("글 손질 가장자리", () => {
+  it("지운 군더더기의 마침표는 앞 말에 남기고, 겹쳐 쓰는 부사는 지우지 않는다", () => {
+    expect(localCleanup("확인했습니다 음.")).toEqual({ text: "확인했습니다.", removed: 1 });
+    expect(localCleanup("정말 정말 감사합니다 하나 하나 확인해요 그 그 상가")).toEqual({ text: "정말 정말 감사합니다 하나 하나 확인해요 그 상가", removed: 1 });
+  });
+
+  it("이모지 결합자는 남기고 폭 0 공백만 지운다", () => {
+    expect(sanitizeDictation("가족 👨\u200d👩\u200d👧 사진")).toBe("가족 👨\u200d👩\u200d👧 사진");
+    expect(sanitizeDictation("클로\u200b드")).toBe("클로드");
+  });
+
+  it("바른 표기가 빈 규칙은 적용하지 않고, 기본 사전이 '공법에 신경'을 망치지 않는다", () => {
+    expect(applyReplacements("건폐률은 60", [{ from: "건폐률", to: "" }]).text).toBe("건폐률은 60");
+    expect(applyReplacements("토지 공법에 신경 써야 합니다", DEFAULT_DICTIONARY.replacements).text).toBe("토지 공법에 신경 써야 합니다");
+  });
+
+  it("글자 수는 이모지를 한 글자로 센다", () => {
+    expect(countChars("안녕하세요 😊")).toBe(6);
+    expect(countChars("👨\u200d👩\u200d👧")).toBe(1);
+  });
+
+  it("글 형식이 다르면 기록을 합치지 않는다", () => {
+    const base: HistoryItem = { id: "1", createdAt: 1000, kind: "dictation", mode: "clean", raw: "내일 2시", result: "a", engine: "local", savedMs: 0 };
+    const email: HistoryItem = { ...base, id: "2", createdAt: 2000, mode: "email", result: "b" };
+    expect(addToHistory([base], email)).toHaveLength(2);
+    const longer: HistoryItem = { ...base, id: "3", createdAt: 3000, raw: "내일 2시 방문", result: "c" };
+    expect(addToHistory([base], longer)).toHaveLength(1);
+  });
+});
