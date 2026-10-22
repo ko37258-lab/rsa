@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ARTIFACT:BEGIN -->
+<title>MR.K 영상만들기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="사진과 대본으로 쇼츠 영상을 만들고, 상품 대표 이미지를 일괄 합성·다운로드하는 웹 도구">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23161a29'/%3E%3Cpath d='M20 16h8v13l11-13h10L36 31l14 17H39L28 34v14h-8z' fill='%23ffd43b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Gowun+Dodum&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Jua&family=Nanum+Myeongjo:wght@800&family=Noto+Sans+KR:wght@500;900&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- ARTIFACT:END -->
+</head>
+<body>
+<!-- ARTIFACT:BODY -->
+<div class="app">
+  <aside class="side">
+    <a class="brand" href="#shorts">
+      <span class="brand-mark" aria-hidden="true">K</span>
+      <span class="brand-text">MR.K <b>영상만들기</b></span>
+    </a>
+    <nav class="nav" aria-label="기능">
+      <a href="#shorts" data-view="shorts"><span class="nav-k">01</span>숏폼 영상 만들기</a>
+      <a href="#compose" data-view="compose"><span class="nav-k">02</span>대표 이미지 합성</a>
+      <a href="#download" data-view="download"><span class="nav-k">03</span>이미지 일괄 다운로드</a>
+      <a href="#guide" data-view="guide"><span class="nav-k">?</span>사용 안내</a>
+    </nav>
+    <p class="side-foot">MR.K 고상철 · 부동산 AI 작업실<br><span id="envBadge" class="env-badge">환경 확인 중</span></p>
+  </aside>
+
+  <main class="main">
+    <!-- ───────────── 01 숏폼 영상 만들기 ───────────── -->
+    <section class="view" id="view-shorts" data-view="shorts">
+      <header class="view-head">
+        <div>
+          <h1>숏폼 영상 만들기</h1>
+          <p>사진과 대본을 넣으면 자막·제목·배경음악이 들어간 쇼츠 영상을 만듭니다. 브라우저 안에서 처리되어 파일이 서버로 올라가지 않습니다.</p>
+        </div>
+        <div class="head-actions">
+          <button type="button" class="btn ghost" id="projOpenBtn">프로젝트 열기</button>
+          <button type="button" class="btn ghost" id="projSaveBtn">프로젝트 저장</button>
+          <input type="file" id="projFile" accept=".json,application/json" hidden>
+        </div>
+      </header>
+
+      <div class="studio">
+        <div class="studio-controls">
+          <!-- 장면 -->
+          <section class="panel" aria-labelledby="h-scenes">
+            <div class="panel-head">
+              <h2 id="h-scenes">장면</h2>
+              <span class="hint" id="sceneSummary"></span>
+            </div>
+            <label class="drop" id="sceneDrop">
+              <input type="file" id="sceneFiles" accept="image/*" multiple>
+              <span><b>사진 추가</b> — 여러 장을 끌어다 놓거나 눌러서 고르세요. 넣은 순서대로 장면이 됩니다.</span>
+            </label>
+            <ol class="scenes" id="sceneList"></ol>
+            <div class="row wrap">
+              <button type="button" class="btn small" id="addTextScene">글자 장면 추가</button>
+              <button type="button" class="btn small ghost" id="clearScenes">장면 모두 지우기</button>
+            </div>
+          </section>
+
+          <!-- 대본 -->
+          <section class="panel" aria-labelledby="h-script">
+            <div class="panel-head">
+              <h2 id="h-script">대본으로 장면 만들기</h2>
+              <span class="hint">한 줄이 한 장면 · <code>*강조*</code>는 노란 글씨</span>
+            </div>
+            <textarea id="scriptText" rows="5" placeholder="땅을 살 때 *용도지역*부터 확인하세요&#10;*도로*에 붙지 않은 땅은 건축이 어렵습니다"></textarea>
+            <div class="row wrap">
+              <button type="button" class="btn small" id="applyScript">대본을 장면 자막에 넣기</button>
+              <span class="hint">사진이 모자라면 남는 줄은 글자 장면이 됩니다.</span>
+            </div>
+
+            <div class="ai-box" id="aiBox" hidden>
+              <h3>AI 대본 만들기</h3>
+              <div class="grid2">
+                <label class="field span2"><span>주제</span>
+                  <input type="text" id="aiTopic" maxlength="300" placeholder="예: 맹지 투자, 이것만은 꼭 확인하세요">
+                </label>
+                <label class="field"><span>유형</span>
+                  <select id="aiStyle"></select>
+                </label>
+                <label class="field"><span>장면 수</span>
+                  <input type="number" id="aiScenes" min="3" max="12" value="6">
+                </label>
+              </div>
+              <div class="row wrap">
+                <button type="button" class="btn small accent" id="aiRun">AI로 대본 쓰기</button>
+                <span class="hint" id="aiStatus">법령·수치는 올리기 전에 꼭 확인하세요.</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 제목·브랜드 -->
+          <section class="panel" aria-labelledby="h-brand">
+            <div class="panel-head"><h2 id="h-brand">제목 · 채널</h2></div>
+            <div class="grid2">
+              <label class="field span2"><span>영상 제목 (화면 위쪽 고정, 줄바꿈 가능)</span>
+                <textarea id="title" rows="2"></textarea>
+              </label>
+              <label class="field"><span>채널 이름</span>
+                <input type="text" id="channel">
+              </label>
+              <label class="field"><span>로고 이미지 (선택)</span>
+                <input type="file" id="logoFile" accept="image/*">
+              </label>
+            </div>
+          </section>
+
+          <!-- 스타일 -->
+          <section class="panel" aria-labelledby="h-style">
+            <div class="panel-head"><h2 id="h-style">화면 구성</h2></div>
+            <div class="grid3">
+              <label class="field"><span>화면 비율</span>
+                <select id="aspect">
+                  <option value="9:16">9:16 쇼츠·릴스</option>
+                  <option value="1:1">1:1 정사각형</option>
+                  <option value="16:9">16:9 가로 영상</option>
+                </select>
+              </label>
+              <label class="field"><span>레이아웃</span>
+                <select id="template">
+                  <option value="band">위 제목 · 가운데 사진</option>
+                  <option value="blur">흐린 배경 · 사진 전체</option>
+                  <option value="full">사진 꽉 채우기</option>
+                </select>
+              </label>
+              <label class="field"><span>글꼴</span>
+                <select id="font"></select>
+              </label>
+              <label class="field"><span>자막 크기</span>
+                <input type="range" id="captionSize" min="40" max="110" step="2">
+              </label>
+              <label class="field"><span>자막 모양</span>
+                <select id="captionStyle">
+                  <option value="outline">테두리 글씨</option>
+                  <option value="box">검은 띠 위 글씨</option>
+                  <option value="plain">글씨만</option>
+                </select>
+              </label>
+              <label class="field"><span>사진 움직임</span>
+                <select id="motion">
+                  <option value="auto">자동 (확대·축소·이동)</option>
+                  <option value="in">천천히 확대</option>
+                  <option value="out">천천히 축소</option>
+                  <option value="none">움직임 없음</option>
+                </select>
+              </label>
+              <label class="field"><span>장면 전환</span>
+                <select id="transition">
+                  <option value="fade">부드럽게 겹치기</option>
+                  <option value="slide">옆으로 밀기</option>
+                  <option value="zoom">확대되며 등장</option>
+                  <option value="none">바로 바꾸기</option>
+                </select>
+              </label>
+              <label class="field color"><span>글자색</span><input type="color" id="textColor"></label>
+              <label class="field color"><span>강조색</span><input type="color" id="highlightColor"></label>
+              <label class="field color"><span>바탕색</span><input type="color" id="bandColor"></label>
+              <label class="field check"><input type="checkbox" id="showProgress"><span>아래쪽 진행 막대</span></label>
+            </div>
+          </section>
+
+          <!-- 오디오 -->
+          <section class="panel" aria-labelledby="h-audio">
+            <div class="panel-head"><h2 id="h-audio">소리</h2><span class="hint">mp3·m4a·wav</span></div>
+            <div class="grid2">
+              <label class="field"><span>배경음악</span><input type="file" id="bgmFile" accept="audio/*"></label>
+              <label class="field"><span>배경음악 크기 <output id="bgmVolOut"></output></span><input type="range" id="bgmVolume" min="0" max="1" step="0.05"></label>
+              <label class="field"><span>내레이션 녹음</span><input type="file" id="narrFile" accept="audio/*"></label>
+              <label class="field"><span>내레이션 크기 <output id="narrVolOut"></output></span><input type="range" id="narrVolume" min="0" max="1.5" step="0.05"></label>
+            </div>
+            <div class="row wrap">
+              <span class="hint" id="audioInfo">소리 파일이 없으면 무음 영상이 만들어집니다.</span>
+              <button type="button" class="btn small" id="fitToNarr" disabled>장면 길이를 내레이션에 맞추기</button>
+              <button type="button" class="btn small ghost" id="clearAudio">소리 빼기</button>
+            </div>
+          </section>
+
+          <!-- 엔딩 -->
+          <section class="panel" aria-labelledby="h-ending">
+            <div class="panel-head"><h2 id="h-ending">마지막 화면</h2></div>
+            <div class="grid3">
+              <label class="field check"><input type="checkbox" id="endingOn"><span>엔딩 화면 넣기</span></label>
+              <label class="field"><span>큰 글씨 (줄바꿈 가능)</span><textarea id="endingText" rows="2"></textarea></label>
+              <label class="field"><span>작은 글씨</span><input type="text" id="endingSub"></label>
+              <label class="field"><span>길이 (초)</span><input type="number" id="endingDur" min="1" max="8" step="0.5"></label>
+            </div>
+          </section>
+        </div>
+
+        <!-- 미리보기 + 내보내기 -->
+        <aside class="studio-preview">
+          <div class="preview-frame" id="previewFrame">
+            <canvas id="previewCanvas" width="540" height="960" aria-label="영상 미리보기"></canvas>
+          </div>
+          <div class="transport">
+            <button type="button" class="btn icon" id="playBtn" aria-label="재생">▶</button>
+            <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="재생 위치">
+            <span class="tc" id="timecode">00:00.0 / 00:00.0</span>
+          </div>
+
+          <div class="export panel">
+            <div class="grid2">
+              <label class="field"><span>화질</span>
+                <select id="quality">
+                  <option value="1080">1080p (권장)</option>
+                  <option value="720">720p (빠름)</option>
+                </select>
+              </label>
+              <label class="field"><span>저장 형식</span>
+                <output id="mimeOut" class="out">확인 중</output>
+              </label>
+            </div>
+            <button type="button" class="btn accent wide" id="exportBtn">영상 만들기</button>
+            <div class="progress" id="exportProgress" hidden><i></i></div>
+            <p class="hint" id="exportStatus">영상 길이만큼 시간이 걸립니다. 만드는 동안 이 탭을 띄워 두세요.</p>
+            <div id="exportResult" hidden>
+              <video id="resultVideo" controls playsinline></video>
+              <div class="row wrap">
+                <button type="button" class="btn small accent" id="saveVideo">영상 파일 저장</button>
+                <button type="button" class="btn small" id="copySrt">자막(SRT) 복사</button>
+                <button type="button" class="btn small ghost" id="saveSrt">자막 파일 저장</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel upload-info" id="uploadInfo" hidden>
+            <div class="panel-head"><h2>업로드용 글</h2><button type="button" class="btn small ghost" id="copyUpload">복사</button></div>
+            <pre id="uploadText"></pre>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ───────────── 02 대표 이미지 합성 ───────────── -->
+    <section class="view" id="view-compose" data-view="compose" hidden>
+      <header class="view-head">
+        <div>
+          <h1>대표 이미지 합성</h1>
+          <p>메인 사진 위에 서브 사진(구성품·라벨·로고)을 같은 자리에 얹어 정사각형 대표 이미지를 한꺼번에 만듭니다. 미리보기에서 서브 사진을 끌어 위치를 옮길 수 있습니다.</p>
+        </div>
+      </header>
+
+      <div class="studio compose">
+        <div class="studio-controls">
+          <section class="panel">
+            <div class="panel-head"><h2>메인 사진</h2><span class="hint" id="mainCount"></span></div>
+            <label class="drop">
+              <input type="file" id="mainFiles" accept="image/*" multiple>
+              <span><b>메인 사진 추가</b> — 여러 장을 한 번에 넣으세요. 장마다 대표 이미지가 1장씩 나옵니다.</span>
+            </label>
+            <ul class="thumbs" id="mainThumbs"></ul>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>서브 사진</h2><span class="hint" id="subCount"></span></div>
+            <label class="drop">
+              <input type="file" id="subFiles" accept="image/*" multiple>
+              <span><b>서브 사진 추가</b> — 1장이면 모든 메인에 똑같이, 여러 장이면 아래 방식대로 붙습니다.</span>
+            </label>
+            <ul class="thumbs" id="subThumbs"></ul>
+            <div class="grid2">
+              <label class="field"><span>여러 장일 때</span>
+                <select id="subMode">
+                  <option value="pair">순서대로 1:1 짝짓기</option>
+                  <option value="single">첫 장만 모두에 쓰기</option>
+                </select>
+              </label>
+              <label class="field"><span>빠른 위치</span>
+                <select id="subPreset">
+                  <option value="">직접 조절</option>
+                  <option value="br">오른쪽 아래</option>
+                  <option value="bl">왼쪽 아래</option>
+                  <option value="tr">오른쪽 위</option>
+                  <option value="tl">왼쪽 위</option>
+                  <option value="c">가운데</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>배치</h2></div>
+            <div class="grid3">
+              <label class="field"><span>캔버스 크기 (px)</span><input type="number" id="cSize" min="300" max="2000" step="50"></label>
+              <label class="field"><span>메인 맞춤</span>
+                <select id="cFit"><option value="contain">전체 보이기</option><option value="cover">꽉 채우기</option></select>
+              </label>
+              <label class="field"><span>메인 여백 <output id="cPadOut"></output></span><input type="range" id="cPad" min="0" max="20" step="1"></label>
+              <label class="field"><span>서브 크기 <output id="cSubWOut"></output></span><input type="range" id="cSubW" min="10" max="70" step="1"></label>
+              <label class="field"><span>가로 위치 <output id="cSubXOut"></output></span><input type="range" id="cSubX" min="0" max="100" step="0.5"></label>
+              <label class="field"><span>세로 위치 <output id="cSubYOut"></output></span><input type="range" id="cSubY" min="0" max="100" step="0.5"></label>
+              <label class="field"><span>서브 테두리 (px)</span><input type="number" id="cBorder" min="0" max="40"></label>
+              <label class="field"><span>서브 모서리 둥글기</span><input type="number" id="cRadius" min="0" max="200"></label>
+              <label class="field check"><input type="checkbox" id="cShadow"><span>서브 그림자</span></label>
+              <label class="field color"><span>바탕색</span><input type="color" id="cBg"></label>
+              <label class="field color"><span>테두리색</span><input type="color" id="cBorderColor"></label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>문구 뱃지</h2><span class="hint">예: 무료배송 · 급매 · 신축</span></div>
+            <div class="grid3">
+              <label class="field check"><input type="checkbox" id="bOn"><span>뱃지 넣기</span></label>
+              <label class="field"><span>문구</span><input type="text" id="bText" maxlength="20"></label>
+              <label class="field"><span>위치</span>
+                <select id="bPos"><option value="tl">왼쪽 위</option><option value="tr">오른쪽 위</option><option value="bl">왼쪽 아래</option><option value="br">오른쪽 아래</option></select>
+              </label>
+              <label class="field color"><span>뱃지색</span><input type="color" id="bColor"></label>
+              <label class="field color"><span>글자색</span><input type="color" id="bTextColor"></label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>저장</h2></div>
+            <div class="grid3">
+              <label class="field"><span>형식</span>
+                <select id="cFormat"><option value="jpg">JPG</option><option value="png">PNG</option><option value="webp">WEBP</option></select>
+              </label>
+              <label class="field"><span>화질 <output id="cQualityOut"></output></span><input type="range" id="cQuality" min="0.5" max="1" step="0.01"></label>
+              <label class="field"><span>파일 이름 규칙</span><input type="text" id="cName" title="{name}=원래 이름, {n}=번호"></label>
+              <label class="field"><span>저장 위치</span>
+                <select id="cSink"><option value="zip">ZIP 파일 1개</option><option value="folder">내 PC 폴더에 바로</option></select>
+              </label>
+            </div>
+            <div class="row wrap">
+              <button type="button" class="btn accent" id="cRun">전체 합성해서 저장</button>
+              <span class="hint" id="cStatus"></span>
+            </div>
+            <div class="progress" id="cProgress" hidden><i></i></div>
+          </section>
+        </div>
+
+        <aside class="studio-preview">
+          <div class="preview-frame square" id="cFrame">
+            <canvas id="cCanvas" width="1000" height="1000" aria-label="합성 미리보기"></canvas>
+          </div>
+          <div class="transport">
+            <button type="button" class="btn icon" id="cPrev" aria-label="이전 사진">‹</button>
+            <span class="tc grow" id="cIndex">0 / 0</span>
+            <button type="button" class="btn icon" id="cNext" aria-label="다음 사진">›</button>
+          </div>
+          <p class="hint">미리보기의 서브 사진을 끌면 모든 결과물에서 같은 자리로 옮겨집니다.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ───────────── 03 이미지 일괄 다운로드 ───────────── -->
+    <section class="view" id="view-download" data-view="download" hidden>
+      <header class="view-head">
+        <div>
+          <h1>이미지 일괄 다운로드</h1>
+          <p>상품 코드와 이미지 주소를 엑셀에서 복사해 붙여 넣으면, 크기·용량·파일 이름을 맞춰 한꺼번에 내려받습니다. PC에 있는 사진도 같은 규칙으로 일괄 변환할 수 있습니다.</p>
+        </div>
+      </header>
+
+      <p class="notice" id="dlNotice" hidden></p>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>내려받을 목록</h2>
+          <div class="row wrap">
+            <button type="button" class="btn small ghost" id="dlSample">예시 채우기</button>
+            <button type="button" class="btn small ghost" id="dlAddRows">행 5개 추가</button>
+            <label class="btn small ghost">PC 사진 추가<input type="file" id="dlLocal" accept="image/*" multiple hidden></label>
+            <button type="button" class="btn small ghost" id="dlClear">비우기</button>
+          </div>
+        </div>
+        <p class="hint">상품 코드 칸이나 주소 칸을 누르고 Ctrl+V(맥은 ⌘+V)로 엑셀 여러 줄을 한 번에 붙여 넣을 수 있습니다. 두 칸(코드, 주소)을 함께 복사해도 됩니다.</p>
+        <div class="table-wrap">
+          <table class="grid-table">
+            <thead><tr><th class="num">#</th><th>상품 코드</th><th>이미지 주소</th><th>저장 이름</th><th>상태</th><th class="num"><span class="sr">삭제</span></th></tr></thead>
+            <tbody id="dlBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="grid4">
+        <section class="panel">
+          <div class="panel-head"><label class="check"><input type="checkbox" id="dlRename"><span>파일 이름 바꾸기</span></label></div>
+          <div class="name-pattern">
+            <input type="text" id="dlPrefix" aria-label="앞 글자" placeholder="앞 글자">
+            <span>_</span><span class="pill">상품 코드</span><span>_</span>
+            <input type="text" id="dlSuffix" aria-label="뒤 글자" placeholder="뒤 글자">
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><label class="check"><input type="checkbox" id="dlResize"><span>크기 맞추기</span></label><span class="hint">300~1500px</span></div>
+          <div class="row">
+            <input type="number" id="dlW" min="300" max="1500" aria-label="가로">
+            <span>×</span>
+            <input type="number" id="dlH" min="300" max="1500" aria-label="세로">
+            <span>px</span>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2>용량 · 형식</h2></div>
+          <div class="stack">
+            <select id="dlCompress" aria-label="용량 줄이기">
+              <option value="0.95">원본에 가깝게</option>
+              <option value="0.85">표준 압축 (권장)</option>
+              <option value="0.72">강하게 압축</option>
+              <option value="0.55">최대 압축</option>
+            </select>
+            <select id="dlFormat" aria-label="저장 형식">
+              <option value="jpg">JPG</option><option value="webp">WEBP</option><option value="png">PNG</option><option value="keep">원본 형식 그대로</option>
+            </select>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><h2>요청 간격 · 저장</h2></div>
+          <div class="stack">
+            <select id="dlInterval" aria-label="요청 간격">
+              <option value="0.3-0.8">0.3~0.8초 (빠름)</option>
+              <option value="1-2">1~2초 (보통)</option>
+              <option value="2-4">2~4초 (안전)</option>
+            </select>
+            <select id="dlSink" aria-label="저장 위치"><option value="zip">ZIP 파일</option><option value="folder">PC 폴더</option></select>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel runbar">
+        <span class="pill" id="dlCountIn">입력 0개</span>
+        <span class="pill" id="dlCountOk">유효 0개</span>
+        <div class="progress grow" id="dlProgress"><i></i></div>
+        <span class="tc" id="dlProgressText">0 / 0</span>
+        <button type="button" class="btn ghost" id="dlStop" disabled>멈춤</button>
+        <button type="button" class="btn accent" id="dlStart">다운로드 시작</button>
+      </section>
+      <p class="hint">본인 상품이거나 사용 권한이 있는 이미지만 내려받으세요. 사이트마다 이용약관이 다르므로 대량 수집 전에 확인하는 것이 안전합니다.</p>
+    </section>
+
+    <!-- ───────────── 안내 ───────────── -->
+    <section class="view prose" id="view-guide" data-view="guide" hidden>
+      <header class="view-head"><div><h1>사용 안내</h1><p>이 화면에서 지금 쓸 수 있는 기능과 각 기능을 쓰는 순서입니다.</p></div></header>
+      <section class="panel">
+        <h2>지금 이 환경</h2>
+        <ul class="status-list" id="envList"></ul>
+      </section>
+      <section class="panel">
+        <h2>쇼츠 한 편 만드는 순서</h2>
+        <ol>
+          <li><b>사진 넣기</b> — 매물·현장·강의 자료 사진을 순서대로 넣습니다.</li>
+          <li><b>대본 넣기</b> — 한 줄에 한 장면씩 씁니다. 강조할 단어는 <code>*별표*</code>로 감쌉니다. AI 대본 만들기가 켜져 있으면 주제만 넣어도 됩니다.</li>
+          <li><b>제목·채널</b> — 위쪽에 계속 떠 있을 제목과 채널 이름을 정합니다.</li>
+          <li><b>소리</b> — 배경음악과 내레이션 녹음을 넣고, 필요하면 “장면 길이를 내레이션에 맞추기”를 누릅니다.</li>
+          <li><b>영상 만들기</b> — 미리보기로 확인한 뒤 만들고, 영상과 자막(SRT)을 저장합니다.</li>
+        </ol>
+      </section>
+      <section class="panel">
+        <h2>알아 두면 좋은 점</h2>
+        <ul>
+          <li>영상은 실제 길이만큼 녹화하듯 만들어집니다. 30초 영상이면 약 30초가 걸립니다.</li>
+          <li>크롬·엣지 최신 버전에서는 MP4로, 그 밖의 브라우저에서는 WEBM으로 저장됩니다. 유튜브는 두 형식 모두 올라갑니다.</li>
+          <li>사진·소리 파일은 서버로 올라가지 않고 이 브라우저 안에서만 처리됩니다.</li>
+          <li>“프로젝트 저장”은 사진과 글을 한 파일(.json)로 묶습니다. 소리 파일은 들어가지 않으니 다시 넣어 주세요.</li>
+        </ul>
+      </section>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module" src="js/main.js"></script>
+<!-- ARTIFACT:BODY_END -->
+</body>
+</html>

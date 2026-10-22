@@ -1,0 +1,18 @@
+{
+  "name": "mrk-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MR.K 영상만들기 — 숏폼 영상·대표 이미지 합성·이미지 일괄 다운로드 웹 도구",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "check": "node --check api/ai.js && node --check api/proxy.js && node --check api/health.js && node --check js/script-prompt.js",
+    "artifact": "node scripts/artifact-page.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0"
+  }
+}
