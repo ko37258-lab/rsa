@@ -36,6 +36,8 @@ export function HistoryView({ history, onChange, active }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  // 카드의 '삭제'는 한 번 더 눌러야 지워집니다 (휴대폰에서 옆 버튼을 잘못 누르는 일을 막음).
+  const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
 
   const totals = useMemo(() => {
     const dictations = history.filter((h) => h.kind === "dictation");
@@ -125,6 +127,7 @@ export function HistoryView({ history, onChange, active }: Props) {
                 <button
                   type="button"
                   className="btn btn--ghost"
+                  aria-label={`${formatWhen(h.createdAt)} 기록 복사`}
                   onClick={async () => {
                     const ok = await copyText(h.result);
                     setCopiedId(ok ? h.id : null);
@@ -133,11 +136,30 @@ export function HistoryView({ history, onChange, active }: Props) {
                 >
                   {copiedId === h.id ? "복사됨" : "복사"}
                 </button>
-                <button type="button" className="btn btn--ghost" onClick={() => setOpenId(openId === h.id ? null : h.id)} aria-expanded={openId === h.id}>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  aria-label={`${formatWhen(h.createdAt)} 기록 ${openId === h.id ? "원문 접기" : "원문 보기"}`}
+                  onClick={() => setOpenId(openId === h.id ? null : h.id)}
+                  aria-expanded={openId === h.id}
+                >
                   {openId === h.id ? "접기" : "원문 보기"}
                 </button>
-                <button type="button" className="btn btn--ghost" onClick={() => onChange(history.filter((x) => x.id !== h.id))}>
-                  삭제
+                <button
+                  type="button"
+                  className={`btn ${armedDeleteId === h.id ? "btn--danger" : "btn--ghost"}`}
+                  aria-label={`${formatWhen(h.createdAt)} 기록 ${armedDeleteId === h.id ? "정말 삭제" : "삭제"}`}
+                  onClick={() => {
+                    if (armedDeleteId === h.id) {
+                      onChange(history.filter((x) => x.id !== h.id));
+                      setArmedDeleteId(null);
+                    } else {
+                      setArmedDeleteId(h.id);
+                      window.setTimeout(() => setArmedDeleteId((id) => (id === h.id ? null : id)), 3000);
+                    }
+                  }}
+                >
+                  {armedDeleteId === h.id ? "정말 삭제" : "삭제"}
                 </button>
               </div>
             </li>

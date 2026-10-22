@@ -29,4 +29,14 @@ export function installPressEffects(): void {
     },
     { passive: true },
   );
+  // 마우스·손가락으로 누른 버튼에는 포커스를 남기지 않습니다. 그래야 다음에 Space를 누를 때
+  // 그 버튼이 다시 눌리지 않고 '말하기'로 갑니다. 키보드(Tab)로 간 포커스는 그대로 둡니다.
+  document.addEventListener(
+    "pointerup",
+    (e) => {
+      const target = (e.target as Element | null)?.closest?.("button");
+      if (target && !target.closest(".mic") && document.activeElement === target) target.blur();
+    },
+    { passive: true },
+  );
 }

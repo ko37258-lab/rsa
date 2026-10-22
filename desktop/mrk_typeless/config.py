@@ -37,7 +37,15 @@ DEFAULTS = {
     "hotkey_edit": "ctrl+alt+e",
     # Win+H(Windows 음성 입력) 대신 MR.K 받아쓰기를 엽니다.
     "win_h": True,
+    # 받아쓴 글과 정리한 글을 history.jsonl에 남길지
+    "save_history": True,
 }
+
+# 기록 파일이 이보다 커지면 오래된 줄부터 지웁니다.
+HISTORY_MAX_BYTES = 2 * 1024 * 1024
+HISTORY_KEEP_LINES = 300
+# 다른 프로그램에서 선택해 가져온 글은 이만큼만 남깁니다.
+HISTORY_RAW_LIMIT = 2000
 
 MODELS = [
     ("claude-opus-5-5", "Claude Opus 5.5 — 가장 정확함"),
@@ -144,8 +152,33 @@ def same_hotkey(a: str, b: str) -> bool:
         return norm(a) == norm(b)
 
 
-def append_history(entry: dict) -> None:
+def append_history(entry: dict, cfg: dict | None = None) -> None:
+    """기록 한 줄을 붙입니다. 설정에서 껐으면 남기지 않고, 파일이 커지면 오래된 줄부터 지웁니다."""
+    if cfg is not None and not cfg.get("save_history", True):
+        return
     APP_DIR.mkdir(parents=True, exist_ok=True)
     entry = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), **entry}
+    if entry.get("kind") in ("polish", "edit") and isinstance(entry.get("raw"), str) and len(entry["raw"]) > HISTORY_RAW_LIMIT:
+        entry["raw"] = entry["raw"][:HISTORY_RAW_LIMIT] + "…"
     with HISTORY_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    _trim_history()
+
+
+def _trim_history() -> None:
+    try:
+        if HISTORY_PATH.stat().st_size <= HISTORY_MAX_BYTES:
+            return
+        lines = HISTORY_PATH.read_text(encoding="utf-8").splitlines(keepends=True)
+        tmp = HISTORY_PATH.with_suffix(".tmp")
+        tmp.write_text("".join(lines[-HISTORY_KEEP_LINES:]), encoding="utf-8")
+        tmp.replace(HISTORY_PATH)
+    except OSError:
+        pass
+
+
+def clear_history() -> None:
+    try:
+        HISTORY_PATH.unlink()
+    except FileNotFoundError:
+        pass

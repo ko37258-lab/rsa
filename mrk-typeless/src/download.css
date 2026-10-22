@@ -70,6 +70,36 @@
   color: var(--primary-text);
 }
 
+.dl-hash {
+  font-size: 0.75rem;
+  color: var(--text);
+  max-width: 560px;
+}
+
+.dl-hash summary {
+  cursor: pointer;
+  color: var(--primary-text);
+  font-weight: 600;
+}
+
+.dl-hash p {
+  margin: 6px 0;
+}
+
+.dl-hash code {
+  font-family: var(--font-mono);
+}
+
+.dl-hash__value {
+  display: block;
+  word-break: break-all;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 6px 8px;
+  text-align: left;
+}
+
 .dl-hero__note {
   position: absolute;
   right: 0;

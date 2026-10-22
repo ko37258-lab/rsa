@@ -155,16 +155,22 @@ const LATEST_API = "https://api.github.com/repos/ko37258-lab/rsa/releases/latest
 
 /** GitHub 릴리스의 최신 버전과 설치 파일 크기. 못 가져오면 코드에 적힌 버전을 보여 줍니다. */
 function useLatestRelease() {
-  const [info, setInfo] = useState<{ version: string; sizeMb: number | null }>({ version: DESKTOP_VERSION, sizeMb: null });
+  const [info, setInfo] = useState<{ version: string; sizeMb: number | null; sha256: string | null }>({
+    version: DESKTOP_VERSION,
+    sizeMb: null,
+    sha256: null,
+  });
   useEffect(() => {
     const ctl = new AbortController();
     fetch(LATEST_API, { signal: ctl.signal, headers: { Accept: "application/vnd.github+json" } })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { tag_name?: string; assets?: { name: string; size: number }[] } | null) => {
+      .then((data: { tag_name?: string; body?: string; assets?: { name: string; size: number }[] } | null) => {
         if (!data) return;
         const version = data.tag_name?.match(/(\d+\.\d+\.\d+)/)?.[1];
         const setup = data.assets?.find((a) => a.name === "MRK-Typeless-Setup.exe");
-        setInfo({ version: version ?? DESKTOP_VERSION, sizeMb: setup ? Math.round(setup.size / 1024 / 1024) : null });
+        // 릴리스 설명에 적힌 설치 파일의 SHA-256 (CI가 붙임)
+        const sha256 = data.body?.match(/MRK-Typeless-Setup\.exe:\s*`([0-9a-f]{64})`/)?.[1] ?? null;
+        setInfo({ version: version ?? DESKTOP_VERSION, sizeMb: setup ? Math.round(setup.size / 1024 / 1024) : null, sha256 });
       })
       .catch(() => undefined);
     return () => ctl.abort();
@@ -206,6 +212,15 @@ export function DownloadPage() {
             {latest.sizeMb ? ` · ${latest.sizeMb}MB` : ""} · Windows 10·11 · 관리자 권한 필요 없음 ·{" "}
             <a href={PORTABLE_URL}>설치 없이 쓰는 한 파일 버전</a>
           </p>
+          {latest.sha256 && (
+            <details className="dl-hash">
+              <summary>내려받은 파일 확인하기 (SHA-256)</summary>
+              <p>
+                PowerShell에서 <code>Get-FileHash MRK-Typeless-Setup.exe</code>를 실행해 아래 값과 같은지 보세요.
+              </p>
+              <code className="dl-hash__value">{latest.sha256}</code>
+            </details>
+          )}
         </div>
         <HandNote text="설치는 5분이면 끝나요" className="dl-hero__note" />
       </section>

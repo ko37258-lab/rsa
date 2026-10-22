@@ -39,7 +39,11 @@ export function GuideDialog({ open, onClose }: Props) {
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      dialog.querySelector<HTMLElement>(".guide__body")?.scrollTo({ top: 0 });
+      dialog.querySelector<HTMLElement>("#guide-title")?.focus();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
@@ -63,7 +67,7 @@ export function GuideDialog({ open, onClose }: Props) {
         <header className="guide__head">
           <div>
             <p className="guide__eyebrow">처음이라면 3분만</p>
-            <h2 id="guide-title" className="guide__title">
+            <h2 id="guide-title" className="guide__title" tabIndex={-1}>
               MR.K Typeless 사용법
             </h2>
           </div>
@@ -202,7 +206,11 @@ export function GuideDialog({ open, onClose }: Props) {
                   <b>Gemini API 키</b>, <b>AI 없이</b>.
                 </li>
                 <li>'AI 없이'는 군더더기와 반복만 지웁니다. 고쳐 말한 곳·목록·형식 바꾸기는 AI가 있어야 됩니다.</li>
-                <li>원문은 고른 AI 회사(Anthropic 또는 Google)로만 보내고, 키와 기록은 이 브라우저에만 저장합니다.</li>
+                <li>
+                  원문은 고른 AI 회사(Anthropic 또는 Google)로만 보냅니다. 단, <b>Claude·Gemini 비교</b>를 누르면 두 회사 모두로 보냅니다. 키와
+                  기록은 이 브라우저에만 저장합니다.
+                </li>
+                <li>Gemini 무료 등급에서는 보낸 내용이 Google 서비스 개선에 쓰일 수 있습니다. 민감한 내용은 유료 등급이나 Claude 키를 쓰세요.</li>
               </ul>
             </div>
             <p className="gsec__subtitle">글의 형식 7가지 (받아쓰기 탭 위쪽에서 고름)</p>

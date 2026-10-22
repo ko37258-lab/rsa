@@ -1,3 +1,5 @@
+import json
+
 from mrk_typeless import config as config_module
 from mrk_typeless import gemini, llm, stt, update
 from mrk_typeless.cleanup import local_cleanup, sanitize_dictation
@@ -211,3 +213,20 @@ def test_clipboard_snapshot_roundtrip_without_windows(monkeypatch):
     clipboard.restore(snap)
     assert store["text"] == "원래 글"
     assert clipboard.Snapshot([], "").empty
+
+
+def test_history_respects_toggle_cap_and_trims(tmp_path, monkeypatch):
+    path = tmp_path / "history.jsonl"
+    monkeypatch.setattr(config_module, "HISTORY_PATH", path)
+    monkeypatch.setattr(config_module, "APP_DIR", tmp_path)
+    monkeypatch.setattr(config_module, "HISTORY_MAX_BYTES", 400)
+    monkeypatch.setattr(config_module, "HISTORY_KEEP_LINES", 2)
+    config_module.append_history({"kind": "dictation", "raw": "a", "result": "b"}, {"save_history": False})
+    assert not path.exists()
+    for i in range(6):
+        config_module.append_history({"kind": "polish", "raw": "x" * 3000, "result": str(i)}, {"save_history": True})
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) <= 2 and lines[-1].endswith('"5"}')
+    assert len(json.loads(lines[-1])["raw"]) == config_module.HISTORY_RAW_LIMIT + 1
+    config_module.clear_history()
+    assert not path.exists()

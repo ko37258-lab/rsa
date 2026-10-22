@@ -137,13 +137,12 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
         {accountAvailable && (
           <div className="field">
             <span className="label">정리 속도 (Claude 계정)</span>
-            <div className="tier" role="radiogroup" aria-label="정리 속도">
+            <div className="tier" role="group" aria-label="정리 속도">
               {TIER_OPTIONS.map((t) => (
                 <button
                   key={t.id}
                   type="button"
-                  role="radio"
-                  aria-checked={settings.accountTier === t.id}
+                  aria-pressed={settings.accountTier === t.id}
                   className={`tier__item${settings.accountTier === t.id ? " is-on" : ""}`}
                   onClick={() => onSettings({ accountTier: t.id })}
                 >
@@ -239,8 +238,9 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
                 <KeyCheckButton id="gemini-key" apiKey={settings.geminiKey} check={checkGeminiKey} />
               </div>
               <p className="field__hint">
-                Google AI Studio에 로그인해 키를 만들고 붙여넣으세요. 키는 이 브라우저에만 저장되고 Google 서버로만 전송됩니다. 두 키를
-                모두 넣으면 정리된 글 아래 <em>Claude·Gemini 비교</em>로 같은 원문을 나란히 견줘 볼 수 있습니다.
+                Google AI Studio에 로그인해 키를 만들고 붙여넣으세요. 키는 이 브라우저에만 저장되고 Google 서버로만 전송됩니다. 무료
+                등급에서는 보낸 내용이 Google 서비스 개선에 쓰일 수 있으니, 민감한 내용은 유료 등급이나 Claude 키를 쓰세요. 두 키를 모두
+                넣으면 정리된 글 아래 <em>Claude·Gemini 비교</em>로 같은 원문을 나란히 견줘 볼 수 있습니다.
               </p>
             </div>
             <div className="field__grid">
@@ -357,6 +357,7 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
             </a>
             <p className="field__hint">
               {stt.keyHint} 키는 이 브라우저에만 저장되고 받아쓰기 서버로만 전송됩니다. 녹음 받아쓰기는 이용한 시간만큼 해당 서비스 요금이 나옵니다.
+              {sttUsesGemini && " Gemini 무료 등급에서는 보낸 녹음과 사전 용어가 Google 서비스 개선에 쓰일 수 있습니다."}
               {settings.speechEngine === "record" && !sttKey.trim() && " 키를 넣기 전까지는 브라우저 음성인식을 씁니다."}
             </p>
           </div>

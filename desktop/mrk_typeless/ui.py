@@ -327,6 +327,9 @@ class SettingsWindow:
         f.head("붙여넣기")
         self.auto_paste, _ = f.check("정리된 글을 쓰던 곳에 바로 붙여넣기 (끄면 클립보드에만 복사)", bool(c.get("auto_paste", True)))
         self.restore, _ = f.check("붙여넣은 뒤 원래 클립보드 내용 되돌리기", bool(c.get("restore_clipboard", True)))
+        f.head("기록")
+        self.save_history, _ = f.check("받아쓴 글과 정리한 글을 이 컴퓨터의 기록 파일에 남기기", bool(c.get("save_history", True)))
+        f.hint("선택한 글을 정리할 때 그 글도 기록에 남습니다. 계약서처럼 민감한 글을 자주 다루면 꺼 두세요. 기록은 트레이 메뉴 → 기록 지우기로 지울 수 있습니다.")
 
         buttons = ttk.Frame(outer)
         buttons.grid(row=1, column=0, sticky="we", pady=(12, 0))
@@ -379,6 +382,7 @@ class SettingsWindow:
         cfg["style_note"] = self.style_note.get("1.0", "end").strip()
         cfg["auto_paste"] = bool(self.auto_paste.get())
         cfg["restore_clipboard"] = bool(self.restore.get())
+        cfg["save_history"] = bool(self.save_history.get())
         if not stt_key(cfg):
             need = "Gemini API 키" if cfg["stt_provider"] == "gemini" else "받아쓰기 API 키"
             if not messagebox.askyesno(

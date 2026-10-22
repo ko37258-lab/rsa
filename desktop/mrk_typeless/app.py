@@ -287,7 +287,7 @@ class App:
             sub = "AI 키가 없어 기본 정리만 했습니다 (설정에서 Gemini 키를 넣어 주세요)"
         self.post(self.overlay.show_done, done, sub)
         try:
-            append_history({"kind": kind, "mode": self.cfg["mode"], "command": command, "raw": raw, "result": result, "seconds": round(seconds, 1)})
+            append_history({"kind": kind, "mode": self.cfg["mode"], "command": command, "raw": raw, "result": result, "seconds": round(seconds, 1)}, self.cfg)
         except OSError:
             log.exception("기록 저장 실패")
 
@@ -368,6 +368,15 @@ class App:
     def open_folder(self) -> None:
         APP_DIR.mkdir(parents=True, exist_ok=True)
         os.startfile(str(APP_DIR))  # type: ignore[attr-defined]
+
+    def clear_history(self) -> None:
+        from tkinter import messagebox
+
+        from .config import clear_history
+
+        if messagebox.askyesno("기록 지우기", "받아쓴 글과 정리한 글 기록을 모두 지울까요? 되돌릴 수 없습니다."):
+            clear_history()
+            self.overlay.show_info("기록을 지웠습니다", "", 1.5)
 
     def quit(self) -> None:
         try:

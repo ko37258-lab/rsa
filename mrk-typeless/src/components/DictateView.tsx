@@ -300,9 +300,9 @@ export function DictateView({
         if (!ai.busy) void polish(false, spokenRef.current);
         return;
       }
-      // 글 칸이 아니면 Space는 말하기. 방금 누른 버튼에 포커스가 남아 있어도 그 버튼을 다시 누르지 않습니다.
-      const onButton = e.target instanceof HTMLButtonElement;
-      if (e.code === "Space" && !e.repeat && (onButton || !isEditable(e.target)) && !speech.listening && !speech.transcribing) {
+      // 글 칸·버튼이 아니거나 마이크 버튼이면 Space는 말하기. (마우스로 누른 버튼은 press.ts가 포커스를 풀어 줍니다.)
+      const onMic = !!(e.target as HTMLElement | null)?.closest?.(".mic");
+      if (e.code === "Space" && !e.repeat && (onMic || !isEditable(e.target)) && !speech.listening && !speech.transcribing) {
         e.preventDefault();
         spaceHeld = true;
         startListening();

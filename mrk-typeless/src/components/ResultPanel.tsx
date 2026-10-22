@@ -44,8 +44,22 @@ export function ResultPanel({ title, status, text, error, badge, meta, original,
     window.setTimeout(() => setCopied(null), 2200);
   }
 
+  const statusText =
+    status === "thinking"
+      ? "정리하는 중"
+      : status === "streaming"
+        ? "글을 쓰는 중"
+        : status === "done" && text
+          ? `정리 완료, ${text.replace(/\s/g, "").length}자`
+          : status === "error" && error
+            ? `오류: ${error}`
+            : "";
+
   return (
-    <section className={`result is-${status}`} aria-live="polite">
+    <section className={`result is-${status}`} aria-busy={busy}>
+      <p className="sr-only" role="status">
+        {statusText}
+      </p>
       <header className="result__head">
         <h2 className="result__title">
           <span className="result__title-text">

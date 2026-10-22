@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import React, { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export interface SegmentedOption<T extends string> {
   id: T;
@@ -43,6 +43,16 @@ export function Segmented<T extends string>({ options, value, onChange, variant,
   }, [measure]);
 
   const isTabs = variant === "tabs";
+  // 방향키로 고르고(고른 것으로 바로 바뀜), Tab은 그룹을 한 번에 지나갑니다.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const keys: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: -index, End: options.length - 1 - index };
+    const delta = keys[e.key];
+    if (delta === undefined) return;
+    e.preventDefault();
+    const next = options[(index + delta + options.length) % options.length];
+    onChange(next.id);
+    wrapRef.current?.querySelector<HTMLElement>(`[data-id="${next.id}"]`)?.focus();
+  };
   return (
     <div ref={wrapRef} className={`seg seg--${variant}`} role={isTabs ? "tablist" : "radiogroup"} aria-label={ariaLabel}>
       {pill && (
@@ -52,7 +62,7 @@ export function Segmented<T extends string>({ options, value, onChange, variant,
           style={{ transform: `translate(${pill.x}px, ${pill.y}px)`, width: pill.w, height: pill.h }}
         />
       )}
-      {options.map((o) => {
+      {options.map((o, index) => {
         const on = o.id === value;
         return (
           <button
@@ -61,6 +71,8 @@ export function Segmented<T extends string>({ options, value, onChange, variant,
             data-id={o.id}
             className={`seg__opt${on ? " is-on" : ""}`}
             role={isTabs ? "tab" : "radio"}
+            tabIndex={on ? 0 : -1}
+            onKeyDown={(e) => onKeyDown(e, index)}
             id={isTabs ? `tab-${o.id}` : undefined}
             aria-selected={isTabs ? on : undefined}
             aria-checked={isTabs ? undefined : on}

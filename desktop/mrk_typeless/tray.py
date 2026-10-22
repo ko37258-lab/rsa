@@ -52,6 +52,7 @@ class Tray:
             pystray.MenuItem("글 형식", pystray.Menu(*(self._mode_item(m) for m in MODES))),
             pystray.MenuItem("사전 고치기 (메모장)", self._action(app.open_dictionary)),
             pystray.MenuItem("기록 폴더 열기", self._action(app.open_folder)),
+            pystray.MenuItem("기록 지우기…", self._action(app.clear_history)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 lambda _item: f"새 버전 {app.newer_version} 받기…",

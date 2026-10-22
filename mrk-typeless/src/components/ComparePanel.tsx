@@ -84,7 +84,7 @@ export function ComparePanel({ req, settings, accountAvailable, onAdopt, onOpenS
           <p className="compare__desc">
             {running.length === 0
               ? "두 AI의 API 키를 넣으면 같은 원문을 동시에 정리해 견줘 볼 수 있습니다."
-              : "같은 원문과 같은 지시로 동시에 정리했습니다. 마음에 드는 쪽을 '이 글 쓰기'로 고르세요."}
+              : "같은 원문과 같은 지시를 Anthropic과 Google 두 곳에 함께 보내 정리했습니다. 마음에 드는 쪽을 '이 글 쓰기'로 고르세요."}
           </p>
         </div>
         <div className="compare__tools">

@@ -11,7 +11,7 @@
   --ink: #0d131b;
   --ink-2: #343a40;
   --text: #495057;
-  --muted: #868e96;
+  --muted: #6c757d;
   --primary: #6868f7;
   --primary-deep: #4c40d9;
   --primary-text: #5353c6;
@@ -22,7 +22,7 @@
   --rec: #f03e3e;
   --rec-deep: #c92a2a;
   --rec-soft: #fff5f5;
-  --ok: #2b8a3e;
+  --ok: #237032;
   --ok-dot: #40c057;
   --warn: #c2410c;
   --warn-soft: #fff4e6;
@@ -117,9 +117,11 @@ textarea {
 
 .nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
+  min-width: 0;
 }
 
 .brand {
@@ -201,8 +203,11 @@ textarea {
 
 .nav__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  margin-left: auto;
 }
 
 .pc-link {
@@ -371,8 +376,9 @@ textarea {
 
 .seg--tabs {
   justify-self: center;
-  width: max-content;
-  max-width: 100%;
+  width: 100%;
+  max-width: max-content;
+  min-width: 0;
   padding: 4px;
   border-radius: 11px;
   background: var(--surface-3);
@@ -624,7 +630,7 @@ kbd {
 }
 
 .btn--danger {
-  background: var(--rec);
+  background: var(--rec-deep);
   color: #fff;
 }
 
@@ -1592,7 +1598,7 @@ textarea:focus {
 }
 
 .cmp__badge--on {
-  background: var(--primary);
+  background: var(--primary-deep);
   color: #fff;
   box-shadow: none;
 }
@@ -2335,7 +2341,8 @@ textarea:focus {
 }
 
 .hero__guide {
-  margin-top: 14px;
+  margin-top: 10px;
+  min-height: 40px;
   border: 0;
   background: none;
   padding: 4px 2px;
@@ -2660,7 +2667,8 @@ body:has(dialog.guide[open]) {
 }
 
 .gflow__step--ai .gflow__num {
-  background: var(--primary);
+  background: var(--primary-deep);
+  border-color: var(--primary-deep);
   color: #fff;
 }
 
@@ -2911,6 +2919,50 @@ body:has(dialog.guide[open]) {
   .gtabs div {
     grid-template-columns: minmax(0, 1fr);
     gap: 2px;
+  }
+}
+
+/* 손가락으로 누르는 기기: 작은 버튼·칩을 40px 이상으로 */
+@media (pointer: coarse) {
+  .term__x,
+  .btn--icon {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .entry__actions .btn,
+  .chip,
+  .seg--chips .seg__opt,
+  .key-link,
+  .guide__toc .chip {
+    min-height: 40px;
+  }
+}
+
+/* 좁은 휴대폰: 위쪽 줄은 아이콘 위주로, 탭은 화면 폭에 맞춰 */
+@media (max-width: 420px) {
+  .guide-btn {
+    padding: 0 9px;
+  }
+
+  .guide-btn__text {
+    display: none;
+  }
+
+  .brand__name {
+    font-size: 1.05rem;
+  }
+
+  .seg--tabs {
+    justify-self: stretch;
+    max-width: 100%;
+  }
+
+  .seg--tabs .seg__opt {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 7px 4px;
+    font-size: var(--step--1);
   }
 }
 

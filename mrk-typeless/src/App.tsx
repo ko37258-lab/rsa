@@ -13,7 +13,7 @@ import { DEFAULT_DICTIONARY, type Dictionary } from "./lib/dictionary";
 import { addToHistory, type HistoryItem } from "./lib/history";
 import { DOWNLOAD_PAGE_URL } from "./lib/desktop";
 import { DEFAULT_SETTINGS, resolveEngine, type EngineId, type Settings } from "./lib/settings";
-import { load, save } from "./lib/storage";
+import { isStorageFull, load, onStorageFull, save } from "./lib/storage";
 
 type Tab = "dictate" | "edit" | "dictionary" | "history" | "settings";
 
@@ -27,10 +27,18 @@ const TABS: { id: Tab; label: string }[] = [
 
 const ENGINE_SHORT: Record<EngineId, string> = { account: "Claude 계정", apikey: "Claude", gemini: "Gemini", local: "AI 없이" };
 
+function shrinkHistory(list: HistoryItem[]): HistoryItem[] | null {
+  if (list.length <= 20) return null;
+  return list.slice(0, Math.max(20, Math.floor(list.length * 0.7)));
+}
+
 export function App() {
   const [settings, setSettings] = usePersistentState<Settings>("settings", (s) => ({ ...DEFAULT_SETTINGS, ...s }));
   const [dictionary, setDictionary] = usePersistentState<Dictionary>("dictionary", (s) => s ?? DEFAULT_DICTIONARY);
-  const [history, setHistory] = usePersistentState<HistoryItem[]>("history", (s) => s ?? []);
+  // 저장 공간이 가득 차면 오래된 기록부터 30%씩 줄여 다시 저장합니다.
+  const [history, setHistory] = usePersistentState<HistoryItem[]>("history", (s) => s ?? [], shrinkHistory);
+  const [storageFull, setStorageFull] = useState(isStorageFull);
+  useEffect(() => onStorageFull(setStorageFull), []);
   const [tab, setTab] = usePersistentState<Tab>("tab", (s) => (s && TABS.some((t) => t.id === s) ? s : "dictate"));
   const [firstVisit] = useState(() => load("history") === undefined && load("draft") === undefined);
   const [editSource, setEditSource] = useState("");
@@ -97,12 +105,12 @@ export function App() {
           </span>
         </div>
         <div className="nav__actions">
-          <button type="button" className={`guide-btn${guideSeen ? "" : " is-new"}`} onClick={openGuide} aria-haspopup="dialog">
+          <button type="button" className={`guide-btn${guideSeen ? "" : " is-new"}`} onClick={openGuide} aria-haspopup="dialog" aria-label="사용법 보기">
             <svg viewBox="0 0 20 20" aria-hidden="true">
               <circle cx="10" cy="10" r="7.5" />
               <path d="M7.9 7.6a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.4M10 14.2v.1" />
             </svg>
-            사용법
+            <span className="guide-btn__text">사용법</span>
           </button>
           <a
             className="pc-link"
@@ -155,6 +163,15 @@ export function App() {
         }))}
       />
 
+      {storageFull && (
+        <p className="banner banner--warn" role="status">
+          이 브라우저의 저장 공간이 가득 찼습니다. 오래된 기록부터 자동으로 지웁니다. 남기고 싶은 기록은{" "}
+          <button type="button" className="link" onClick={() => setTab("history")}>
+            기록 탭에서 내보내기
+          </button>
+          로 파일로 저장하세요.
+        </p>
+      )}
       {aiMissing && tab !== "settings" && (
         <p className="banner">
           지금은 AI 없이 기본 정리만 합니다.{" "}
