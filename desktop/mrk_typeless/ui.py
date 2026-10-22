@@ -1,4 +1,4 @@
-"""화면: 녹음·정리 상태를 보여 주는 작은 알약 창, 설정 창, 사용법 창."""
+"""화면: 녹음·정리 상태를 보여 주는 작은 알약 창, 설정 창, 사용 방법 창."""
 
 import sys
 import tkinter as tk
@@ -6,7 +6,19 @@ import tkinter.font as tkfont
 import webbrowser
 from tkinter import messagebox, ttk
 
-from .config import CLAUDE_KEY_URL, MODELS, SPEECH_LANGS, STT_PROVIDERS, TARGET_LANGS
+from .config import (
+    CLAUDE_KEY_URL,
+    ENGINES,
+    GEMINI_KEY_URL,
+    GEMINI_MODELS,
+    GUIDE_URL,
+    MODELS,
+    SPEECH_LANGS,
+    STT_PROVIDERS,
+    TARGET_LANGS,
+    stt_key,
+)
+from .guide import help_items, readiness
 from .modes import MODES
 
 FONT = "Malgun Gothic"
@@ -144,21 +156,98 @@ class Overlay:
         self._visible = False
 
 
+
+def _label_of(options, value, fallback_index=0):
+    return next((label for key, label, *_ in options if key == value), options[fallback_index][1])
+
+
+def _key_of(options, label):
+    return next(key for key, lab, *_ in options if lab == label)
+
+
+class _Form:
+    """설정 창 한 칸(탭)의 줄 맞춤 도우미."""
+
+    def __init__(self, parent) -> None:
+        self.frame = ttk.Frame(parent, padding=(18, 14))
+        self.frame.columnconfigure(1, weight=1)
+        self.row = 0
+
+    def _next(self) -> int:
+        self.row += 1
+        return self.row - 1
+
+    def banner(self, text: str) -> None:
+        ttk.Label(self.frame, text=text, style="Banner.TLabel", justify="left", wraplength=500).grid(
+            row=self._next(), column=0, columnspan=3, sticky="w", pady=(0, 8)
+        )
+
+    def head(self, text: str) -> None:
+        ttk.Label(self.frame, text=text, style="Head.TLabel").grid(row=self._next(), column=0, columnspan=3, sticky="w", pady=(10, 4))
+
+    def hint(self, text: str) -> None:
+        ttk.Label(self.frame, text=text, style="Hint.TLabel", wraplength=500, justify="left").grid(
+            row=self._next(), column=0, columnspan=3, sticky="w", pady=(0, 4)
+        )
+
+    def secret(self, label: str, value: str, url) -> tk.StringVar:
+        row = self._next()
+        ttk.Label(self.frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=3)
+        var = tk.StringVar(value=value)
+        entry = ttk.Entry(self.frame, textvariable=var, show="•", width=38)
+        entry.grid(row=row, column=1, sticky="we", pady=3)
+        buttons = ttk.Frame(self.frame)
+        buttons.grid(row=row, column=2, sticky="w", padx=(6, 0))
+        ttk.Button(buttons, text="보기", width=5, command=lambda: entry.configure(show="" if entry.cget("show") else "•")).pack(side="left")
+        ttk.Button(buttons, text="키 발급 ↗", command=lambda: webbrowser.open(url())).pack(side="left", padx=(4, 0))
+        return var
+
+    def choice(self, label: str, values: list[str], current: str) -> tk.StringVar:
+        row = self._next()
+        ttk.Label(self.frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=3)
+        var = tk.StringVar(value=current)
+        ttk.Combobox(self.frame, textvariable=var, values=values, state="readonly", width=44).grid(
+            row=row, column=1, columnspan=2, sticky="w", pady=3
+        )
+        return var
+
+    def entry(self, label: str, value: str, width: int = 44) -> tk.StringVar:
+        row = self._next()
+        ttk.Label(self.frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=3)
+        var = tk.StringVar(value=value)
+        ttk.Entry(self.frame, textvariable=var, width=width).grid(row=row, column=1, columnspan=2, sticky="w", pady=3)
+        return var
+
+    def check(self, text: str, value: bool) -> tuple[tk.BooleanVar, ttk.Checkbutton]:
+        var = tk.BooleanVar(value=value)
+        cb = ttk.Checkbutton(self.frame, text=text, variable=var)
+        cb.grid(row=self._next(), column=0, columnspan=3, sticky="w", pady=2)
+        return var, cb
+
+    def text(self, label: str, value: str) -> tk.Text:
+        row = self._next()
+        ttk.Label(self.frame, text=label).grid(row=row, column=0, sticky="nw", padx=(0, 10), pady=3)
+        box = tk.Text(self.frame, width=50, height=3, font=(FONT, 10), wrap="word")
+        box.insert("1.0", value)
+        box.grid(row=row, column=1, columnspan=2, sticky="w", pady=3)
+        return box
+
+
 class SettingsWindow:
     """설정 창. 저장하면 on_save(새 설정, 자동 실행 여부)를 부릅니다."""
 
     _open: "SettingsWindow | None" = None
 
     @classmethod
-    def open(cls, root, cfg, on_save, autostart_state, first_run=False):
+    def open(cls, root, cfg, on_save, autostart_state, first_run=False, on_help=None):
         if cls._open and cls._open.win.winfo_exists():
             cls._open.win.deiconify()
             cls._open.win.lift()
             cls._open.win.focus_force()
             return
-        cls._open = cls(root, cfg, on_save, autostart_state, first_run)
+        cls._open = cls(root, cfg, on_save, autostart_state, first_run, on_help)
 
-    def __init__(self, root, cfg, on_save, autostart_state, first_run):
+    def __init__(self, root, cfg, on_save, autostart_state, first_run, on_help):
         self.cfg = dict(cfg)
         self.on_save = on_save
         win = self.win = tk.Toplevel(root)
@@ -169,123 +258,79 @@ class SettingsWindow:
         style.configure("TLabel", font=(FONT, 10))
         style.configure("Head.TLabel", font=(FONT, 11, "bold"))
         style.configure("Hint.TLabel", font=(FONT, 9), foreground="#576074")
+        style.configure("Banner.TLabel", font=(FONT, 10, "bold"), foreground="#4c40d9")
         style.configure("TButton", font=(FONT, 10))
         style.configure("TCheckbutton", font=(FONT, 10))
+        style.configure("TNotebook.Tab", font=(FONT, 10), padding=(12, 5))
 
-        frame = ttk.Frame(win, padding=18)
-        frame.grid(sticky="nsew")
-        frame.columnconfigure(1, weight=1)
-        row = 0
+        outer = ttk.Frame(win, padding=(12, 12, 12, 14))
+        outer.grid(sticky="nsew")
+        tabs = ttk.Notebook(outer)
+        tabs.grid(row=0, column=0, sticky="nsew")
+        c = self.cfg
 
-        def head(text):
-            nonlocal row
-            ttk.Label(frame, text=text, style="Head.TLabel").grid(row=row, column=0, columnspan=3, sticky="w", pady=(12, 4))
-            row += 1
-
-        def hint(text):
-            nonlocal row
-            ttk.Label(frame, text=text, style="Hint.TLabel", wraplength=470, justify="left").grid(
-                row=row, column=0, columnspan=3, sticky="w", pady=(0, 4)
-            )
-            row += 1
-
-        def secret(label, key, url):
-            nonlocal row
-            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=3)
-            var = tk.StringVar(value=self.cfg.get(key, ""))
-            entry = ttk.Entry(frame, textvariable=var, show="•", width=42)
-            entry.grid(row=row, column=1, sticky="we", pady=3)
-            buttons = ttk.Frame(frame)
-            buttons.grid(row=row, column=2, sticky="w", padx=(6, 0))
-            ttk.Button(buttons, text="보기", width=5, command=lambda: entry.configure(show="" if entry.cget("show") else "•")).pack(side="left")
-            ttk.Button(buttons, text="키 발급 ↗", command=lambda: webbrowser.open(url())).pack(side="left", padx=(4, 0))
-            row += 1
-            return var
-
-        def choice(label, values, current):
-            nonlocal row
-            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=3)
-            var = tk.StringVar(value=current)
-            ttk.Combobox(frame, textvariable=var, values=values, state="readonly", width=40).grid(row=row, column=1, columnspan=2, sticky="w", pady=3)
-            row += 1
-            return var
-
-        def text_entry(label, key, width=42):
-            nonlocal row
-            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=3)
-            var = tk.StringVar(value=self.cfg.get(key, ""))
-            ttk.Entry(frame, textvariable=var, width=width).grid(row=row, column=1, columnspan=2, sticky="w", pady=3)
-            row += 1
-            return var
-
+        # ---- 1. 시작하기: 키와 Win+H ----
+        f = _Form(tabs)
+        tabs.add(f.frame, text="시작하기")
         if first_run:
-            ttk.Label(
-                frame,
-                text="처음 오셨네요! 두 가지 API 키를 넣으면 바로 쓸 수 있습니다.\n'키 발급 ↗' 버튼을 누르면 발급 페이지가 열립니다.",
-                font=(FONT, 10, "bold"),
-                foreground="#2443d6",
-                justify="left",
-            ).grid(row=row, column=0, columnspan=3, sticky="w", pady=(0, 6))
-            row += 1
-
-        head("1. 받아쓰기 (말 → 글자)")
-        provider_labels = [p[1] for p in STT_PROVIDERS]
-        current_provider = next((p for p in STT_PROVIDERS if p[0] == self.cfg.get("stt_provider")), STT_PROVIDERS[0])
-        self.provider = choice("받아쓰기 서비스", provider_labels, current_provider[1])
-        self.stt_key = secret(
-            "받아쓰기 API 키",
-            "stt_api_key",
-            lambda: next(p[2] for p in STT_PROVIDERS if p[1] == self.provider.get()),
-        )
-        lang_labels = [l[1] for l in SPEECH_LANGS]
-        self.lang = choice("말하는 언어", lang_labels, next((l[1] for l in SPEECH_LANGS if l[0] == self.cfg.get("speech_lang")), "한국어"))
-        hint("ElevenLabs는 키를 만들 때 권한을 고를 수 있으면 Speech to Text만 켜 두세요. 이용한 시간만큼 요금이 나옵니다.")
-
-        head("2. 정리 (Claude)")
-        self.claude_key = secret("Claude API 키", "claude_api_key", lambda: CLAUDE_KEY_URL)
-        model_labels = [m[1] for m in MODELS]
-        self.model = choice("모델", model_labels, next((m[1] for m in MODELS if m[0] == self.cfg.get("model")), model_labels[0]))
-        hint("Claude 키가 없으면 '음, 어'와 반복만 지우는 기본 정리만 합니다.")
-
-        head("3. 글")
-        mode_labels = [m["label"] for m in MODES]
-        self.mode = choice("기본 글 형식", mode_labels, next((m["label"] for m in MODES if m["id"] == self.cfg.get("mode")), "자동 정리"))
-        self.target = choice("번역할 언어", TARGET_LANGS, self.cfg.get("target_language", "영어"))
-        self.signature = text_entry("이메일 서명", "signature")
-        ttk.Label(frame, text="나만의 문체").grid(row=row, column=0, sticky="nw", padx=(0, 10), pady=3)
-        self.style_note = tk.Text(frame, width=48, height=3, font=(FONT, 10), wrap="word")
-        self.style_note.insert("1.0", self.cfg.get("style_note", ""))
-        self.style_note.grid(row=row, column=1, columnspan=2, sticky="w", pady=3)
-        row += 1
-        hint("예: '~습니다'체로, 문장은 짧게. 법령 이름은 정식 명칭으로.")
-
-        head("4. 단축키")
-        self.hk_dictate = text_entry("말하기", "hotkey_dictate", 24)
-        self.hk_polish = text_entry("선택한 글 정리", "hotkey_polish", 24)
-        self.hk_edit = text_entry("선택한 글 말로 고치기", "hotkey_edit", 24)
-        hint("길게 누르고 말하면 손을 뗄 때 끝나고, 짧게 누르면 다시 누를 때까지 듣습니다. 예: ctrl+shift+space, f9")
-
-        head("5. 기타")
-        self.auto_paste = tk.BooleanVar(value=bool(self.cfg.get("auto_paste", True)))
-        ttk.Checkbutton(frame, text="정리된 글을 쓰던 곳에 바로 붙여넣기 (끄면 클립보드에만 복사)", variable=self.auto_paste).grid(
-            row=row, column=0, columnspan=3, sticky="w"
-        )
-        row += 1
-        self.restore = tk.BooleanVar(value=bool(self.cfg.get("restore_clipboard", True)))
-        ttk.Checkbutton(frame, text="붙여넣은 뒤 원래 클립보드 내용 되돌리기", variable=self.restore).grid(
-            row=row, column=0, columnspan=3, sticky="w"
-        )
-        row += 1
+            f.banner("처음 오셨네요! Gemini API 키 하나만 넣고 저장하면 바로 쓸 수 있습니다.\n'키 발급 ↗'을 누르면 Google AI Studio가 열립니다 (Google 계정으로 로그인).")
+        f.head("AI 키")
+        self.gemini_key = f.secret("Gemini API 키", c.get("gemini_api_key", ""), lambda: GEMINI_KEY_URL)
+        f.hint("이 키 하나로 받아쓰기(말 → 글자)와 정리를 모두 합니다. Google AI Studio에서 무료로 만들 수 있고, 무료 사용량 안에서는 요금이 나오지 않습니다. 무료 등급에서는 보낸 내용이 Google 서비스 개선에 쓰일 수 있습니다.")
+        self.claude_key = f.secret("Claude API 키 (선택)", c.get("claude_api_key", ""), lambda: CLAUDE_KEY_URL)
+        f.hint("넣으면 정리는 Claude가 합니다 (유료). 비워 두면 Gemini가 정리합니다.")
+        f.head("Win+H")
+        self.win_h, _ = f.check("Win+H를 누르면 MR.K로 받아쓰기 (Windows 기본 음성 입력 대신)", bool(c.get("win_h", True)))
+        f.hint("Win+H → 말하기 → Win+H 한 번 더 누르면, 받아쓰고 정리해서 그 자리에 붙여넣습니다. 끄면 Win+H는 원래대로 Windows 음성 입력이 열립니다.")
+        f.head("실행")
         self.autostart_available = autostart_state is not None
-        self.autostart = tk.BooleanVar(value=bool(autostart_state))
-        cb = ttk.Checkbutton(frame, text="Windows를 켤 때 자동으로 실행", variable=self.autostart)
-        cb.grid(row=row, column=0, columnspan=3, sticky="w")
+        self.autostart, cb = f.check("Windows를 켤 때 자동으로 실행", bool(autostart_state))
         if not self.autostart_available:
             cb.state(["disabled"])
-        row += 1
 
-        buttons = ttk.Frame(frame)
-        buttons.grid(row=row, column=0, columnspan=3, sticky="e", pady=(16, 0))
+        # ---- 2. 받아쓰기·정리 ----
+        f = _Form(tabs)
+        tabs.add(f.frame, text="받아쓰기 · 정리")
+        f.head("받아쓰기 (말 → 글자)")
+        self.provider = f.choice("받아쓰기 서비스", [p[1] for p in STT_PROVIDERS], _label_of(STT_PROVIDERS, c.get("stt_provider")))
+        self.stt_key = f.secret(
+            "받아쓰기 API 키",
+            c.get("stt_api_key", ""),
+            lambda: next(p[2] for p in STT_PROVIDERS if p[1] == self.provider.get()),
+        )
+        f.hint("ElevenLabs·OpenAI를 고를 때만 넣습니다. Gemini를 고르면 '시작하기'의 Gemini 키를 씁니다.")
+        self.lang = f.choice("말하는 언어", [l[1] for l in SPEECH_LANGS], _label_of(SPEECH_LANGS, c.get("speech_lang")))
+        f.head("정리 (글자 → 정리된 글)")
+        self.engine = f.choice("정리할 AI", [e[1] for e in ENGINES], _label_of(ENGINES, c.get("engine")))
+        self.gemini_model = f.choice("Gemini 모델", [m[1] for m in GEMINI_MODELS], _label_of(GEMINI_MODELS, c.get("gemini_model")))
+        self.model = f.choice("Claude 모델", [m[1] for m in MODELS], _label_of(MODELS, c.get("model")))
+        f.hint("AI 키가 하나도 없으면 '음, 어'와 반복만 지우는 기본 정리만 합니다.")
+
+        # ---- 3. 글 ----
+        f = _Form(tabs)
+        tabs.add(f.frame, text="글")
+        mode_options = [(m["id"], m["label"]) for m in MODES]
+        self.mode = f.choice("기본 글 형식", [m[1] for m in mode_options], _label_of(mode_options, c.get("mode")))
+        self.target = f.choice("번역할 언어", TARGET_LANGS, c.get("target_language", "영어"))
+        self.signature = f.entry("이메일 서명", c.get("signature", ""))
+        self.style_note = f.text("나만의 문체", c.get("style_note", ""))
+        f.hint("예: '~습니다'체로, 문장은 짧게. 법령 이름은 정식 명칭으로.")
+
+        # ---- 4. 단축키·기타 ----
+        f = _Form(tabs)
+        tabs.add(f.frame, text="단축키 · 기타")
+        self.hk_dictate = f.entry("말하기", c.get("hotkey_dictate", ""), 24)
+        self.hk_polish = f.entry("선택한 글 정리", c.get("hotkey_polish", ""), 24)
+        self.hk_edit = f.entry("선택한 글 말로 고치기", c.get("hotkey_edit", ""), 24)
+        f.hint("길게 누르고 말하면 손을 뗄 때 끝나고, 짧게 누르면 다시 누를 때까지 듣습니다. 예: ctrl+shift+space, f9")
+        f.head("붙여넣기")
+        self.auto_paste, _ = f.check("정리된 글을 쓰던 곳에 바로 붙여넣기 (끄면 클립보드에만 복사)", bool(c.get("auto_paste", True)))
+        self.restore, _ = f.check("붙여넣은 뒤 원래 클립보드 내용 되돌리기", bool(c.get("restore_clipboard", True)))
+
+        buttons = ttk.Frame(outer)
+        buttons.grid(row=1, column=0, sticky="we", pady=(12, 0))
+        if on_help:
+            ttk.Button(buttons, text="사용 방법 보기", command=on_help).pack(side="left")
         ttk.Button(buttons, text="취소", command=win.destroy).pack(side="right")
         ttk.Button(buttons, text="저장", command=self._save).pack(side="right", padx=(0, 6))
 
@@ -315,57 +360,103 @@ class SettingsWindow:
 
         cfg = dict(self.cfg)
         cfg.update(hotkeys)
-        cfg["stt_provider"] = next(p[0] for p in STT_PROVIDERS if p[1] == self.provider.get())
-        cfg["stt_api_key"] = self.stt_key.get().strip()
-        cfg["speech_lang"] = next(l[0] for l in SPEECH_LANGS if l[1] == self.lang.get())
+        cfg["gemini_api_key"] = self.gemini_key.get().strip()
         cfg["claude_api_key"] = self.claude_key.get().strip()
-        cfg["model"] = next(m[0] for m in MODELS if m[1] == self.model.get())
+        cfg["win_h"] = bool(self.win_h.get())
+        cfg["stt_provider"] = _key_of(STT_PROVIDERS, self.provider.get())
+        cfg["stt_api_key"] = self.stt_key.get().strip()
+        cfg["speech_lang"] = _key_of(SPEECH_LANGS, self.lang.get())
+        cfg["engine"] = _key_of(ENGINES, self.engine.get())
+        cfg["gemini_model"] = _key_of(GEMINI_MODELS, self.gemini_model.get())
+        cfg["model"] = _key_of(MODELS, self.model.get())
         cfg["mode"] = next(m["id"] for m in MODES if m["label"] == self.mode.get())
         cfg["target_language"] = self.target.get()
         cfg["signature"] = self.signature.get().strip()
         cfg["style_note"] = self.style_note.get("1.0", "end").strip()
         cfg["auto_paste"] = bool(self.auto_paste.get())
         cfg["restore_clipboard"] = bool(self.restore.get())
+        if not stt_key(cfg):
+            need = "Gemini API 키" if cfg["stt_provider"] == "gemini" else "받아쓰기 API 키"
+            if not messagebox.askyesno(
+                "키 확인",
+                f"{need}가 비어 있어 아직 말로 입력할 수 없습니다.\n그래도 저장할까요?",
+                parent=self.win,
+            ):
+                return
         self.on_save(cfg, bool(self.autostart.get()) if self.autostart_available else None)
         self.win.destroy()
 
 
-def help_text(cfg: dict) -> str:
-    return f"""MR.K Typeless 데스크톱 사용법
+# ---------- 사용 방법 ----------
 
-■ 말하기  [{cfg['hotkey_dictate']}]
-  글을 쓸 곳(메일, 카톡, Claude 입력창 등)을 클릭해 두고
-  단축키를 길게 누른 채 말하고 손을 떼세요.
-  짧게 한 번 누르면 계속 듣다가, 다시 누르면 끝납니다.
-  → 받아쓰고, 정리하고, 그 자리에 바로 붙여넣습니다.
+class HelpWindow:
+    """사용 방법 창: 트레이 아이콘을 누르거나, 처음 설정을 마치면 열립니다."""
 
-■ 선택한 글 정리  [{cfg['hotkey_polish']}]
-  Win+H 등으로 받아쓴 글을 마우스로 선택한 뒤 누르면
-  '음, 어'를 지우고 정리된 글로 바꿉니다. (받아쓰기 키 없이도 됩니다)
+    _open: "HelpWindow | None" = None
+    BG = "#ffffff"
+    INK = "#0d131b"
+    TEXT = "#495057"
+    PRIMARY = "#4c40d9"
 
-■ 선택한 글 말로 고치기  [{cfg['hotkey_edit']}]
-  고칠 글을 선택하고 단축키를 누른 채
-  "더 공손하게", "세 줄로 요약해줘"처럼 말하세요.
+    @classmethod
+    def open(cls, root, cfg, open_settings=None):
+        if cls._open and cls._open.win.winfo_exists():
+            cls._open.win.destroy()
+        cls._open = cls(root, cfg, open_settings)
 
-■ 글 형식
-  작업 표시줄 오른쪽 아래 MR.K 아이콘(^ 안에 있을 수 있음)을 오른쪽 클릭 → 글 형식
-  (자동 정리 · 메시지 · 이메일 · 보고서 · 강의 원고 · 상담 노트 · 번역)
+    def __init__(self, root, cfg, open_settings):
+        win = self.win = tk.Toplevel(root)
+        win.title("MR.K Typeless 사용 방법")
+        win.resizable(False, False)
+        win.attributes("-topmost", True)
+        win.configure(bg=self.BG)
+        body = tk.Frame(win, bg=self.BG, padx=26, pady=22)
+        body.pack(fill="both", expand=True)
 
-■ 멈추기  [Esc] 녹음 중에 누르면 버립니다.
+        tk.Label(body, text="MR.K Typeless 사용 방법", font=(FONT, 16, "bold"), fg=self.INK, bg=self.BG).pack(anchor="w")
+        tk.Label(
+            body,
+            text="어느 창에서든 말하면, 정리된 글이 그 자리에 들어갑니다.",
+            font=(FONT, 10),
+            fg=self.TEXT,
+            bg=self.BG,
+        ).pack(anchor="w", pady=(2, 12))
 
-■ 팁
-  · 영상이나 음악을 틀어 두면 그 소리도 받아써집니다. 멈추고 말하세요.
-  · 관리자 권한으로 연 프로그램 안에서는 단축키가 안 먹을 수 있습니다.
-"""
+        ready, status = readiness(cfg)
+        state = tk.Frame(body, bg="#ebfbee" if ready else "#fff5f5", padx=12, pady=8)
+        state.pack(fill="x", pady=(0, 14))
+        tk.Label(state, text="●", fg="#2b8a3e" if ready else "#e03131", bg=state["bg"], font=(FONT, 10)).pack(side="left")
+        tk.Label(state, text=status, fg=self.INK, bg=state["bg"], font=(FONT, 10, "bold"), wraplength=470, justify="left").pack(
+            side="left", padx=(6, 0)
+        )
 
+        for keys, title, desc in help_items(cfg):
+            row = tk.Frame(body, bg=self.BG)
+            row.pack(fill="x", pady=5)
+            badge = tk.Label(row, text=keys, font=(FONT, 10, "bold"), fg="#ffffff", bg="#151531", padx=10, pady=5, width=18)
+            badge.pack(side="left", anchor="n")
+            text = tk.Frame(row, bg=self.BG)
+            text.pack(side="left", fill="x", padx=(12, 0))
+            tk.Label(text, text=title, font=(FONT, 10, "bold"), fg=self.INK, bg=self.BG).pack(anchor="w")
+            tk.Label(text, text=desc, font=(FONT, 9), fg=self.TEXT, bg=self.BG, justify="left", wraplength=360).pack(anchor="w")
 
-def show_help(root, cfg: dict) -> None:
-    win = tk.Toplevel(root)
-    win.title("MR.K Typeless 사용법")
-    win.attributes("-topmost", True)
-    text = tk.Text(win, width=62, height=26, font=(FONT, 10), wrap="word", padx=16, pady=14, relief="flat")
-    text.insert("1.0", help_text(cfg))
-    text.configure(state="disabled")
-    text.pack()
-    ttk.Button(win, text="닫기", command=win.destroy).pack(pady=(0, 12))
-    win.focus_force()
+        tips = (
+            "· 글 형식(메시지·이메일·보고서·강의 원고·번역 등)은 작업 표시줄 오른쪽 아래\n"
+            "  MR.K 아이콘(^ 안에 있을 수 있음)을 오른쪽 클릭 → 글 형식에서 바꿉니다.\n"
+            "· 영상·음악을 틀어 두면 그 소리도 받아써집니다. 멈추고 말하세요.\n"
+            "· 관리자 권한으로 연 프로그램 안에서는 단축키가 듣지 않을 수 있습니다."
+        )
+        tk.Label(body, text=tips, font=(FONT, 9), fg=self.TEXT, bg=self.BG, justify="left").pack(anchor="w", pady=(14, 0))
+
+        buttons = tk.Frame(body, bg=self.BG)
+        buttons.pack(fill="x", pady=(18, 0))
+        ttk.Button(buttons, text="닫기", command=win.destroy).pack(side="right")
+        ttk.Button(buttons, text="웹에서 자세히 보기 ↗", command=lambda: webbrowser.open(GUIDE_URL)).pack(side="right", padx=(0, 6))
+        if open_settings:
+            ttk.Button(buttons, text="설정 열기", command=lambda: (win.destroy(), open_settings())).pack(side="left")
+
+        win.update_idletasks()
+        x = (win.winfo_screenwidth() - win.winfo_reqwidth()) // 2
+        y = max(20, (win.winfo_screenheight() - win.winfo_reqheight()) // 3)
+        win.geometry(f"+{x}+{y}")
+        win.focus_force()

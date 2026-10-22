@@ -1,10 +1,41 @@
-"""Claude로 정리하기 (공식 Anthropic Python SDK)."""
+"""AI로 정리하기: Claude(공식 Anthropic Python SDK) 또는 Gemini(REST)."""
 
 import anthropic
+
+from . import gemini
+from .config import polish_engine
 
 
 class LlmError(Exception):
     pass
+
+
+def run_ai(system: str, user: str, cfg: dict) -> str:
+    """설정에서 고른 AI로 정리합니다. 키가 없으면 LlmError."""
+    engine = polish_engine(cfg)
+    if engine == "gemini":
+        return run_gemini(system, user, cfg)
+    if engine == "claude":
+        return run_claude(system, user, cfg)
+    raise LlmError("AI 키가 없습니다. 트레이 아이콘 → 설정에서 Gemini나 Claude 키를 넣어 주세요.")
+
+
+def run_gemini(system: str, user: str, cfg: dict) -> str:
+    api_key = (cfg.get("gemini_api_key") or "").strip()
+    if not api_key:
+        raise LlmError("Gemini API 키가 없습니다. 트레이 아이콘 → 설정에서 넣어 주세요.")
+    model = cfg.get("gemini_model") or "gemini-3.8-flash"
+    body = gemini.build_body([{"text": user}], model, cfg.get("effort") or "low", system=system)
+    try:
+        data = gemini.generate(model, api_key, body, "정리")
+    except gemini.GeminiError as e:
+        raise LlmError(str(e)) from e
+    text = gemini.text_of(data).strip()
+    if not text and gemini.is_blocked(data):
+        raise LlmError("Gemini가 이 내용을 정리하지 않았습니다. 내용을 바꿔 다시 해 주세요.")
+    if not text:
+        raise LlmError("정리된 글이 비어 있습니다. 조금 더 길게 말해 주세요.")
+    return text
 
 
 def run_claude(system: str, user: str, cfg: dict) -> str:

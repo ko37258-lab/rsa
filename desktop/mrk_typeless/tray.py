@@ -46,9 +46,10 @@ class Tray:
         return pystray.Menu(
             pystray.MenuItem(lambda _item: f"MR.K Typeless · {app.status_text}", None, enabled=False),
             pystray.Menu.SEPARATOR,
+            # 아이콘을 왼쪽 클릭하면 사용 방법이 열립니다.
+            pystray.MenuItem("사용 방법", self._action(app.open_help), default=True),
+            pystray.MenuItem("설정…", self._action(app.open_settings)),
             pystray.MenuItem("글 형식", pystray.Menu(*(self._mode_item(m) for m in MODES))),
-            pystray.MenuItem("설정…", self._action(app.open_settings), default=True),
-            pystray.MenuItem("사용법", self._action(app.open_help)),
             pystray.MenuItem("사전 고치기 (메모장)", self._action(app.open_dictionary)),
             pystray.MenuItem("기록 폴더 열기", self._action(app.open_folder)),
             pystray.Menu.SEPARATOR,

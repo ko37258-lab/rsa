@@ -2,14 +2,20 @@
 
 import requests
 
+from . import gemini
+
+LANG_NAMES = {"ko": "한국어", "en": "영어", "ja": "일본어", "zh": "중국어"}
+
 
 class SttError(Exception):
     pass
 
 
-def transcribe(wav: bytes, provider: str, api_key: str, lang: str = "ko") -> str:
+def transcribe(wav: bytes, provider: str, api_key: str, lang: str = "ko", hints: list[str] | None = None) -> str:
     if not api_key.strip():
         raise SttError("받아쓰기 API 키가 없습니다. 트레이 아이콘 → 설정에서 넣어 주세요.")
+    if provider == "gemini":
+        return _transcribe_gemini(wav, api_key, lang, hints or [])
 
     files = {"file": ("speech.wav", wav, "audio/wav")}
     if provider == "openai":
@@ -40,3 +46,25 @@ def transcribe(wav: bytes, provider: str, api_key: str, lang: str = "ko") -> str
     except ValueError as e:
         raise SttError("받아쓰기 결과를 읽지 못했습니다. 다시 말해 주세요.") from e
     return text.strip() if isinstance(text, str) else ""
+
+
+def gemini_prompt(lang: str, hints: list[str]) -> str:
+    language = LANG_NAMES.get(lang, lang)
+    lines = [
+        f"이 녹음을 {language}로 들리는 그대로 받아쓰세요.",
+        "말을 고치거나 요약하지 말고, '음', '어' 같은 말과 고쳐 말한 부분도 그대로 적으세요.",
+        "받아쓴 글만 출력하세요. 말소리가 없으면 아무것도 출력하지 마세요.",
+    ]
+    if hints:
+        lines.append("이런 용어가 나올 수 있습니다: " + ", ".join(hints[:100]))
+    return "\n".join(lines)
+
+
+def _transcribe_gemini(wav: bytes, api_key: str, lang: str, hints: list[str]) -> str:
+    """Gemini는 받아쓰기 전용 주소가 없어, 녹음을 그대로 넣고 들리는 대로 적으라고 부탁합니다."""
+    body = gemini.build_body([{"text": gemini_prompt(lang, hints)}, gemini.audio_part(wav)], gemini.STT_MODEL, "low", max_tokens=8192)
+    try:
+        data = gemini.generate(gemini.STT_MODEL, api_key, body, "받아쓰기", timeout=60)
+    except gemini.GeminiError as e:
+        raise SttError(str(e)) from e
+    return gemini.text_of(data).strip()

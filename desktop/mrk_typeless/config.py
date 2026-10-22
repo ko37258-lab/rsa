@@ -15,10 +15,15 @@ HISTORY_PATH = APP_DIR / "history.jsonl"
 LOG_PATH = APP_DIR / "log.txt"
 
 DEFAULTS = {
+    # 정리할 AI: auto(Claude 키가 있으면 Claude, 없으면 Gemini) | claude | gemini | local(AI 없이)
+    "engine": "auto",
     "claude_api_key": "",
     "model": "claude-opus-5-5",
+    "gemini_api_key": "",
+    "gemini_model": "gemini-3.8-flash",
     "effort": "low",
-    "stt_provider": "elevenlabs",
+    # 처음 설치하면 Gemini 키 하나로 받아쓰기·정리를 모두 합니다.
+    "stt_provider": "gemini",
     "stt_api_key": "",
     "speech_lang": "ko",
     "mode": "clean",
@@ -30,6 +35,8 @@ DEFAULTS = {
     "hotkey_dictate": "ctrl+shift+space",
     "hotkey_polish": "ctrl+alt+space",
     "hotkey_edit": "ctrl+alt+e",
+    # Win+H(Windows 음성 입력) 대신 MR.K 받아쓰기를 엽니다.
+    "win_h": True,
 }
 
 MODELS = [
@@ -38,15 +45,51 @@ MODELS = [
     ("claude-haiku-5-5", "Claude Haiku 5.5 — 가장 빠르고 저렴함"),
 ]
 
+GEMINI_MODELS = [
+    ("gemini-3.8-flash", "Gemini 3.8 Flash — 빠르고 정확함 (권장)"),
+    ("gemini-4-argon", "Gemini 4 Argon — 가장 정확함, 느림"),
+    ("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite — 가장 빠르고 저렴함"),
+]
+
+ENGINES = [
+    ("auto", "자동 (Claude 키가 있으면 Claude, 없으면 Gemini)"),
+    ("gemini", "Gemini"),
+    ("claude", "Claude"),
+    ("local", "AI 없이 ('음, 어'와 반복만 지우기)"),
+]
+
+CLAUDE_KEY_URL = "https://platform.claude.com/settings/keys"
+GEMINI_KEY_URL = "https://aistudio.google.com/apikey"
+GUIDE_URL = "https://mrk-typeless.vercel.app/download"
+
 STT_PROVIDERS = [
+    ("gemini", "Gemini (위 Gemini 키를 같이 씀)", GEMINI_KEY_URL),
     ("elevenlabs", "ElevenLabs Scribe", "https://elevenlabs.io/app/developers/api-keys"),
     ("openai", "OpenAI (gpt-4o-transcribe)", "https://platform.openai.com/api-keys"),
 ]
 
-CLAUDE_KEY_URL = "https://platform.claude.com/settings/keys"
-
 SPEECH_LANGS = [("ko", "한국어"), ("en", "영어"), ("ja", "일본어"), ("zh", "중국어")]
 TARGET_LANGS = ["영어", "일본어", "중국어(간체)", "베트남어", "한국어"]
+
+
+def stt_key(cfg: dict) -> str:
+    """받아쓰기에 쓸 키: Gemini를 고르면 정리용 Gemini 키를 같이 씁니다."""
+    key = cfg.get("gemini_api_key") if cfg.get("stt_provider") == "gemini" else cfg.get("stt_api_key")
+    return (key or "").strip()
+
+
+def polish_engine(cfg: dict) -> str:
+    """이번에 정리할 AI: claude | gemini | local. 고른 AI의 키가 없으면 local."""
+    claude = bool((cfg.get("claude_api_key") or "").strip())
+    gemini = bool((cfg.get("gemini_api_key") or "").strip())
+    choice = cfg.get("engine") or "auto"
+    if choice == "claude":
+        return "claude" if claude else "local"
+    if choice == "gemini":
+        return "gemini" if gemini else "local"
+    if choice == "local":
+        return "local"
+    return "claude" if claude else "gemini" if gemini else "local"
 
 
 def _read_json(path: Path):

@@ -1,6 +1,8 @@
+from mrk_typeless import gemini, llm, stt
 from mrk_typeless.cleanup import local_cleanup, sanitize_dictation
-from mrk_typeless.config import DEFAULTS
+from mrk_typeless.config import DEFAULTS, polish_engine, stt_key
 from mrk_typeless.dictionary import DEFAULT_DICTIONARY, apply_replacements
+from mrk_typeless.guide import help_items, pretty_hotkey, readiness
 from mrk_typeless.modes import MODES, get_mode
 from mrk_typeless.prompts import build_edit_prompt, build_polish_prompt
 
@@ -54,3 +56,89 @@ def test_modes_match_web_app():
 def test_default_hotkeys_are_distinct():
     keys = {DEFAULTS["hotkey_dictate"], DEFAULTS["hotkey_polish"], DEFAULTS["hotkey_edit"]}
     assert len(keys) == 3
+
+
+# ---------- Gemini · 엔진 고르기 · 사용 방법 ----------
+
+
+class FakeResponse:
+    def __init__(self, status, data):
+        self.status_code, self._data = status, data
+        self.ok = 200 <= status < 300
+
+    def json(self):
+        return self._data
+
+
+def test_new_install_uses_one_gemini_key_and_win_h():
+    assert DEFAULTS["stt_provider"] == "gemini" and DEFAULTS["win_h"] is True
+    cfg = {**DEFAULTS, "gemini_api_key": "AIza-x"}
+    assert stt_key(cfg) == "AIza-x" and polish_engine(cfg) == "gemini"
+
+
+def test_polish_engine_choice():
+    both = {**DEFAULTS, "gemini_api_key": "AIza-x", "claude_api_key": "sk-ant"}
+    assert polish_engine(both) == "claude"  # 자동: Claude 키가 있으면 Claude
+    assert polish_engine({**both, "engine": "gemini"}) == "gemini"
+    assert polish_engine({**both, "engine": "local"}) == "local"
+    assert polish_engine({**DEFAULTS, "engine": "claude", "gemini_api_key": "AIza-x"}) == "local"
+    assert stt_key({**both, "stt_provider": "elevenlabs", "stt_api_key": " sk_e "}) == "sk_e"
+
+
+def test_gemini_helpers():
+    assert gemini.thinking_level("gemini-3.5-flash-lite", "low") == "MINIMAL"
+    assert gemini.thinking_level("gemini-3.8-flash", "low") == "LOW"
+    assert gemini.thinking_level("gemini-4-argon", "medium") == "MEDIUM"
+    data = {"candidates": [{"content": {"parts": [{"text": "생각", "thought": True}, {"text": "정리된 글"}]}, "finishReason": "STOP"}]}
+    assert gemini.text_of(data) == "정리된 글" and not gemini.is_blocked(data)
+    assert gemini.is_blocked({"promptFeedback": {"blockReason": "SAFETY"}})
+
+
+def test_run_gemini_request_and_errors(monkeypatch):
+    sent = {}
+
+    def fake_post(url, headers, json, timeout):
+        sent.update(url=url, headers=headers, body=json)
+        return FakeResponse(200, {"candidates": [{"content": {"parts": [{"text": " 정리된 글 "}]}}]})
+
+    monkeypatch.setattr(gemini.requests, "post", fake_post)
+    cfg = {**DEFAULTS, "gemini_api_key": "AIza-x", "engine": "gemini"}
+    assert llm.run_ai("SYSTEM", "USER", cfg) == "정리된 글"
+    assert sent["url"].endswith("/gemini-3.8-flash:generateContent") and sent["headers"]["x-goog-api-key"] == "AIza-x"
+    assert sent["body"]["systemInstruction"]["parts"][0]["text"] == "SYSTEM"
+    assert sent["body"]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "LOW"}
+
+    bad = {"error": {"code": 400, "message": "API key not valid.", "status": "INVALID_ARGUMENT", "details": [{"reason": "API_KEY_INVALID"}]}}
+    monkeypatch.setattr(gemini.requests, "post", lambda *a, **k: FakeResponse(400, bad))
+    try:
+        llm.run_ai("S", "U", cfg)
+        raise AssertionError("should fail")
+    except llm.LlmError as e:
+        assert "키가 맞지 않습니다" in str(e)
+
+
+def test_gemini_transcribe_sends_wav_and_terms(monkeypatch):
+    sent = {}
+
+    def fake_post(url, headers, json, timeout):
+        sent.update(url=url, body=json)
+        return FakeResponse(200, {"candidates": [{"content": {"parts": [{"text": "음 지구단위계획 확인"}]}}]})
+
+    monkeypatch.setattr(gemini.requests, "post", fake_post)
+    text = stt.transcribe(b"RIFF-wav", "gemini", "AIza-x", "ko", hints=["지구단위계획", "건폐율"])
+    parts = sent["body"]["contents"][0]["parts"]
+    assert text == "음 지구단위계획 확인"
+    assert sent["url"].endswith("/gemini-3.8-flash:generateContent")
+    assert parts[1]["inlineData"]["mimeType"] == "audio/wav" and parts[1]["inlineData"]["data"] == "UklGRi13YXY="
+    assert "한국어" in parts[0]["text"] and "지구단위계획, 건폐율" in parts[0]["text"]
+
+
+def test_help_follows_settings():
+    cfg = {**DEFAULTS}
+    assert help_items(cfg)[0][0] == "Win + H"
+    assert all(k != "Win + H" for k, _, _ in help_items({**cfg, "win_h": False}))
+    assert pretty_hotkey("ctrl+shift+space") == "Ctrl + Shift + Space" and pretty_hotkey("ctrl+alt+e") == "Ctrl + Alt + E"
+    ok, text = readiness(cfg)
+    assert not ok and "Gemini API 키" in text
+    ok, text = readiness({**cfg, "gemini_api_key": "AIza-x"})
+    assert ok and "받아쓰기 Gemini" in text and "정리 Gemini" in text

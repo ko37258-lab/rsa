@@ -1,4 +1,4 @@
-"""MR.K Typeless 데스크톱 본체: 단축키 → 녹음 → 받아쓰기 → Claude 정리 → 쓰던 창에 붙여넣기."""
+"""MR.K Typeless 데스크톱 본체: 단축키(또는 Win+H) → 녹음 → 받아쓰기 → AI 정리 → 쓰던 창에 붙여넣기."""
 
 import logging
 import os
@@ -12,9 +12,19 @@ import tkinter as tk
 from . import __version__, autostart
 from .audio import AudioError, Recorder
 from .cleanup import local_cleanup, sanitize_dictation
-from .config import APP_DIR, DICTIONARY_PATH, LOG_PATH, append_history, load_config, load_dictionary, save_config
+from .config import (
+    APP_DIR,
+    DICTIONARY_PATH,
+    LOG_PATH,
+    append_history,
+    load_config,
+    load_dictionary,
+    polish_engine,
+    save_config,
+    stt_key,
+)
 from .dictionary import apply_replacements
-from .llm import LlmError, run_claude
+from .llm import LlmError, run_ai
 from .modes import get_mode
 from .prompts import build_edit_prompt, build_polish_prompt
 from .stt import SttError, transcribe
@@ -50,6 +60,7 @@ class App:
         self._pressed_at = 0.0
         self._keys_down: set[str] = set()
         self._lock = threading.Lock()
+        self._first_setup = False
         self.tray = Tray(self)
 
     # ---------- 화면(tk) 스레드로 일 넘기기 ----------
@@ -81,20 +92,31 @@ class App:
         import keyboard
 
         keyboard.unhook_all()
-        for purpose, setting in (("dictate", "hotkey_dictate"), ("edit", "hotkey_edit")):
-            combo = self.cfg[setting]
-            keyboard.add_hotkey(combo, self._on_record_hotkey, args=(purpose,), suppress=True)
+        triggers = [("dictate", "dictate", self.cfg["hotkey_dictate"]), ("edit", "edit", self.cfg["hotkey_edit"])]
+        # Win+H: Windows 음성 입력 대신 MR.K 받아쓰기를 엽니다. Win 키를 혼자 누르거나 다른 키와 누르면
+        # keyboard가 Win 누름을 그대로 다시 보내므로 시작 메뉴·Win+E 같은 단축키는 그대로 됩니다.
+        if self.cfg.get("win_h", True):
+            triggers.append(("dictate", "winh", "windows+h"))
+        for purpose, trigger, combo in triggers:
+            keyboard.add_hotkey(combo, self._on_record_hotkey, args=(purpose, trigger), suppress=True)
             last_key = combo.split("+")[-1].strip()
-            keyboard.on_release_key(last_key, lambda _e, p=purpose: self._on_record_key_up(p))
+            keyboard.on_release_key(last_key, lambda _e, p=purpose, t=trigger: self._on_record_key_up(p, t))
         keyboard.add_hotkey(self.cfg["hotkey_polish"], self._on_polish_hotkey, suppress=True)
         keyboard.on_press_key("esc", lambda _e: self._on_escape())
-        log.info("단축키 등록: %s / %s / %s", self.cfg["hotkey_dictate"], self.cfg["hotkey_polish"], self.cfg["hotkey_edit"])
+        log.info(
+            "단축키 등록: %s / %s / %s / Win+H %s",
+            self.cfg["hotkey_dictate"],
+            self.cfg["hotkey_polish"],
+            self.cfg["hotkey_edit"],
+            "켬" if self.cfg.get("win_h", True) else "끔",
+        )
 
-    def _on_record_hotkey(self, purpose: str) -> None:
+    def _on_record_hotkey(self, purpose: str, trigger: str | None = None) -> None:
         # 키를 누르고 있으면 같은 신호가 반복해서 들어오므로 첫 번째만 받습니다.
-        if purpose in self._keys_down:
+        trigger = trigger or purpose
+        if trigger in self._keys_down:
             return
-        self._keys_down.add(purpose)
+        self._keys_down.add(trigger)
         with self._lock:
             if self.state == "recording":
                 if self.purpose == purpose:
@@ -105,10 +127,11 @@ class App:
                 return
             self._start_recording(purpose)
 
-    def _on_record_key_up(self, purpose: str) -> None:
-        if purpose not in self._keys_down:
+    def _on_record_key_up(self, purpose: str, trigger: str | None = None) -> None:
+        trigger = trigger or purpose
+        if trigger not in self._keys_down:
             return
-        self._keys_down.discard(purpose)
+        self._keys_down.discard(trigger)
         with self._lock:
             held = time.monotonic() - self._pressed_at >= HOLD_SECONDS
             if self.state == "recording" and self.purpose == purpose and held:
@@ -133,9 +156,12 @@ class App:
 
     # ---------- 녹음 ----------
     def _start_recording(self, purpose: str) -> None:
-        if not self.cfg.get("stt_api_key", "").strip():
-            self.post(self.overlay.show_error, "받아쓰기 API 키가 없습니다. 설정 창에서 넣어 주세요.")
+        if not stt_key(self.cfg):
+            self.post(self.overlay.show_error, "받아쓰기 키가 없습니다. 설정 창에서 Gemini 키를 넣어 주세요.")
             self.post(self.open_settings)
+            return
+        if purpose == "edit" and polish_engine(self.cfg) == "local":
+            self.post(self.overlay.show_error, "말로 고치기는 AI 키(Gemini나 Claude)가 있어야 합니다. 설정에서 넣어 주세요.")
             return
         try:
             self.recorder.start()
@@ -146,7 +172,7 @@ class App:
         self._pressed_at = time.monotonic()
         self._set_state("recording", "듣는 중")
         title = f"듣는 중 · {get_mode(self.cfg['mode'])['label']}" if purpose == "dictate" else "고칠 내용을 말하세요"
-        hint = "손을 떼거나 단축키를 한 번 더 누르면 끝 · Esc 취소"
+        hint = "손을 떼거나 같은 키를 한 번 더 누르면 끝 · Esc 취소"
         recorder = self.recorder
         self.post(self.overlay.show_recording, title, hint, lambda: (recorder.level, time.monotonic() - recorder.started_at))
 
@@ -166,15 +192,16 @@ class App:
         cfg = self.cfg
         try:
             self.post(self.overlay.show_working, "받아쓰는 중…")
-            spoken = sanitize_dictation(transcribe(wav, cfg["stt_provider"], cfg["stt_api_key"], cfg["speech_lang"])).strip()
+            dictionary = load_dictionary()
+            spoken = transcribe(wav, cfg["stt_provider"], stt_key(cfg), cfg["speech_lang"], hints=dictionary.get("terms", []))
+            spoken = sanitize_dictation(spoken).strip()
             if not spoken:
                 raise UserFacingError("말소리를 알아듣지 못했습니다. 마이크에 조금 더 가까이 대고 말해 주세요.")
-            dictionary = load_dictionary()
             if purpose == "edit":
                 selection, previous = self._selection()
                 self.post(self.overlay.show_working, f"고치는 중… ({spoken[:24]})")
                 system, user = build_edit_prompt(selection, spoken, cfg, dictionary)
-                result = run_claude(system, user, cfg)
+                result = run_ai(system, user, cfg)
                 self._deliver(result, raw=selection, kind="edit", previous=previous, command=spoken, seconds=seconds)
             else:
                 result = self._polish(spoken, dictionary)
@@ -211,12 +238,14 @@ class App:
 
     def _polish(self, text: str, dictionary: dict) -> str:
         text, _ = apply_replacements(sanitize_dictation(text), dictionary.get("replacements", []))
-        if not self.cfg.get("claude_api_key", "").strip():
+        engine = polish_engine(self.cfg)
+        if engine == "local":
             cleaned, _ = local_cleanup(text)
             return cleaned
-        self.post(self.overlay.show_working, f"정리하는 중… ({get_mode(self.cfg['mode'])['label']})")
+        who = "Gemini" if engine == "gemini" else "Claude"
+        self.post(self.overlay.show_working, f"{who}가 정리하는 중… ({get_mode(self.cfg['mode'])['label']})")
         system, user = build_polish_prompt(text, self.cfg["mode"], self.cfg, dictionary)
-        return run_claude(system, user, self.cfg)
+        return run_ai(system, user, self.cfg)
 
     def _deliver(self, result: str, raw: str, kind: str, previous: str | None = None, command: str = "", seconds: float = 0) -> None:
         from .clipboard import paste_text, set_text
@@ -227,8 +256,8 @@ class App:
         else:
             set_text(result)
             done, sub = "복사했습니다", "쓰던 곳에서 Ctrl+V로 붙여넣으세요"
-        if not self.cfg.get("claude_api_key", "").strip() and kind != "edit":
-            sub = "Claude 키가 없어 기본 정리만 했습니다 (설정에서 넣어 주세요)"
+        if polish_engine(self.cfg) == "local" and kind != "edit":
+            sub = "AI 키가 없어 기본 정리만 했습니다 (설정에서 Gemini 키를 넣어 주세요)"
         self.post(self.overlay.show_done, done, sub)
         try:
             append_history({"kind": kind, "mode": self.cfg["mode"], "command": command, "raw": raw, "result": result, "seconds": round(seconds, 1)})
@@ -245,7 +274,7 @@ class App:
         from .ui import SettingsWindow
 
         state = autostart.is_enabled() if autostart.available() else None
-        SettingsWindow.open(self.root, self.cfg, self._apply_settings, state, first_run)
+        SettingsWindow.open(self.root, self.cfg, self._apply_settings, state, first_run, on_help=self.open_help)
 
     def _apply_settings(self, cfg: dict, autostart_on: bool | None) -> None:
         self.cfg = cfg
@@ -261,12 +290,20 @@ class App:
             log.exception("단축키 등록 실패")
             self.overlay.show_error("단축키를 등록하지 못했습니다. 설정에서 다른 단축키로 바꿔 주세요.")
             return
-        self.overlay.show_done("설정을 저장했습니다", f"말하기: {cfg['hotkey_dictate']}")
+        self.overlay.show_done("설정을 저장했습니다", f"말하기: {self.speak_hint()}")
+        # 처음 설정을 마치면 바로 쓰는 법을 보여 줍니다.
+        if self._first_setup and stt_key(cfg):
+            self._first_setup = False
+            self.root.after(600, self.open_help)
+
+    def speak_hint(self) -> str:
+        keys = ["Win+H"] if self.cfg.get("win_h", True) else []
+        return " 또는 ".join(keys + [self.cfg["hotkey_dictate"]])
 
     def open_help(self) -> None:
-        from .ui import show_help
+        from .ui import HelpWindow
 
-        show_help(self.root, self.cfg)
+        HelpWindow.open(self.root, self.cfg, open_settings=self.open_settings)
 
     def open_dictionary(self) -> None:
         load_dictionary()  # 파일이 없으면 기본 사전으로 만들어 둡니다.
@@ -295,13 +332,14 @@ class App:
         except Exception:
             log.exception("단축키 등록 실패")
         self.root.after(40, self._pump)
-        first_run = not (self.cfg.get("stt_api_key") and self.cfg.get("claude_api_key"))
+        first_run = not stt_key(self.cfg)
         if first_run:
+            self._first_setup = True
             self.root.after(300, lambda: self.open_settings(first_run=True))
         else:
             self.root.after(
                 300,
-                lambda: self.overlay.show_info("MR.K Typeless가 켜졌습니다", f"{self.cfg['hotkey_dictate']}를 누른 채 말하세요"),
+                lambda: self.overlay.show_info("MR.K Typeless가 켜졌습니다", f"{self.speak_hint()}를 누르고 말하세요"),
             )
         self.root.mainloop()
 
@@ -330,6 +368,7 @@ def _self_test(out_path: str) -> int:
     checks = [
         ("anthropic", lambda: __import__("anthropic").__version__),
         ("anthropic client", lambda: __import__("anthropic").Anthropic(api_key="sk-test").beta.messages and "ok"),
+        ("gemini", lambda: __import__("mrk_typeless.gemini", fromlist=["build_body"]).build_body([{"text": "t"}], "gemini-3.8-flash", "low") and "ok"),
         ("requests", lambda: __import__("requests").__version__),
         ("CA 인증서", _check_ca_bundle),
         ("keyboard", lambda: __import__("keyboard") and "ok"),
