@@ -2,3 +2,6 @@ node_modules/
 dist/
 dist-artifact/
 *.local
+
+# 디자인 점검 훅의 캐시 (설정 .impeccable/config.json은 함께 씁니다)
+.impeccable/hook.cache.json

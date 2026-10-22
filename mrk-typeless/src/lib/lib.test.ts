@@ -84,7 +84,9 @@ describe("resolveEngine", () => {
 
 describe("sttKeyFor", () => {
   it("Gemini 받아쓰기는 정리용 Gemini 키를 같이 쓴다", () => {
-    const s = { ...DEFAULT_SETTINGS, sttKey: "sk_eleven", geminiKey: "AIza-x" };
+    // 처음 쓰는 분은 Gemini 키 하나로 받아쓰기까지 합니다
+    expect(DEFAULT_SETTINGS.sttProvider).toBe("gemini");
+    const s = { ...DEFAULT_SETTINGS, sttProvider: "elevenlabs" as const, sttKey: "sk_eleven", geminiKey: "AIza-x" };
     expect(sttKeyFor(s)).toBe("sk_eleven");
     expect(sttKeyFor({ ...s, sttProvider: "gemini" })).toBe("AIza-x");
     // 고른 서비스의 키가 비어 있고 Gemini 키만 있으면 Gemini로 받아씁니다

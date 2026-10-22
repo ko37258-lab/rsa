@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SttError, transcribe, type SttProvider } from "../ai/transcribe";
+import { canSwitchStt, SttError, transcribe, type SttProvider } from "../ai/transcribe";
 import type { SpeechProblem, StopResult } from "./useSpeech";
 
 const MIME_CANDIDATES: [string, string][] = [
@@ -25,6 +25,12 @@ interface RecorderOptions {
   provider: SttProvider;
   apiKey: string;
   hints?: string[];
+  /**
+   * ElevenLabs·OpenAI가 크레딧·키·차단 문제로 거절하면 같은 녹음을 이 Gemini 키로 다시 받아씁니다.
+   * 성공하면 onSwitched가 불려 다음부터 Gemini를 쓰게 설정을 바꿉니다.
+   */
+  geminiKey?: string;
+  onSwitched?: (from: SttProvider, reason: string) => void;
 }
 
 /**
@@ -38,6 +44,8 @@ export function useRecorder(options: RecorderOptions, onFinal: (text: string) =>
   const [transcribing, setTranscribing] = useState(false);
   const [problem, setProblem] = useState<SpeechProblem>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 오류는 아니지만 알려 줄 일(예: ElevenLabs 크레딧이 떨어져 Gemini로 받아씀) */
+  const [notice, setNotice] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [pulse, setPulse] = useState(0);
 
@@ -81,6 +89,7 @@ export function useRecorder(options: RecorderOptions, onFinal: (text: string) =>
     if (recorderRef.current || startingRef.current) return;
     cancelledRef.current = false;
     setError(null);
+    setNotice(null);
     setProblem(null);
 
     startingRef.current = (async () => {
@@ -118,12 +127,32 @@ export function useRecorder(options: RecorderOptions, onFinal: (text: string) =>
         const ctl = new AbortController();
         abortRef.current = ctl;
         setTranscribing(true);
+        const opts = optionsRef.current;
+        const finish = (text: string) => {
+          if (ctl.signal.aborted) return;
+          if (text) onFinalRef.current(text);
+          else setError("말소리를 알아듣지 못했습니다. 마이크에 조금 더 가까이 대고 말해 주세요.");
+        };
         try {
-          const text = await transcribe(audio, `speech.${ext}`, { ...optionsRef.current, signal: ctl.signal });
-          if (text && !ctl.signal.aborted) onFinalRef.current(text);
-          else if (!text && !ctl.signal.aborted) setError("말소리를 알아듣지 못했습니다. 마이크에 조금 더 가까이 대고 말해 주세요.");
+          finish(await transcribe(audio, `speech.${ext}`, { ...opts, signal: ctl.signal }));
         } catch (e) {
-          if (!ctl.signal.aborted) setError(e instanceof SttError ? e.message : "받아쓰기 중 문제가 생겼습니다. 다시 말해 주세요.");
+          const geminiKey = opts.geminiKey?.trim();
+          if (!ctl.signal.aborted && canSwitchStt(e) && opts.provider !== "gemini" && geminiKey) {
+            // 크레딧이 떨어졌거나 키가 막힌 서비스 대신, 같은 녹음을 Gemini로 다시 받아씁니다.
+            try {
+              const text = await transcribe(audio, `speech.${ext}`, { ...opts, provider: "gemini", apiKey: geminiKey, signal: ctl.signal });
+              if (!ctl.signal.aborted) {
+                opts.onSwitched?.(opts.provider, (e as SttError).message);
+                setNotice(`${(e as SttError).message.split(".")[0]}. 그래서 Gemini로 받아썼고, 앞으로도 Gemini로 받아씁니다.`);
+              }
+              finish(text);
+            } catch (e2) {
+              if (!ctl.signal.aborted)
+                setError(`${(e as SttError).message} Gemini로도 받아쓰지 못했습니다: ${e2 instanceof SttError ? e2.message : "다시 말해 주세요."}`);
+            }
+          } else if (!ctl.signal.aborted) {
+            setError(e instanceof SttError ? e.message : "받아쓰기 중 문제가 생겼습니다. 다시 말해 주세요.");
+          }
         } finally {
           abortRef.current = null;
           setTranscribing(false);
@@ -188,5 +217,5 @@ export function useRecorder(options: RecorderOptions, onFinal: (text: string) =>
     [releaseMic],
   );
 
-  return { supported, listening, transcribing, problem, error, elapsedMs, pulse, start, stop, cancel };
+  return { supported, listening, transcribing, problem, error, notice, elapsedMs, pulse, start, stop, cancel };
 }

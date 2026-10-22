@@ -1,5 +1,7 @@
 """AI로 정리하기: Claude(공식 Anthropic Python SDK) 또는 Gemini(REST)."""
 
+import re
+
 import anthropic
 
 from . import gemini
@@ -71,6 +73,11 @@ def run_claude(system: str, user: str, cfg: dict) -> str:
     except anthropic.RateLimitError as e:
         raise LlmError("요청이 많아 잠시 막혔습니다. 조금 뒤 다시 해 주세요.") from e
     except anthropic.BadRequestError as e:
+        # 크레딧이 떨어지면 Claude는 400으로 "credit balance is too low"를 보냅니다.
+        if re.search(r"credit balance|billing", str(e.message), re.IGNORECASE):
+            raise LlmError(
+                "Claude 크레딧(잔액)이 다 떨어졌습니다. console.anthropic.com → Plans & Billing에서 충전하거나, 설정에서 정리 AI를 Gemini로 바꿔 주세요."
+            ) from e
         raise LlmError(f"요청이 거절되었습니다: {e.message}") from e
     except anthropic.APIStatusError as e:
         raise LlmError(f"Claude 오류 ({e.status_code}). 조금 뒤 다시 해 주세요.") from e

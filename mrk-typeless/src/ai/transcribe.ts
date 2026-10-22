@@ -40,7 +40,66 @@ export const STT_PROVIDERS: { id: SttProvider; label: string; keyHint: string; k
   },
 ];
 
-export class SttError extends Error {}
+/**
+ * 받아쓰기 실패의 종류. key·credit·blocked·permission은 이 서비스로는 다시 해도 안 되는 경우라
+ * Gemini 키가 있으면 Gemini로 바로 넘겨 받아씁니다(useRecorder).
+ */
+export type SttFailureKind = "key" | "credit" | "blocked" | "permission" | "busy" | "other";
+
+export class SttError extends Error {
+  constructor(
+    message: string,
+    readonly kind: SttFailureKind = "other",
+  ) {
+    super(message);
+  }
+}
+
+/** 다른 받아쓰기 서비스(Gemini)로 넘기면 될 실패인지 */
+export function canSwitchStt(e: unknown): boolean {
+  return e instanceof SttError && (e.kind === "key" || e.kind === "credit" || e.kind === "blocked" || e.kind === "permission");
+}
+
+const SWITCH_TIP = " 설정 → 음성 인식에서 받아쓰기 서비스를 Gemini로 바꾸면 Gemini 키 하나로 받아씁니다.";
+
+/**
+ * ElevenLabs·OpenAI가 보낸 오류 본문을 읽어 진짜 이유를 알려 줍니다.
+ *   ElevenLabs는 키가 틀릴 때뿐 아니라 크레딧이 떨어지거나(quota_exceeded) 무료 계정을 막을 때도
+ *   (detected_unusual_activity) 401을 보냅니다. 예전에는 401이면 무조건 '키가 맞지 않습니다'라고 해서
+ *   크레딧이 떨어진 사용자가 키만 다시 넣다 헤맸습니다(2026-10-22).
+ *   본문 모양: ElevenLabs {detail:{status,message}}, OpenAI {error:{code,type,message}}
+ */
+export function sttFailure(provider: "elevenlabs" | "openai", status: number, body: unknown): SttError {
+  const name = provider === "elevenlabs" ? "ElevenLabs" : "OpenAI";
+  const b = (body ?? {}) as { detail?: unknown; error?: { code?: unknown; type?: unknown; message?: unknown } };
+  const detail = (typeof b.detail === "object" && b.detail && !Array.isArray(b.detail) ? b.detail : {}) as {
+    status?: unknown;
+    message?: unknown;
+  };
+  const code = String(provider === "elevenlabs" ? (detail.status ?? "") : (b.error?.code ?? b.error?.type ?? "")).toLowerCase();
+  const raw = provider === "elevenlabs" ? (detail.message ?? (typeof b.detail === "string" ? b.detail : "")) : (b.error?.message ?? "");
+  const serverSaid = typeof raw === "string" && raw.trim() ? ` (${name}: ${raw.trim().slice(0, 160)})` : "";
+
+  if (/quota|insufficient_quota|credit|payment|billing/.test(code) || status === 402)
+    return new SttError(
+      `${name} 크레딧(잔액)이 다 떨어졌습니다. ${provider === "elevenlabs" ? "elevenlabs.io" : "platform.openai.com"}에서 충전하거나,${SWITCH_TIP}`,
+      "credit",
+    );
+  if (code === "detected_unusual_activity")
+    return new SttError(`${name}가 이 무료 계정의 사용을 막았습니다(이상 사용 감지). VPN을 쓰고 있다면 끄거나 유료 요금제가 필요합니다.${SWITCH_TIP}`, "blocked");
+  if (code === "missing_permissions" || code === "insufficient_permissions")
+    return new SttError(`이 ${name} 키에는 받아쓰기(Speech to Text) 권한이 없습니다. ${name}의 API 키 설정에서 권한을 켜 주세요.${SWITCH_TIP}`, "permission");
+  if (code === "unsupported_country_region_territory")
+    return new SttError(`${name}가 지금 접속한 지역에서는 쓸 수 없다고 합니다. VPN을 쓰고 있다면 꺼 주세요.${SWITCH_TIP}`, "blocked");
+  if (/invalid_api_key|needs_authorization|invalid_authorization|unauthorized/.test(code) || status === 401)
+    return new SttError(`${name} API 키가 맞지 않습니다. 설정 → 음성 인식에서 키를 다시 붙여넣어 주세요.${SWITCH_TIP}`, "key");
+  if (status === 403) return new SttError(`${name}가 이 키의 받아쓰기 요청을 거절했습니다${serverSaid}.${SWITCH_TIP}`, "permission");
+  if (status === 429 || /rate_limit|too_many|system_busy/.test(code))
+    return new SttError(`${name}에 요청이 몰려 잠시 막혔습니다. 조금 뒤 다시 말해 주세요.`, "busy");
+  if (status === 413) return new SttError("녹음이 너무 깁니다. 나눠서 말해 주세요.");
+  if (status >= 500) return new SttError(`${name} 받아쓰기 서버가 잠시 멈췄습니다. 조금 뒤 다시 말해 주세요.`, "busy");
+  return new SttError(`받아쓰기 중 오류가 났습니다 (${status})${serverSaid}. 다시 말해 주세요.`);
+}
 
 interface TranscribeOptions {
   provider: SttProvider;
@@ -93,12 +152,13 @@ export async function transcribe(audio: Blob, filename: string, opts: Transcribe
   }
 
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403)
-      throw new SttError("받아쓰기 API 키가 맞지 않습니다. 설정 → 음성 인식에서 키를 확인해 주세요.");
-    if (res.status === 402 || res.status === 429)
-      throw new SttError("받아쓰기 사용량 한도에 닿았습니다. 잠시 뒤 다시 하거나 요금제를 확인해 주세요.");
-    if (res.status === 413) throw new SttError("녹음이 너무 깁니다. 나눠서 말해 주세요.");
-    throw new SttError(`받아쓰기 중 오류가 났습니다 (${res.status}). 다시 말해 주세요.`);
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      // 본문이 JSON이 아니면 상태 코드만으로 판단합니다.
+    }
+    throw sttFailure(opts.provider, res.status, body);
   }
 
   const data = (await res.json()) as { text?: unknown };

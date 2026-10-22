@@ -58,7 +58,13 @@ export async function runWithApiKey(req: AiRequest, settings: Settings, opts: Ru
     if (e instanceof EngineError) throw e;
     if (e instanceof APIUserAbortError) throw new EngineError("cancelled", "정리를 멈췄습니다.", streamed);
     if (e instanceof AuthenticationError)
-      throw new EngineError("failed", "API 키가 맞지 않습니다. 설정에서 키를 확인해 주세요.");
+      throw new EngineError("failed", "Claude API 키가 맞지 않습니다. 설정에서 키를 확인해 주세요.");
+    // 크레딧이 떨어지면 Claude는 400(invalid_request_error)으로 "credit balance is too low"를 보냅니다.
+    if (e instanceof BadRequestError && /credit balance|billing/i.test(e.message))
+      throw new EngineError(
+        "failed",
+        "Claude 크레딧(잔액)이 다 떨어졌습니다. console.anthropic.com → Plans & Billing에서 충전하거나, 설정에서 정리 AI를 Gemini로 바꿔 주세요.",
+      );
     if (e instanceof PermissionDeniedError)
       throw new EngineError("failed", "이 API 키로는 고른 모델을 쓸 수 없습니다. 설정에서 다른 모델을 골라 주세요.");
     if (e instanceof NotFoundError)

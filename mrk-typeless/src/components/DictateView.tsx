@@ -110,7 +110,7 @@ export function DictateView({
     [leaveExample, updateRaw],
   );
 
-  const speech = useDictation(settings, appendFinal, dictionary.terms);
+  const speech = useDictation(settings, appendFinal, dictionary.terms, onSettings);
 
   useEffect(() => {
     if (isExample) ai.show(EXAMPLE_RESULT);
@@ -509,6 +509,11 @@ export function DictateView({
         </aside>
       )}
       {speech.error && <p className="notice">{speech.error}</p>}
+      {speech.notice && !speech.error && (
+        <p className="notice notice--info" role="status">
+          {speech.notice}
+        </p>
+      )}
 
       <ResultPanel
         title={`정리된 글 · ${mode.label}`}

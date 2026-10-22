@@ -55,6 +55,7 @@ def app(monkeypatch, tmp_path):
     a.recorder, a.overlay, a.tray = FakeRecorder(), FakeOverlay(), FakeTray()
     a.state, a.status_text, a.purpose = "idle", "대기 중", None
     a._pressed_at, a._keys_down, a._first_setup = 0.0, set(), False
+    a._stt_note = ""
     import threading
 
     a._lock = threading.Lock()
@@ -323,3 +324,69 @@ def test_mode_hotkeys_registered(app, monkeypatch):
     monkeypatch.setitem(sys.modules, "keyboard", kb)
     app.register_hotkeys()
     assert [c for c, _, _ in kb.hotkeys if c.startswith("ctrl+alt+")] [:7] == [f"ctrl+alt+{i}" for i in range(1, 8)] or sum(c.startswith("ctrl+alt+") and c[-1].isdigit() for c, _, _ in kb.hotkeys) == 7
+
+
+def _run_dictation(app):
+    app._on_record_hotkey("dictate")
+    app._pressed_at -= 1.0
+    app._on_record_key_up("dictate")
+    wait_idle(app)
+
+
+def test_stt_out_of_credit_switches_to_gemini(app, monkeypatch):
+    """ElevenLabs 크레딧이 떨어지면(401 quota_exceeded) 같은 녹음을 Gemini로 받아쓰고, 다음부터 Gemini를 씁니다."""
+    from mrk_typeless import stt as stt_module
+
+    app.cfg["gemini_api_key"] = "AIza-test"
+    calls = []
+
+    def fake_transcribe(wav, provider, key, lang, hints=None):
+        calls.append((provider, key))
+        if provider == "elevenlabs":
+            raise stt_module.stt_failure("elevenlabs", 401, {"detail": {"status": "quota_exceeded", "message": "0 credits remaining"}})
+        return "음 내일 오후 어 세 시에 현장 답사 가요"
+
+    saved = []
+    monkeypatch.setattr(app_module, "transcribe", fake_transcribe)
+    monkeypatch.setattr(app_module, "save_config", lambda cfg: saved.append(dict(cfg)))
+    _run_dictation(app)
+    assert calls == [("elevenlabs", "sk_stt"), ("gemini", "AIza-test")]
+    assert app.pasted and app.pasted[0][0] == "내일 오후 3시에 현장 답사를 갑니다."
+    info = [args for name, args in app.overlay.calls if name == "show_info"]
+    assert info and "크레딧" in info[-1][1] and "Gemini" in info[-1][1]
+    assert "_switch_stt_to_gemini" in app.posted
+    app._switch_stt_to_gemini()
+    assert app.cfg["stt_provider"] == "gemini" and saved[-1]["stt_provider"] == "gemini"
+    assert app._stt_note == ""
+
+
+def test_stt_out_of_credit_without_gemini_shows_real_reason(app, monkeypatch):
+    from mrk_typeless import stt as stt_module
+
+    app.cfg["gemini_api_key"] = ""
+
+    def fake_transcribe(wav, provider, key, lang, hints=None):
+        raise stt_module.stt_failure("elevenlabs", 401, {"detail": {"status": "quota_exceeded"}})
+
+    monkeypatch.setattr(app_module, "transcribe", fake_transcribe)
+    _run_dictation(app)
+    errors = [args[0] for name, args in app.overlay.calls if name == "show_error"]
+    assert errors and "크레딧" in errors[-1] and "키가 맞지 않습니다" not in errors[-1]
+    assert app.pasted == []
+
+
+def test_stt_busy_does_not_switch(app, monkeypatch):
+    """잠깐 몰린 것(429)은 Gemini로 넘기지 않고 그대로 알립니다."""
+    from mrk_typeless import stt as stt_module
+
+    app.cfg["gemini_api_key"] = "AIza-test"
+    calls = []
+
+    def fake_transcribe(wav, provider, key, lang, hints=None):
+        calls.append(provider)
+        raise stt_module.stt_failure("elevenlabs", 429, {"detail": {"status": "too_many_concurrent_requests"}})
+
+    monkeypatch.setattr(app_module, "transcribe", fake_transcribe)
+    _run_dictation(app)
+    assert calls == ["elevenlabs"]
+    assert "_switch_stt_to_gemini" not in app.posted

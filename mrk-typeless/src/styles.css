@@ -720,6 +720,11 @@ textarea:focus {
   color: var(--warn);
 }
 
+/* 오류는 아니지만 알려 줄 일 (예: 크레딧이 떨어져 Gemini로 받아씀) */
+.notice--info {
+  color: var(--primary-text);
+}
+
 /* ---------- 받아쓰기 ---------- */
 
 .modes {
@@ -840,19 +845,41 @@ textarea:focus {
   border-color: var(--primary) !important;
 }
 
+/* 듣는 중인 말: 옆줄 대신 깜빡이는 작은 점으로 '아직 듣는 중'임을 알립니다 */
 .pad__interim {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin: 0;
   color: var(--text);
   font-style: italic;
-  border-left: 3px solid var(--rec);
-  padding-left: 10px;
   animation: fade-up 0.25s var(--ease-out);
+}
+
+.pad__interim::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rec);
+  transform: translateY(-1px);
+  animation: cmp-blink 1.2s ease-in-out infinite;
 }
 
 .pad__interim--voice {
   font-style: normal;
-  border-left-color: var(--primary);
   color: var(--primary-text);
+}
+
+.pad__interim--voice::before {
+  background: var(--primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pad__interim::before {
+    animation: none;
+  }
 }
 
 .pad__bar {
@@ -1298,19 +1325,21 @@ textarea:focus {
   overflow: visible;
 }
 
+/* 폭을 늘리며 나타나면 버튼이 매 프레임 다시 그려집니다. '복사됨'으로 글자가 바뀌는 순간 함께 자리를 잡고, 크기(transform)만 키웁니다. */
 .copy-btn__check {
-  width: 0;
+  display: none;
+  width: 14px;
   height: 14px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: width 0.25s var(--spring);
 }
 
 .copy-btn.is-done .copy-btn__check {
-  width: 14px;
+  display: inline-block;
+  animation: pop 0.3s var(--spring) both;
 }
 
 .copy-btn.is-done .copy-btn__check path {

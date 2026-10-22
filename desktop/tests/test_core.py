@@ -263,3 +263,37 @@ def test_version_files_agree():
     from mrk_typeless import __version__
 
     assert (Path(__file__).resolve().parents[1] / "VERSION").read_text().strip() == __version__
+
+
+# 응답 본문은 2026-10-22에 실제 서버에서 받은 모양 그대로입니다(가짜 키로 요청).
+def test_stt_failure_reads_real_reason():
+    from mrk_typeless.stt import can_switch, stt_failure
+
+    def el(status):
+        return {"detail": {"type": "authentication_error", "code": "unauthorized", "status": status, "message": "x"}}
+
+    credit = stt_failure("elevenlabs", 401, el("quota_exceeded"))
+    assert credit.kind == "credit" and "크레딧" in str(credit) and "키가 맞지 않습니다" not in str(credit)
+    assert stt_failure("elevenlabs", 401, el("detected_unusual_activity")).kind == "blocked"
+    assert stt_failure("elevenlabs", 401, el("missing_permissions")).kind == "permission"
+    assert stt_failure("elevenlabs", 401, el("invalid_api_key")).kind == "key"
+    assert "ElevenLabs API 키가 맞지 않습니다" in str(stt_failure("elevenlabs", 401, el("invalid_api_key")))
+    def oa(code):
+        return {"error": {"message": "m", "type": "invalid_request_error", "code": code}}
+
+    assert stt_failure("openai", 401, oa("invalid_api_key")).kind == "key"
+    assert stt_failure("openai", 429, oa("insufficient_quota")).kind == "credit"
+    assert stt_failure("openai", 429, oa("rate_limit_exceeded")).kind == "busy"
+    assert stt_failure("elevenlabs", 402, None).kind == "credit"
+    assert stt_failure("elevenlabs", 503, None).kind == "busy"
+    odd = stt_failure("elevenlabs", 422, {"detail": {"status": "invalid_audio", "message": "Audio could not be decoded"}})
+    assert odd.kind == "other" and "Audio could not be decoded" in str(odd) and "422" in str(odd)
+    assert can_switch(credit) and not can_switch(stt_failure("elevenlabs", 429, None))
+
+
+def test_gemini_failure_messages():
+    from mrk_typeless.gemini import failure_message
+
+    assert "키가 맞지 않습니다" in failure_message(400, "API_KEY_INVALID", "API key not valid.", "정리")
+    assert "제한" in failure_message(403, "API_KEY_HTTP_REFERRER_BLOCKED", "", "정리")
+    assert "지역" in failure_message(400, "FAILED_PRECONDITION", "User location is not supported for the API use.", "정리")

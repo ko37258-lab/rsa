@@ -28,7 +28,7 @@ from .dictionary import apply_replacements
 from .llm import LlmError, run_ai
 from .modes import MODES, get_mode
 from .prompts import build_edit_prompt, build_polish_prompt
-from .stt import SttError, transcribe
+from .stt import SttError, can_switch, transcribe
 
 # 이보다 오래 누르고 있다가 떼면 '누르는 동안만 듣기', 짧게 누르면 '다시 누를 때까지 듣기'.
 # Win+H를 또박또박 누르면 0.5초쯤 걸리므로 그보다 넉넉하게 둡니다.
@@ -63,6 +63,8 @@ class App:
         self._keys_down: set[str] = set()
         self._lock = threading.Lock()
         self._first_setup = False
+        # 받아쓰기를 Gemini로 넘겨 받아썼을 때, 결과를 붙여넣은 뒤 함께 보여 줄 안내
+        self._stt_note = ""
         self.newer_version: str | None = None  # 켤 때 확인한 새 버전 (없으면 None)
         self.tray = Tray(self)
 
@@ -217,7 +219,7 @@ class App:
         try:
             self.post(self.overlay.show_working, "받아쓰는 중…")
             dictionary = self._dictionary()
-            spoken = transcribe(wav, cfg["stt_provider"], stt_key(cfg), cfg["speech_lang"], hints=dictionary.get("terms", []))
+            spoken = self._transcribe(wav, cfg, dictionary.get("terms", []))
             spoken = sanitize_dictation(spoken).strip()
             if not spoken:
                 raise UserFacingError("말소리를 알아듣지 못했습니다. 마이크에 조금 더 가까이 대고 말해 주세요.")
@@ -244,6 +246,31 @@ class App:
             self.post(self.overlay.show_error, "문제가 생겼습니다. 트레이 메뉴 → 기록 폴더 열기 → log.txt를 확인해 주세요.")
         finally:
             self._set_state("idle", "대기 중")
+
+    def _transcribe(self, wav: bytes, cfg: dict, hints: list[str]) -> str:
+        """받아씁니다. ElevenLabs·OpenAI가 크레딧·키·차단 문제로 거절하면 같은 녹음을 Gemini로 다시 받아쓰고,
+        다음부터 Gemini를 쓰도록 설정을 바꿉니다 (웹앱 useRecorder와 같음)."""
+        provider = cfg["stt_provider"]
+        try:
+            return transcribe(wav, provider, stt_key(cfg), cfg["speech_lang"], hints=hints)
+        except SttError as e:
+            gemini_key = (cfg.get("gemini_api_key") or "").strip()
+            if provider == "gemini" or not gemini_key or not can_switch(e):
+                raise
+            log.info("받아쓰기를 Gemini로 넘김: %s", e)
+            self.post(self.overlay.show_working, "Gemini로 다시 받아쓰는 중…")
+            try:
+                text = transcribe(wav, "gemini", gemini_key, cfg["speech_lang"], hints=hints)
+            except SttError as e2:
+                raise SttError(f"{e} Gemini로도 받아쓰지 못했습니다: {e2}") from e2
+            self.post(self._switch_stt_to_gemini)
+            self._stt_note = f"{str(e).split('.')[0]}. 그래서 Gemini로 받아썼고, 앞으로도 Gemini로 받아씁니다."
+            return text
+
+    def _switch_stt_to_gemini(self) -> None:
+        """(tk 스레드) 받아쓰기 서비스를 Gemini로 바꿔 저장합니다."""
+        self.cfg["stt_provider"] = "gemini"
+        save_config(self.cfg)
 
     def _dictionary(self) -> dict:
         dictionary, problem = load_dictionary()
@@ -295,7 +322,12 @@ class App:
             done, sub = "복사했습니다", "쓰던 곳에서 Ctrl+V로 붙여넣으세요"
         if polish_engine(self.cfg) == "local" and kind != "edit":
             sub = "AI 키가 없어 기본 정리만 했습니다 (설정에서 Gemini 키를 넣어 주세요)"
-        self.post(self.overlay.show_done, done, sub)
+        note, self._stt_note = self._stt_note, ""
+        if note:
+            # 받아쓰기를 Gemini로 넘긴 일은 읽을 시간을 넉넉히 줍니다
+            self.post(self.overlay.show_info, done, note, 7)
+        else:
+            self.post(self.overlay.show_done, done, sub)
         try:
             append_history({"kind": kind, "mode": self.cfg["mode"], "command": command, "raw": raw, "result": result, "seconds": round(seconds, 1)}, self.cfg)
         except OSError:

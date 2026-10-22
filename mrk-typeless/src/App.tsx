@@ -235,7 +235,15 @@ export function App() {
           />
         </div>
         <div role="tabpanel" id="panel-edit" aria-labelledby="tab-edit" hidden={tab !== "edit"}>
-          <EditView settings={settings} dictionary={dictionary} engine={engine} source={editSource} onSource={setEditSource} onSave={saveItem} />
+          <EditView
+            settings={settings}
+            dictionary={dictionary}
+            engine={engine}
+            source={editSource}
+            onSource={setEditSource}
+            onSave={saveItem}
+            onSettings={patchSettings}
+          />
         </div>
         <div role="tabpanel" id="panel-dictionary" aria-labelledby="tab-dictionary" hidden={tab !== "dictionary"}>
           <DictionaryView dictionary={dictionary} onChange={setDictionary} />

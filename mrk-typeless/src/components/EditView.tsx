@@ -25,10 +25,11 @@ interface Props {
   source: string;
   onSource: (text: string) => void;
   onSave: (item: HistoryItem) => void;
+  onSettings?: (patch: Partial<Settings>) => void;
 }
 
 /** Typeless의 "말로 고치기": 글을 붙여넣고, 고칠 내용을 말하면 그대로 고칩니다. */
-export function EditView({ settings, dictionary, engine, source, onSource, onSave }: Props) {
+export function EditView({ settings, dictionary, engine, source, onSource, onSave, onSettings }: Props) {
   const [command, setCommand] = useState("");
   const commandRef = useRef("");
   const ai = useAiRun();
@@ -45,6 +46,7 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
       updateCommand(base ? `${base} ${said}` : said);
     },
     dictionary.terms,
+    onSettings,
   );
 
   const apply = useCallback(
@@ -148,13 +150,18 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
             </button>
           ))}
         </div>
-        {aiOff && <p className="notice">음성 편집은 AI가 필요합니다. 설정에서 Claude 연결 방식을 골라 주세요.</p>}
+        {aiOff && <p className="notice">음성 편집은 AI가 필요합니다. 설정에서 Gemini나 Claude 키를 넣어 주세요.</p>}
         {(speech.problem === "blocked" || speech.problem === "network") && (
           <p className="notice">지금은 마이크로 지시를 받을 수 없어 글로 적어 주세요. 키보드의 음성 입력도 됩니다.</p>
         )}
         {speech.interim && <p className="pad__interim">{speech.interim}</p>}
         {speech.transcribing && <p className="notice">지시를 받아쓰는 중…</p>}
         {speech.error && <p className="notice">{speech.error}</p>}
+        {speech.notice && !speech.error && (
+          <p className="notice notice--info" role="status">
+            {speech.notice}
+          </p>
+        )}
       </div>
 
       <ResultPanel

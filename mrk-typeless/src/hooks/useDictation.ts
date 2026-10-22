@@ -28,7 +28,13 @@ function rememberFailure(failed: boolean): void {
   save(FAILED_KEY, failed ? [...list, name] : list);
 }
 
-export function useDictation(settings: Settings, onFinal: (text: string) => void, hints?: string[]) {
+export function useDictation(
+  settings: Settings,
+  onFinal: (text: string) => void,
+  hints?: string[],
+  /** ElevenLabs·OpenAI가 크레딧·키 문제로 막히면 Gemini로 받아쓰고, 이걸로 설정을 Gemini로 바꿉니다 */
+  onSettings?: (patch: Partial<Settings>) => void,
+) {
   const [browserFailed, setBrowserFailed] = useState(rememberedFailure);
   const failedRef = useRef(browserFailed);
   failedRef.current = browserFailed;
@@ -42,7 +48,14 @@ export function useDictation(settings: Settings, onFinal: (text: string) => void
     onFinal(text);
   });
   const recorder = useRecorder(
-    { lang: settings.speechLang, provider: sttProviderFor(settings), apiKey: sttKeyFor(settings), hints },
+    {
+      lang: settings.speechLang,
+      provider: sttProviderFor(settings),
+      apiKey: sttKeyFor(settings),
+      hints,
+      geminiKey: settings.geminiKey,
+      onSwitched: () => onSettings?.({ sttProvider: "gemini" }),
+    },
     onFinal,
   );
   const hasKey = !__ARTIFACT__ && sttKeyFor(settings).trim().length > 0 && recorder.supported;
@@ -93,6 +106,7 @@ export function useDictation(settings: Settings, onFinal: (text: string) => void
     interim: speech.interim,
     problem: useRecord ? recorder.problem : speechProblem,
     error: recorder.error,
+    notice: recorder.notice,
     elapsedMs: recording || useRecord ? recorder.elapsedMs : speech.elapsedMs,
     pulse: speech.pulse + recorder.pulse,
     hasKey,

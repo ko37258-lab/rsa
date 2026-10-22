@@ -39,7 +39,8 @@ export const DEFAULT_SETTINGS: Settings = {
   accountTier: "quick",
   speechLang: "ko-KR",
   speechEngine: "auto",
-  sttProvider: "elevenlabs",
+  // Gemini 키 하나로 받아쓰기와 정리를 모두 합니다(데스크톱과 같게). ElevenLabs·OpenAI는 설정에서 고릅니다.
+  sttProvider: "gemini",
   sttKey: "",
   targetLanguage: "영어",
   signature: "",
