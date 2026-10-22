@@ -1,0 +1,102 @@
+{
+  "generatedWith": "Higgsfield gpt_image_2_5",
+  "license": "MR.K 자체 생성 이미지",
+  "items": [
+    {
+      "id": "s01-land-zoning",
+      "file": "s01-land-zoning.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "드론 부감 한국 농촌 토지, 논밭 필지 경계",
+      "use": "shorts"
+    },
+    {
+      "id": "s02-landlocked",
+      "file": "s02-landlocked.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "밭에 둘러싸인 맹지와 빨간 리본 측량 말뚝",
+      "use": "shorts"
+    },
+    {
+      "id": "s03-permit-site",
+      "file": "s03-permit-site.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "개발행위허가 뒤 공사 준비 중인 야산 부지",
+      "use": "shorts"
+    },
+    {
+      "id": "s04-city-commercial",
+      "file": "s04-city-commercial.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "해질녘 신도시 근린상가 거리",
+      "use": "shorts"
+    },
+    {
+      "id": "s05-apartment",
+      "file": "s05-apartment.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "황금빛 오후 햇살의 아파트 단지 외관",
+      "use": "shorts"
+    },
+    {
+      "id": "s06-consultant-desk",
+      "file": "s06-consultant-desk.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "지적도와 태블릿이 놓인 컨설턴트 책상",
+      "use": "shorts"
+    },
+    {
+      "id": "c01-product-main",
+      "file": "c01-product-main.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "회색 스튜디오 배경의 스킨케어 세럼 병",
+      "use": "compose"
+    },
+    {
+      "id": "c02-product-sub",
+      "file": "c02-product-sub.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "흰 배경 위 세럼 종이 패키지 박스",
+      "use": "compose"
+    },
+    {
+      "id": "c03-listing-main",
+      "file": "c03-listing-main.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "자연광 밝은 아파트 거실 인테리어",
+      "use": "compose"
+    },
+    {
+      "id": "c04-listing-sub",
+      "file": "c04-listing-sub.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "파란 하늘 아래 다세대 빌라 외관",
+      "use": "compose"
+    },
+    {
+      "id": "h01-hero-land",
+      "file": "h01-hero-land.jpg",
+      "aspect": "3:2",
+      "ok": true,
+      "caption": "일출 안개 들판의 개발 예정지 드론 와이드",
+      "use": "hero"
+    },
+    {
+      "id": "h02-hero-studio",
+      "file": "h02-hero-studio.jpg",
+      "aspect": "3:2",
+      "ok": true,
+      "caption": "삼각대 스마트폰으로 세로 영상 찍는 작업실",
+      "use": "hero"
+    }
+  ]
+}
