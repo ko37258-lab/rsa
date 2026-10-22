@@ -169,6 +169,8 @@ export function HistoryView({ history, onChange, active }: Props) {
 
       {history.length > 0 && (
         <div className="danger-row">
+          {/* claude.ai 아티팩트 안에서는 파일 내려받기가 막혀 있어 숨깁니다. */}
+          {!__ARTIFACT__ && (
           <button
             type="button"
             className="btn btn--ghost"
@@ -194,6 +196,7 @@ export function HistoryView({ history, onChange, active }: Props) {
           >
             기록 내보내기 (.txt)
           </button>
+          )}
           {confirmClear ? (
             <>
               <span>기록 {history.length}개를 모두 지울까요? 되돌릴 수 없습니다.</span>

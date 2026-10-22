@@ -104,9 +104,12 @@ jobs:
           $v = (Get-Content VERSION).Trim()
           echo "version=$v" >> $env:GITHUB_OUTPUT
           # 같은 버전의 릴리스가 이미 있으면 덮어쓰지 않습니다 (VERSION을 올려야 새로 올라감).
-          gh release view "desktop-v$v" --repo "$env:GITHUB_REPOSITORY" 2>$null
+          # gh가 '없음'으로 끝내는 것(종료 코드 1)이 오류로 번지지 않게 합니다.
+          $PSNativeCommandUseErrorActionPreference = $false
+          $ErrorActionPreference = 'Continue'
+          $null = gh release view "desktop-v$v" --repo "$env:GITHUB_REPOSITORY" 2>&1
           if ($LASTEXITCODE -eq 0) { echo "publish=false" >> $env:GITHUB_OUTPUT; Write-Host "desktop-v$v 릴리스가 이미 있어 올리지 않습니다 (artifact만 남김)" }
-          else { echo "publish=true" >> $env:GITHUB_OUTPUT }
+          else { echo "publish=true" >> $env:GITHUB_OUTPUT; Write-Host "desktop-v$v 릴리스를 새로 올립니다" }
 
       - name: 릴리스 설명에 파일 확인값(SHA-256) 붙이기
         if: steps.ver.outputs.publish == 'true'
