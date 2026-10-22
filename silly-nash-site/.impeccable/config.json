@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-10-22T00:10:38.663Z",
+        "reason": "Claude triage: Inter is the existing site-wide body/heading font set in silly-nash css/style.css (font-family: 'Inter', 'Noto Sans KR'); this redesign only reuses it, changing the brand typeface is out of scope"
+      }
+    ]
+  }
+}

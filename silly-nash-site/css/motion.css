@@ -6,7 +6,6 @@
 
 :root {
     --mx-ease: cubic-bezier(0.16, 0.84, 0.24, 1);
-    --mx-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* ── 스크롤 진행바 ── */
@@ -51,36 +50,31 @@
     transition: opacity 0.2s ease;
 }
 
+/* 링은 84px 하나로 고정하고 scale 만 바꿔 크기를 조절합니다 (레이아웃 재계산 없음). */
 .mx-ring {
-    width: 38px;
-    height: 38px;
-    margin: -19px 0 0 -19px;
+    width: 84px;
+    height: 84px;
+    margin: -42px 0 0 -42px;
     display: grid;
     place-items: center;
-    border: 1px solid rgba(var(--orange-rgb, 154 123 63) / 0.6);
-    transition: width 0.35s var(--mx-ease), height 0.35s var(--mx-ease), margin 0.35s var(--mx-ease),
-        background-color 0.3s ease, border-color 0.3s ease, opacity 0.2s ease;
+    border: 2px solid rgba(var(--orange-rgb, 154 123 63) / 0.6);
+    scale: 0.45;
+    transition: scale 0.35s var(--mx-ease), background-color 0.3s ease, border-color 0.3s ease, opacity 0.2s ease;
 }
 
 .mx-ring.is-link {
-    width: 58px;
-    height: 58px;
-    margin: -29px 0 0 -29px;
+    scale: 0.69;
     background: rgba(var(--orange-rgb, 154 123 63) / 0.1);
 }
 
 .mx-ring.has-label {
-    width: 84px;
-    height: 84px;
-    margin: -42px 0 0 -42px;
+    scale: 1;
     background: var(--orange);
     border-color: transparent;
 }
 
 .mx-ring.is-down {
-    width: 30px;
-    height: 30px;
-    margin: -15px 0 0 -15px;
+    scale: 0.36;
 }
 
 .mx-ring-label {
@@ -106,7 +100,7 @@
 
 /* ── 마그네틱 버튼 ── */
 .mx-magnetic {
-    transition: translate 0.45s var(--mx-spring), opacity 0.15s, background 0.2s, box-shadow 0.25s;
+    transition: translate 0.5s var(--mx-ease), opacity 0.15s, background 0.2s, box-shadow 0.25s;
 }
 
 .mx-fine .btn-primary:hover {
