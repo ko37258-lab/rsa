@@ -110,6 +110,7 @@ jobs:
           $null = gh release view "desktop-v$v" --repo "$env:GITHUB_REPOSITORY" 2>&1
           if ($LASTEXITCODE -eq 0) { echo "publish=false" >> $env:GITHUB_OUTPUT; Write-Host "desktop-v$v 릴리스가 이미 있어 올리지 않습니다 (artifact만 남김)" }
           else { echo "publish=true" >> $env:GITHUB_OUTPUT; Write-Host "desktop-v$v 릴리스를 새로 올립니다" }
+          exit 0  # gh의 종료 코드(1)가 이 단계의 결과가 되지 않게
 
       - name: 릴리스 설명에 파일 확인값(SHA-256) 붙이기
         if: steps.ver.outputs.publish == 'true'
