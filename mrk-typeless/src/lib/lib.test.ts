@@ -5,7 +5,7 @@ import { localCleanup } from "./localCleanup";
 import { sanitizeDictation } from "./sanitize";
 import { getMode } from "./modes";
 import { buildEditPrompt, buildPolishPrompt, toSingleInput } from "./prompts";
-import { DEFAULT_SETTINGS, resolveEngine, sttKeyFor } from "./settings";
+import { DEFAULT_SETTINGS, resolveEngine, sttKeyFor, sttProviderFor } from "./settings";
 import { countChars, estimateSavedMs, formatClock, formatDuration } from "./stats";
 
 const ctx = { dictionary: DEFAULT_DICTIONARY, styleNote: "", targetLanguage: "영어", signature: "" };
@@ -87,6 +87,11 @@ describe("sttKeyFor", () => {
     const s = { ...DEFAULT_SETTINGS, sttKey: "sk_eleven", geminiKey: "AIza-x" };
     expect(sttKeyFor(s)).toBe("sk_eleven");
     expect(sttKeyFor({ ...s, sttProvider: "gemini" })).toBe("AIza-x");
+    // 고른 서비스의 키가 비어 있고 Gemini 키만 있으면 Gemini로 받아씁니다
+    const geminiOnly = { ...DEFAULT_SETTINGS, sttProvider: "elevenlabs" as const, sttKey: "", geminiKey: "AIza-x" };
+    expect(sttProviderFor(geminiOnly)).toBe("gemini");
+    expect(sttKeyFor(geminiOnly)).toBe("AIza-x");
+    expect(sttProviderFor({ ...geminiOnly, sttKey: "sk_e" })).toBe("elevenlabs");
   });
 });
 

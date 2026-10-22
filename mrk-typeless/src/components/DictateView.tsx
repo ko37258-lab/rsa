@@ -199,7 +199,12 @@ export function DictateView({
       });
       if (settings.autoCopy) {
         const ok = await copyText(result);
-        setCopyNote(ok ? "클립보드에 복사했습니다. 쓰던 곳에 붙여넣기만 하세요." : null);
+        // 모바일 Safari 등은 사용자가 직접 누르지 않은 복사를 막습니다. 그럴 땐 솔직히 알려 '복사' 버튼으로 이끕니다.
+        setCopyNote(
+          ok
+            ? "클립보드에 복사했습니다. 쓰던 곳에 붙여넣기만 하세요."
+            : "이 브라우저는 자동 복사를 막았습니다. 아래 '복사' 버튼을 눌러 주세요.",
+        );
       }
     },
     [ai, clearVoiceTimer, engine, leaveExample, onSave, requestFor, settings, updateRaw],

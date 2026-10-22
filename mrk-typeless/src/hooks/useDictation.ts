@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserName, hasNativeSpeechService } from "../lib/browser";
-import { sttKeyFor, type Settings } from "../lib/settings";
+import { sttKeyFor, sttProviderFor, type Settings } from "../lib/settings";
 import { load, save } from "../lib/storage";
 import { useRecorder } from "./useRecorder";
 import { useSpeech, type StopResult } from "./useSpeech";
@@ -42,7 +42,7 @@ export function useDictation(settings: Settings, onFinal: (text: string) => void
     onFinal(text);
   });
   const recorder = useRecorder(
-    { lang: settings.speechLang, provider: settings.sttProvider, apiKey: sttKeyFor(settings), hints },
+    { lang: settings.speechLang, provider: sttProviderFor(settings), apiKey: sttKeyFor(settings), hints },
     onFinal,
   );
   const hasKey = !__ARTIFACT__ && sttKeyFor(settings).trim().length > 0 && recorder.supported;

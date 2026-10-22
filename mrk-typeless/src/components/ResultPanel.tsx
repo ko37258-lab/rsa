@@ -22,6 +22,8 @@ interface Props {
 
 export function ResultPanel({ title, status, text, error, badge, meta, original, onCancel, actions, copyNote, preview, swapKey = 0 }: Props) {
   const [copied, setCopied] = useState<"ok" | "fail" | null>(null);
+  // 휴대폰에서는 카톡·메일 등으로 바로 보낼 수 있게 (지원하는 브라우저에서만 보임)
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function" && !__ARTIFACT__;
   const [showOriginal, setShowOriginal] = useState(false);
   const busy = status === "thinking" || status === "streaming";
 
@@ -75,6 +77,17 @@ export function ResultPanel({ title, status, text, error, badge, meta, original,
             </button>
           ) : (
             text && (
+              <>
+                {canShare && (
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={() => navigator.share({ text }).catch(() => undefined)}
+                    aria-label="다른 앱으로 보내기"
+                  >
+                    보내기
+                  </button>
+                )}
               <button type="button" className={`btn btn--primary copy-btn${copied === "ok" ? " is-done" : ""}`} onClick={copy}>
                 <svg className="copy-btn__check" viewBox="0 0 16 16" aria-hidden="true">
                   <path d="M3 8.5l3 3 7-7" />
@@ -88,6 +101,7 @@ export function ResultPanel({ title, status, text, error, badge, meta, original,
                   </span>
                 )}
               </button>
+              </>
             )
           )}
         </div>

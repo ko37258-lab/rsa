@@ -358,7 +358,9 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
             <p className="field__hint">
               {stt.keyHint} 키는 이 브라우저에만 저장되고 받아쓰기 서버로만 전송됩니다. 녹음 받아쓰기는 이용한 시간만큼 해당 서비스 요금이 나옵니다.
               {sttUsesGemini && " Gemini 무료 등급에서는 보낸 녹음과 사전 용어가 Google 서비스 개선에 쓰일 수 있습니다."}
-              {settings.speechEngine === "record" && !sttKey.trim() && " 키를 넣기 전까지는 브라우저 음성인식을 씁니다."}
+              {!sttUsesGemini && !settings.sttKey.trim() && settings.geminiKey.trim()
+                ? " 이 칸이 비어 있어 위의 Gemini 키로 받아씁니다."
+                : settings.speechEngine === "record" && !sttKey.trim() && " 키를 넣기 전까지는 브라우저 음성인식을 씁니다."}
             </p>
           </div>
         )}

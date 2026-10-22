@@ -27,6 +27,25 @@ export function browserName(): string {
   return "이 브라우저";
 }
 
+/** 카카오톡·네이버 같은 앱 안에서 열린 경우 그 앱 이름. 앱 안 브라우저는 마이크가 막힌 경우가 많습니다. */
+export function inAppBrowser(): string | null {
+  if (typeof navigator === "undefined") return null;
+  const ua = navigator.userAgent;
+  if (/KAKAOTALK/i.test(ua)) return "카카오톡";
+  if (/NAVER\(inapp/i.test(ua)) return "네이버 앱";
+  if (/Instagram/i.test(ua)) return "인스타그램";
+  if (/FBAN|FBAV/i.test(ua)) return "페이스북";
+  if (/\bLine\//i.test(ua)) return "라인";
+  return null;
+}
+
+/** 안드로이드에서 지금 주소를 Chrome으로 여는 주소 */
+export function openInChromeUrl(): string | null {
+  if (typeof navigator === "undefined" || !/Android/i.test(navigator.userAgent)) return null;
+  const { host, pathname, search, hash } = window.location;
+  return `intent://${host}${pathname}${search}${hash}#Intent;scheme=https;package=com.android.chrome;end`;
+}
+
 /** 무료 브라우저 음성인식이 원래 되는 브라우저인지 (실패해도 네트워크 탓일 가능성이 큼) */
 export function hasNativeSpeechService(name = browserName()): boolean {
   return name === "Chrome" || name === "Edge" || name === "Safari";

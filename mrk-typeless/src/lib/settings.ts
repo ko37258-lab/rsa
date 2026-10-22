@@ -97,7 +97,14 @@ export function resolveEngine(settings: Settings, accountAvailable: boolean, api
   }
 }
 
-/** 녹음 받아쓰기에 쓸 키: Gemini를 고르면 정리용 Gemini 키를 같이 씁니다. */
+/** 녹음 받아쓰기에 실제로 쓸 서비스: 고른 서비스의 키가 없고 Gemini 키만 있으면 Gemini로 받아씁니다. */
+export function sttProviderFor(settings: Settings): SttProvider {
+  if (settings.sttProvider === "gemini") return "gemini";
+  if (!settings.sttKey.trim() && settings.geminiKey.trim()) return "gemini";
+  return settings.sttProvider;
+}
+
+/** 녹음 받아쓰기에 쓸 키: Gemini로 받아쓰면 정리용 Gemini 키를 같이 씁니다. */
 export function sttKeyFor(settings: Settings): string {
-  return settings.sttProvider === "gemini" ? settings.geminiKey : settings.sttKey;
+  return sttProviderFor(settings) === "gemini" ? settings.geminiKey : settings.sttKey;
 }

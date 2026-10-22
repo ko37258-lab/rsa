@@ -11,6 +11,8 @@ import { SettingsView } from "./components/SettingsView";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { DEFAULT_DICTIONARY, type Dictionary } from "./lib/dictionary";
 import { addToHistory, type HistoryItem } from "./lib/history";
+import { inAppBrowser, openInChromeUrl } from "./lib/browser";
+import { copyText } from "./lib/clipboard";
 import { DOWNLOAD_PAGE_URL } from "./lib/desktop";
 import { DEFAULT_SETTINGS, resolveEngine, type EngineId, type Settings } from "./lib/settings";
 import { isStorageFull, load, onStorageFull, save } from "./lib/storage";
@@ -39,6 +41,10 @@ export function App() {
   const [history, setHistory] = usePersistentState<HistoryItem[]>("history", (s) => s ?? [], shrinkHistory);
   const [storageFull, setStorageFull] = useState(isStorageFull);
   useEffect(() => onStorageFull(setStorageFull), []);
+  // 카카오톡 등 앱 안 브라우저: 마이크가 막힌 경우가 많아 다른 브라우저로 열도록 안내합니다.
+  const [inApp] = useState(() => (__ARTIFACT__ ? null : inAppBrowser()));
+  const [inAppDismissed, setInAppDismissed] = useState(() => load<boolean>("inAppDismissed") === true);
+  const [addressCopied, setAddressCopied] = useState(false);
   const [tab, setTab] = usePersistentState<Tab>("tab", (s) => (s && TABS.some((t) => t.id === s) ? s : "dictate"));
   const [firstVisit] = useState(() => load("history") === undefined && load("draft") === undefined);
   const [editSource, setEditSource] = useState("");
@@ -163,6 +169,37 @@ export function App() {
         }))}
       />
 
+      {inApp && !inAppDismissed && (
+        <p className="banner banner--warn" role="status">
+          {inApp} 안에서 열려 마이크가 안 될 수 있습니다. Chrome·Safari 같은 브라우저에서 열어 주세요.{" "}
+          {openInChromeUrl() ? (
+            <a className="link" href={openInChromeUrl() ?? "#"}>
+              Chrome으로 열기
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="link"
+              onClick={async () => {
+                setAddressCopied(await copyText(window.location.href));
+                window.setTimeout(() => setAddressCopied(false), 2000);
+              }}
+            >
+              {addressCopied ? "주소를 복사했습니다" : "주소 복사"}
+            </button>
+          )}{" "}
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setInAppDismissed(true);
+              save("inAppDismissed", true);
+            }}
+          >
+            닫기
+          </button>
+        </p>
+      )}
       {storageFull && (
         <p className="banner banner--warn" role="status">
           이 브라우저의 저장 공간이 가득 찼습니다. 오래된 기록부터 자동으로 지웁니다. 남기고 싶은 기록은{" "}

@@ -26,7 +26,7 @@ from .config import (
 )
 from .dictionary import apply_replacements
 from .llm import LlmError, run_ai
-from .modes import get_mode
+from .modes import MODES, get_mode
 from .prompts import build_edit_prompt, build_polish_prompt
 from .stt import SttError, transcribe
 
@@ -111,6 +111,9 @@ class App:
             last_key = combo.split("+")[-1].strip()
             keyboard.on_release_key(last_key, lambda _e, p=purpose, t=trigger: self._on_record_key_up(p, t))
         keyboard.add_hotkey(self.cfg["hotkey_polish"], self._on_polish_hotkey, suppress=True)
+        # Ctrl+Alt+1~7: 글 형식 바로 바꾸기 (자동 정리·메시지·이메일·보고서·강의 원고·상담 노트·번역)
+        for i, mode in enumerate(MODES[:7], start=1):
+            keyboard.add_hotkey(f"ctrl+alt+{i}", lambda m=mode["id"]: self.post(self.set_mode, m), suppress=True)
         keyboard.on_press_key("esc", lambda _e: self._on_escape())
         log.info(
             "단축키 등록: %s / %s / %s / Win+H %s",
@@ -225,7 +228,14 @@ class App:
                 result = run_ai(system, user, cfg)
                 self._deliver(result, raw=selection, kind="edit", previous=previous, command=spoken, seconds=seconds)
             else:
-                result = self._polish(spoken, dictionary)
+                try:
+                    result = self._polish(spoken, dictionary)
+                except LlmError as e:
+                    # 정리에 실패해도 받아쓴 말은 잃지 않도록 원문을 클립보드에 둡니다.
+                    from .clipboard import set_text
+
+                    set_text(spoken)
+                    raise UserFacingError(f"{e} · 받아쓴 원문은 클립보드에 복사해 두었습니다 (Ctrl+V)") from e
                 self._deliver(result, raw=spoken, kind="dictation", seconds=seconds)
         except (SttError, LlmError, UserFacingError) as e:
             self.post(self.overlay.show_error, str(e))

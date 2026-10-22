@@ -300,3 +300,26 @@ def test_win_h_hotkey_follows_setting(app, monkeypatch, win_h):
     if win_h:
         assert combos["windows+h"] == (("dictate", "winh"), True) and "h" in kb.releases
     assert combos["ctrl+shift+space"] == (("dictate", "dictate"), True)
+
+
+def test_polish_failure_keeps_transcript_in_clipboard(app, monkeypatch):
+    copied = []
+    monkeypatch.setattr(clipboard, "set_text", lambda text: copied.append(text))
+
+    def fail(system, user, cfg):
+        raise app_module.LlmError("Gemini 서버가 바쁩니다.")
+
+    monkeypatch.setattr(app_module, "run_ai", fail)
+    app._on_record_hotkey("dictate")
+    app._pressed_at -= 1.0
+    app._on_record_key_up("dictate")
+    wait_idle(app)
+    assert app.pasted == [] and copied == ["음 내일 오후 어 세 시에 현장 답사 가요"]
+    assert any(name == "show_error" and "클립보드" in args[0] for name, args in app.overlay.calls)
+
+
+def test_mode_hotkeys_registered(app, monkeypatch):
+    kb = FakeKeyboard()
+    monkeypatch.setitem(sys.modules, "keyboard", kb)
+    app.register_hotkeys()
+    assert [c for c, _, _ in kb.hotkeys if c.startswith("ctrl+alt+")] [:7] == [f"ctrl+alt+{i}" for i in range(1, 8)] or sum(c.startswith("ctrl+alt+") and c[-1].isdigit() for c, _, _ in kb.hotkeys) == 7
