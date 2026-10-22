@@ -9,7 +9,7 @@ import threading
 import time
 import tkinter as tk
 
-from . import __version__, autostart
+from . import __version__, autostart, update
 from .audio import AudioError, Recorder
 from .cleanup import local_cleanup, sanitize_dictation
 from .config import (
@@ -61,6 +61,7 @@ class App:
         self._keys_down: set[str] = set()
         self._lock = threading.Lock()
         self._first_setup = False
+        self.newer_version: str | None = None  # 켤 때 확인한 새 버전 (없으면 None)
         self.tray = Tray(self)
 
     # ---------- 화면(tk) 스레드로 일 넘기기 ----------
@@ -303,7 +304,29 @@ class App:
     def open_help(self) -> None:
         from .ui import HelpWindow
 
-        HelpWindow.open(self.root, self.cfg, open_settings=self.open_settings)
+        HelpWindow.open(self.root, self.cfg, open_settings=self.open_settings, newer_version=self.newer_version)
+
+    def open_download(self) -> None:
+        import webbrowser
+
+        webbrowser.open(update.DOWNLOAD_URL)
+
+    # ---------- 새 버전 확인 (작업 스레드) ----------
+    def check_update(self) -> None:
+        newer = update.check()
+        if not newer:
+            return
+        self.newer_version = newer
+        log.info("새 버전 있음: %s (지금 %s)", newer, __version__)
+        self.post(self._announce_update, newer)
+
+    def _announce_update(self, newer: str) -> None:
+        try:
+            self.tray.icon.update_menu()
+        except Exception:
+            pass
+        if self.state == "idle":
+            self.overlay.show_info(f"새 버전 {newer}이 나왔습니다", "트레이 아이콘 → '새 버전 받기'에서 내려받으세요", 6)
 
     def open_dictionary(self) -> None:
         load_dictionary()  # 파일이 없으면 기본 사전으로 만들어 둡니다.
@@ -332,6 +355,8 @@ class App:
         except Exception:
             log.exception("단축키 등록 실패")
         self.root.after(40, self._pump)
+        # 새 버전 확인은 켜고 잠시 뒤 다른 스레드에서, 실패해도 조용히
+        self.root.after(8000, lambda: threading.Thread(target=self.check_update, daemon=True).start())
         first_run = not stt_key(self.cfg)
         if first_run:
             self._first_setup = True

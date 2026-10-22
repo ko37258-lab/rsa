@@ -1,4 +1,4 @@
-from mrk_typeless import gemini, llm, stt
+from mrk_typeless import gemini, llm, stt, update
 from mrk_typeless.cleanup import local_cleanup, sanitize_dictation
 from mrk_typeless.config import DEFAULTS, polish_engine, stt_key
 from mrk_typeless.dictionary import DEFAULT_DICTIONARY, apply_replacements
@@ -142,3 +142,13 @@ def test_help_follows_settings():
     assert not ok and "Gemini API 키" in text
     ok, text = readiness({**cfg, "gemini_api_key": "AIza-x"})
     assert ok and "받아쓰기 Gemini" in text and "정리 Gemini" in text
+
+
+def test_update_version_compare(monkeypatch):
+    assert update.parse_version("desktop-v1.2.0") == (1, 2, 0)
+    assert update.is_newer("desktop-v1.2.0", "1.1.0") and not update.is_newer("desktop-v1.1.0", "1.1.0")
+    assert not update.is_newer("weird", "1.1.0")
+    monkeypatch.setattr(update.requests, "get", lambda *a, **k: FakeResponse(200, {"tag_name": "desktop-v9.9.9"}))
+    assert update.check() == "9.9.9"
+    monkeypatch.setattr(update.requests, "get", lambda *a, **k: (_ for _ in ()).throw(update.requests.ConnectionError()))
+    assert update.check() is None

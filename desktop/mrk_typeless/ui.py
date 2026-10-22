@@ -399,12 +399,12 @@ class HelpWindow:
     PRIMARY = "#4c40d9"
 
     @classmethod
-    def open(cls, root, cfg, open_settings=None):
+    def open(cls, root, cfg, open_settings=None, newer_version=None):
         if cls._open and cls._open.win.winfo_exists():
             cls._open.win.destroy()
-        cls._open = cls(root, cfg, open_settings)
+        cls._open = cls(root, cfg, open_settings, newer_version)
 
-    def __init__(self, root, cfg, open_settings):
+    def __init__(self, root, cfg, open_settings, newer_version=None):
         win = self.win = tk.Toplevel(root)
         win.title("MR.K Typeless 사용 방법")
         win.resizable(False, False)
@@ -447,6 +447,12 @@ class HelpWindow:
             "· 관리자 권한으로 연 프로그램 안에서는 단축키가 듣지 않을 수 있습니다."
         )
         tk.Label(body, text=tips, font=(FONT, 9), fg=self.TEXT, bg=self.BG, justify="left").pack(anchor="w", pady=(14, 0))
+
+        if newer_version:
+            upd = tk.Frame(body, bg="#fff4e6", padx=12, pady=8)
+            upd.pack(fill="x", pady=(14, 0))
+            tk.Label(upd, text=f"새 버전 {newer_version}이 나왔습니다.", font=(FONT, 10, "bold"), fg=self.INK, bg=upd["bg"]).pack(side="left")
+            ttk.Button(upd, text="내려받기 ↗", command=lambda: webbrowser.open(GUIDE_URL)).pack(side="right")
 
         buttons = tk.Frame(body, bg=self.BG)
         buttons.pack(fill="x", pady=(18, 0))

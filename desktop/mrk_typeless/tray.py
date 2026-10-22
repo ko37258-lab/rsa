@@ -53,6 +53,11 @@ class Tray:
             pystray.MenuItem("사전 고치기 (메모장)", self._action(app.open_dictionary)),
             pystray.MenuItem("기록 폴더 열기", self._action(app.open_folder)),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
+                lambda _item: f"새 버전 {app.newer_version} 받기…",
+                self._action(app.open_download),
+                visible=lambda _item: bool(app.newer_version),
+            ),
             pystray.MenuItem("종료", self._action(app.quit)),
         )
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { checkClaudeKey, checkGeminiKey, type KeyCheck } from "../ai/keyCheck";
 import { STT_PROVIDERS } from "../ai/transcribe";
 import {
   GEMINI_MODEL_OPTIONS,
@@ -33,6 +34,42 @@ const SPEECH_ENGINES: { id: SpeechEngine; label: string; desc: string }[] = [
   { id: "browser", label: "브라우저 음성인식", desc: "무료. 말하는 동안 글자가 바로 보입니다. Chrome·Edge·Safari에서 됩니다." },
   { id: "record", label: "녹음 받아쓰기", desc: "다 말하면 녹음을 받아쓰기 API로 보냅니다. 어느 브라우저에서나 됩니다." },
 ];
+
+/** '키 확인' 버튼: 가벼운 요청으로 키가 맞는지 보고 결과를 옆에 적습니다. */
+function KeyCheckButton({ id, apiKey, check }: { id: string; apiKey: string; check: (key: string, signal: AbortSignal) => Promise<KeyCheck> }) {
+  const [state, setState] = useState<{ busy: boolean; result: KeyCheck | null }>({ busy: false, result: null });
+  const ctlRef = useRef<AbortController | null>(null);
+  // 키를 고치면 지난 결과는 지웁니다.
+  useEffect(() => {
+    setState({ busy: false, result: null });
+    ctlRef.current?.abort();
+  }, [apiKey]);
+  useEffect(() => () => ctlRef.current?.abort(), []);
+
+  async function run() {
+    ctlRef.current?.abort();
+    const ctl = new AbortController();
+    ctlRef.current = ctl;
+    setState({ busy: true, result: null });
+    try {
+      const result = await check(apiKey, ctl.signal);
+      if (!ctl.signal.aborted) setState({ busy: false, result });
+    } catch {
+      if (!ctl.signal.aborted) setState({ busy: false, result: null });
+    }
+  }
+
+  return (
+    <span className="key-check">
+      <button type="button" className="btn btn--ghost" onClick={() => void run()} disabled={state.busy || !apiKey.trim()} aria-describedby={`${id}-status`}>
+        {state.busy ? "확인 중…" : "키 확인"}
+      </button>
+      <span id={`${id}-status`} className={`key-check__status${state.result ? (state.result.ok ? " is-ok" : " is-bad") : ""}`} role="status">
+        {state.result?.message ?? ""}
+      </span>
+    </span>
+  );
+}
 
 export function SettingsView({ settings, onSettings, engine, accountAvailable }: Props) {
   const [showKey, setShowKey] = useState(false);
@@ -138,9 +175,12 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
                   {showKey ? "숨기기" : "보기"}
                 </button>
               </div>
-              <a className="key-link" href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener noreferrer">
-                Anthropic API 키 발급받기 ↗
-              </a>
+              <div className="key-row">
+                <a className="key-link" href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener noreferrer">
+                  Anthropic API 키 발급받기 ↗
+                </a>
+                <KeyCheckButton id="api-key" apiKey={settings.apiKey} check={checkClaudeKey} />
+              </div>
               <p className="field__hint">
                 Claude 개발자 플랫폼에 로그인해 키를 만들고 붙여넣으세요. 키는 이 브라우저에만 저장되고 Claude 서버로만 전송됩니다.
                 여러 사람이 쓰는 컴퓨터에서는 쓰지 마세요.
@@ -192,9 +232,12 @@ export function SettingsView({ settings, onSettings, engine, accountAvailable }:
                   {showGeminiKey ? "숨기기" : "보기"}
                 </button>
               </div>
-              <a className="key-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
-                Gemini API 키 발급받기 ↗
-              </a>
+              <div className="key-row">
+                <a className="key-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">
+                  Gemini API 키 발급받기 ↗
+                </a>
+                <KeyCheckButton id="gemini-key" apiKey={settings.geminiKey} check={checkGeminiKey} />
+              </div>
               <p className="field__hint">
                 Google AI Studio에 로그인해 키를 만들고 붙여넣으세요. 키는 이 브라우저에만 저장되고 Google 서버로만 전송됩니다. 두 키를
                 모두 넣으면 정리된 글 아래 <em>Claude·Gemini 비교</em>로 같은 원문을 나란히 견줘 볼 수 있습니다.

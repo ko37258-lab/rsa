@@ -151,7 +151,29 @@ function DownloadButton({ big = false }: { big?: boolean }) {
   );
 }
 
+const LATEST_API = "https://api.github.com/repos/ko37258-lab/rsa/releases/latest";
+
+/** GitHub 릴리스의 최신 버전과 설치 파일 크기. 못 가져오면 코드에 적힌 버전을 보여 줍니다. */
+function useLatestRelease() {
+  const [info, setInfo] = useState<{ version: string; sizeMb: number | null }>({ version: DESKTOP_VERSION, sizeMb: null });
+  useEffect(() => {
+    const ctl = new AbortController();
+    fetch(LATEST_API, { signal: ctl.signal, headers: { Accept: "application/vnd.github+json" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { tag_name?: string; assets?: { name: string; size: number }[] } | null) => {
+        if (!data) return;
+        const version = data.tag_name?.match(/(\d+\.\d+\.\d+)/)?.[1];
+        const setup = data.assets?.find((a) => a.name === "MRK-Typeless-Setup.exe");
+        setInfo({ version: version ?? DESKTOP_VERSION, sizeMb: setup ? Math.round(setup.size / 1024 / 1024) : null });
+      })
+      .catch(() => undefined);
+    return () => ctl.abort();
+  }, []);
+  return info;
+}
+
 export function DownloadPage() {
+  const latest = useLatestRelease();
   return (
     <div className="app dl">
       <header className="nav">
@@ -180,7 +202,8 @@ export function DownloadPage() {
         <div className="dl-cta">
           <DownloadButton big />
           <p className="dl-meta">
-            v{DESKTOP_VERSION} · Windows 10·11 · 관리자 권한 필요 없음 ·{" "}
+            v{latest.version}
+            {latest.sizeMb ? ` · ${latest.sizeMb}MB` : ""} · Windows 10·11 · 관리자 권한 필요 없음 ·{" "}
             <a href={PORTABLE_URL}>설치 없이 쓰는 한 파일 버전</a>
           </p>
         </div>

@@ -43,6 +43,14 @@ interface TranscribeOptions {
 
 const LANG_NAMES: Record<string, string> = { ko: "한국어", en: "영어", ja: "일본어", zh: "중국어" };
 
+/** 녹음 형식을 Gemini가 받는 MIME로 맞춥니다. "audio/webm;codecs=opus"의 꼬리를 떼고, Safari의 audio/mp4는 m4a로 보냅니다. */
+export function geminiMime(type: string): string {
+  const base = (type.split(";")[0] || "").trim().toLowerCase();
+  if (!base) return "audio/webm";
+  if (base === "audio/mp4" || base === "audio/x-m4a") return "audio/m4a";
+  return base;
+}
+
 export async function transcribe(audio: Blob, filename: string, opts: TranscribeOptions): Promise<string> {
   if (opts.provider === "gemini") return transcribeWithGemini(audio, opts);
   const language = opts.lang.split("-")[0];
@@ -110,8 +118,7 @@ async function transcribeWithGemini(audio: Blob, opts: TranscribeOptions): Promi
             role: "user",
             parts: [
               { text: prompt },
-              // "audio/webm;codecs=opus"처럼 붙은 꼬리는 떼고 보냅니다.
-              { inlineData: { mimeType: audio.type.split(";")[0] || "audio/webm", data: await blobToBase64(audio) } },
+              { inlineData: { mimeType: geminiMime(audio.type), data: await blobToBase64(audio) } },
             ],
           },
         ],

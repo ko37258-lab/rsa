@@ -147,6 +147,31 @@ export function HistoryView({ history, onChange, active }: Props) {
 
       {history.length > 0 && (
         <div className="danger-row">
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={() => {
+              // 기록 전체를 글 파일로 내려받습니다 (가장 최근 것이 위).
+              const lines = history.map((h) => {
+                const when = new Date(h.createdAt).toLocaleString("ko-KR");
+                const head = h.kind === "edit" ? `[음성 편집 · ${when}] 지시: ${h.command ?? ""}` : `[${getMode(h.mode ?? "clean").label} · ${when}]`;
+                return `${head}\n${h.result}\n\n(원문) ${h.raw}`;
+              });
+              const blob = new Blob([lines.join("\n\n" + "-".repeat(40) + "\n\n")], { type: "text/plain;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              // 파일 이름은 영문으로 둡니다 (일부 브라우저는 한글 이름을 'download'로 바꿉니다).
+              a.download = `MRK-Typeless-history-${new Date().toISOString().slice(0, 10)}.txt`;
+              // 문서에 붙여야 파일 이름(download 속성)이 적용됩니다.
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}
+          >
+            기록 내보내기 (.txt)
+          </button>
           {confirmClear ? (
             <>
               <span>기록 {history.length}개를 모두 지울까요? 되돌릴 수 없습니다.</span>

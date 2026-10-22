@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { failureMessage, isBlocked, parseSse, textOf, thinkingLevelFor } from "./gemini";
+import { geminiMime } from "./transcribe";
 
 const chunk = (text: string, extra: object = {}) => ({ candidates: [{ content: { parts: [{ text }] }, ...extra }] });
 
@@ -44,5 +45,13 @@ describe("failureMessage", () => {
     expect(failureMessage({ status: 400, reason: "API_KEY_INVALID", message: "" }, "정리")).toContain("키가 맞지 않습니다");
     expect(failureMessage({ status: 429, reason: "RESOURCE_EXHAUSTED", message: "" }, "정리")).toContain("한도");
     expect(failureMessage({ status: 503, reason: "UNAVAILABLE", message: "" }, "받아쓰기")).toContain("다시 받아쓰기해");
+  });
+});
+
+describe("geminiMime", () => {
+  it("코덱 꼬리를 떼고 Safari의 mp4 녹음은 m4a로 보낸다", () => {
+    expect(geminiMime("audio/webm;codecs=opus")).toBe("audio/webm");
+    expect(geminiMime("audio/mp4")).toBe("audio/m4a");
+    expect(geminiMime("")).toBe("audio/webm");
   });
 });

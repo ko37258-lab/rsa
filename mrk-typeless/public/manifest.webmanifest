@@ -1,0 +1,16 @@
+{
+  "name": "MR.K Typeless",
+  "short_name": "MR.K 받아쓰기",
+  "description": "말하면 정리된 글이 되는 MR.K의 AI 받아쓰기",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6868f7",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

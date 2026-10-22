@@ -278,7 +278,8 @@ export function DictateView({
     let spaceHeld = false;
     const down = (e: KeyboardEvent) => {
       const { active, startListening, polish, speech, ai } = latest.current;
-      if (!active) return;
+      // 사용법 같은 대화 상자가 열려 있으면 뒤에서 단축키가 동작하지 않게 합니다.
+      if (!active || document.querySelector("dialog[open]")) return;
       if (e.key === "Escape") {
         if (speech.listening || speech.transcribing) speech.cancel();
         ai.cancel();
