@@ -121,6 +121,15 @@ async function renderEnv() {
   }
 }
 
+/** 화면 곳곳의 "N가지" 숫자(index.html 의 data-style-count 자리표시)를 실제 스타일 수로 채웁니다. 데이터를 못 읽으면 HTML 에 적힌 수를 그대로 둡니다. */
+async function fillStyleCount() {
+  try {
+    const { STYLES } = await import('./styles.js');
+    if (!STYLES.length) return;
+    for (const el of document.querySelectorAll('[data-style-count]')) el.textContent = String(STYLES.length);
+  } catch (e) { console.warn('styles.js 없음', e); }
+}
+
 /** 사용법 영상 파일이 있으면 안내 화면에 보여 줍니다(없으면 그 칸은 숨긴 채로). */
 async function wireGuideVideo() {
   const box = $('#guideVideo');
@@ -147,7 +156,9 @@ async function boot() {
   });
   window.addEventListener('resize', () => current && moveIndicator(current));
   show(currentView());
+  // 스타일 수 채우기는 사례 화면(initShowcase)의 제목 움직임(kinetic)이 글자를 다시 짜기 전에 끝나야 한다
   await Promise.all([
+    fillStyleCount(),
     initShorts().catch((e) => console.error('shorts', e)),
     initCompose().catch((e) => console.error('compose', e)),
     initDownloader().catch((e) => console.error('download', e)),

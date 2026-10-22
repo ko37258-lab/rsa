@@ -24,17 +24,17 @@
 <pre id="log"></pre>
 <div id="out"></div>
 <script type="module">
-import { drawFrame, buildTimeline, dims, ensureFonts, OVERLAYS } from './js/shorts-render.js';
+import { drawFrame, buildTimeline, dims, ensureFonts, OVERLAYS, CAPTION_STYLES, CAPTION_ANIMS } from './js/shorts-render.js';
 import { STYLES, styleProject } from './js/styles.js';
 import { sample, SHORTS_CASE } from './js/samples.js';
 
 const log = (m) => { document.getElementById('log').textContent += m + '\n'; };
 
-// 사양서 어휘 전체
+// 사양서 어휘 전체(자막 모양·등장은 엔진이 내보내는 목록을 그대로 씁니다)
 export const VOCAB = {
   template: ['band', 'blur', 'full', 'split', 'card', 'dark'],
-  captionAnim: ['none', 'words', 'karaoke', 'type', 'pop'],
-  captionStyle: ['outline', 'box', 'plain', 'pill'],
+  captionAnim: CAPTION_ANIMS,
+  captionStyle: CAPTION_STYLES,
   overlay: Object.keys(OVERLAYS),
   transition: ['fade', 'slide', 'zoom', 'none', 'wipe'],
   titleMode: ['band', 'hook', 'none'],
@@ -110,10 +110,16 @@ async function renderSheet(styles, { cellW = 540, cellH = 960, cols = 0 } = {}) 
       cells.push({ canvas: c, id: `${st.id} · t=${t.toFixed(1)}`, label: st.name || st.id, sub: `${p.template}/${p.captionAnim}/${p.overlay}/${p.transition}/${p.titleMode}` });
     }
   }
+  const sheet = composeGrid(cells, { cellW, cellH, cols });
+  document.getElementById('out').replaceChildren(sheet);
+  return { dataUrl: sheet.toDataURL('image/png'), errors, cells: cells.length };
+}
+
+/** 타일 목록 [{canvas, id, label, sub}] → 격자 시트 캔버스. 타일 아래 글자 3줄: id·시간 / 이름 / 어휘 요약(타일 폭에 맞춰 줄임) */
+function composeGrid(cells, { cellW, cellH, cols = 0 }) {
   const n = cells.length;
   const C = cols || Math.min(8, Math.max(2, Math.ceil(Math.sqrt(n * 1.6))));
   const R = Math.ceil(n / C);
-  // 타일 아래 글자 3줄: id·시간 / 스타일 이름 / 어휘 요약. 글자 크기는 타일 폭에 맞춰 줄입니다(270px 타일에서도 읽히게).
   const fs = Math.max(11, Math.min(20, Math.round(cellW / 15)));
   const labelH = Math.round(fs * 4.2);
   const gap = 14;
@@ -139,10 +145,153 @@ async function renderSheet(styles, { cellW = 540, cellH = 960, cols = 0 } = {}) 
     g.fillText(fit(g, cell.label, cellW), x, y + cellH + 6 + fs * 1.3);
     g.fillStyle = '#9aa';
     g.font = `500 ${Math.round(fs * 0.85)}px "Pretendard Variable", sans-serif`;
-    g.fillText(fit(g, cell.sub, cellW), x, y + cellH + 6 + fs * 2.6);
+    g.fillText(fit(g, cell.sub || '', cellW), x, y + cellH + 6 + fs * 2.6);
   });
+  return sheet;
+}
+
+// ── 자막 모양·등장 점검(tests/caption-sheet.cjs 가 부릅니다) ──────────────
+/** 자막 점검용 장면: 사진 장면(0~3s) → 사진 없는 장면(3~6s) → 훅 장면(6~8.4s) */
+async function captionScenes() {
+  const [a, b] = await Promise.all(['s01-land-zoning', 's02-landlocked'].map((id) => sample(id)));
+  return [
+    { caption: '땅을 살 때는\n*용도지역*부터 확인하세요', img: a, duration: 3 },
+    { caption: '*도로*에 붙지 않은 맹지는\n건축이 어렵습니다', img: null, duration: 3 },
+    { caption: '이거 모르고 땅 사면\n*손해*봅니다', img: b, kind: 'hook', duration: 2.4 },
+  ];
+}
+
+/** p 를 t초에 cellW 폭 타일로 그려 셀을 만듭니다(예외는 errors 에) */
+function drawCell(p, t, id, label, sub, cellW, errors) {
+  const c = document.createElement('canvas');
+  const { W, H } = cellDims(p.aspect, cellW);
+  c.width = W; c.height = H;
+  const tl = buildTimeline(p);
+  try { drawFrame(c.getContext('2d'), p, W, H, t, tl); }
+  catch (e) { errors.push({ id, t, message: String(e && e.stack || e) }); }
+  return { canvas: c, id, label, sub };
+}
+
+/**
+ * 자막 시트: 모든 captionStyle × 대표 template 3종(band/split/dark) 을 t=1.4s 에, 모든 captionAnim 을 t=0.3/0.9/1.8s 에.
+ * 한 줄 12타일(모양은 한 줄에 4모양×3템플릿, 등장은 한 줄에 4등장×3시각).
+ */
+async function renderCaptionSheet({ cellW = 270, cols = 12 } = {}) {
+  const scenes = await captionScenes();
+  const errors = [];
+  const cells = [];
+  const base = { ...BASE, scenes, title: '공법의 신이 알려주는\n*토지투자* 3원칙' };
+  await ensureFonts(base);
+  const { H: cellH } = cellDims('9:16', cellW);
+  for (const captionStyle of VOCAB.captionStyle) {
+    for (const template of ['band', 'split', 'dark']) {
+      const p = { ...base, captionStyle, template };
+      cells.push(drawCell(p, 1.4, `${captionStyle} · ${template}`, `자막 모양 ${captionStyle}`, `t=1.4 / ${template}`, cellW, errors));
+    }
+  }
+  for (const captionAnim of VOCAB.captionAnim) {
+    for (const t of [0.3, 0.9, 1.8]) {
+      const p = { ...base, captionAnim, captionStyle: 'outline', template: 'band' };
+      cells.push(drawCell(p, t, `${captionAnim} · t=${t}`, `자막 등장 ${captionAnim}`, 'outline / band', cellW, errors));
+    }
+  }
+  const sheet = composeGrid(cells, { cellW, cellH, cols });
   document.getElementById('out').replaceChildren(sheet);
-  return { dataUrl: sheet.toDataURL('image/png'), errors, cells: n };
+  return { dataUrl: sheet.toDataURL('image/png'), errors, cells: cells.length };
+}
+
+/**
+ * 자막 보조 시트(눈 점검용): 모든 captionStyle 을 어려운 자리에서 — full 훅 배경(t=7.4), band 사진 없는 장면(t=4.4), card·blur·full 사진 장면(t=1.4),
+ * 밝은 배경 dark(t=1.4) — 그리고 새 등장 5종을 칩(tag)·유리 패널(glass) 모양과 섞어서.
+ */
+async function renderCaptionExtra({ cellW = 270, cols = 14 } = {}) {
+  const scenes = await captionScenes();
+  const errors = [];
+  const cells = [];
+  const base = { ...BASE, scenes, title: '공법의 신이 알려주는\n*토지투자* 3원칙' };
+  await ensureFonts(base);
+  const { H: cellH } = cellDims('9:16', cellW);
+  const spots = [
+    ['full', 7.4, 'full 훅', {}],
+    ['band', 4.4, 'band 사진없음', {}],
+    ['card', 1.4, 'card', {}],
+    ['blur', 1.4, 'blur', {}],
+    ['full', 1.4, 'full', {}],
+    ['dark', 1.4, 'dark 밝은배경', { bandColor: '#f3efe6', highlightColor: '#e8473c' }],
+    ['split', 4.4, 'split 사진없음', { highlightColor: '#2f6cff' }],
+  ];
+  for (const captionStyle of VOCAB.captionStyle) {
+    for (const [template, t, label, extra] of spots) {
+      const p = { ...base, captionStyle, template, ...extra };
+      cells.push(drawCell(p, t, `${captionStyle} · ${label}`, `자막 모양 ${captionStyle}`, `t=${t} / ${template}`, cellW, errors));
+    }
+  }
+  for (const captionAnim of ['bounce', 'scale', 'slide', 'wave', 'flash']) {
+    for (const [captionStyle, template] of [['tag', 'band'], ['glass', 'full'], ['bubble', 'split'], ['marker', 'dark'], ['underline', 'card'], ['neon', 'blur'], ['shadow3d', 'band']]) {
+      const p = { ...base, captionAnim, captionStyle, template };
+      cells.push(drawCell(p, 0.6, `${captionAnim} · ${captionStyle}`, `등장 ${captionAnim} + 모양 ${captionStyle}`, `t=0.6 / ${template}`, cellW, errors));
+    }
+  }
+  const sheet = composeGrid(cells, { cellW, cellH, cols });
+  document.getElementById('out').replaceChildren(sheet);
+  return { dataUrl: sheet.toDataURL('image/png'), errors, cells: cells.length };
+}
+
+/** 모든 captionStyle × captionAnim × template 을 사진 장면·전환·사진 없는 장면·훅·엔딩 시각에 한 번씩 그려 예외를 모읍니다(그림은 270×480). 장식·제목 모드·배경 밝기는 돌아가며. */
+async function sweepCaptions() {
+  const scenes = await captionScenes();
+  const errors = [];
+  let count = 0;
+  const c = document.createElement('canvas');
+  c.width = 270; c.height = 480;
+  const ctx = c.getContext('2d');
+  const overlays = VOCAB.overlay;
+  for (const captionStyle of VOCAB.captionStyle) for (const captionAnim of VOCAB.captionAnim) for (const template of VOCAB.template) {
+    const overlay = overlays[count % overlays.length];
+    const titleMode = VOCAB.titleMode[count % 3];
+    const transition = VOCAB.transition[count % 5];
+    const p = { ...BASE, scenes, captionStyle, captionAnim, template, overlay, titleMode, transition, bandColor: count % 2 ? '#e9e7e2' : '#0b0d14', highlightColor: count % 3 ? '#ffd43b' : '#2f6cff' };
+    const tl = buildTimeline(p);
+    for (const t of [0.3, 1.4, 3.2, 4.4, 6.3, 7.4, tl.total - 0.1]) {
+      try { drawFrame(ctx, p, 270, 480, t, tl); }
+      catch (e) { errors.push({ captionStyle, captionAnim, template, overlay, titleMode, transition, t, message: String(e && e.stack || e) }); }
+    }
+    count++;
+  }
+  return { combos: count, errors };
+}
+
+/** 자막 모양·등장별 1080×1920 프레임 시간: 모양 12종(band, 등장 none) + 등장 10종(band, 모양 outline) + 무거운 조합 몇 개 */
+async function measureCaptionPerf(frames = 30) {
+  const list = [];
+  for (const captionStyle of VOCAB.captionStyle) list.push({ id: `style:${captionStyle}`, visual: { ...BASE, captionStyle, template: 'band' } });
+  for (const captionAnim of VOCAB.captionAnim) list.push({ id: `anim:${captionAnim}`, visual: { ...BASE, captionAnim, template: 'band' } });
+  list.push({ id: 'heavy:neon+wave+dark', visual: { ...BASE, captionStyle: 'neon', captionAnim: 'wave', template: 'dark' } });
+  list.push({ id: 'heavy:shadow3d+bounce+full', visual: { ...BASE, captionStyle: 'shadow3d', captionAnim: 'bounce', template: 'full' } });
+  list.push({ id: 'heavy:tag+slide+split', visual: { ...BASE, captionStyle: 'tag', captionAnim: 'slide', template: 'split' } });
+  list.push({ id: 'heavy:gradient+flash+blur', visual: { ...BASE, captionStyle: 'gradient', captionAnim: 'flash', template: 'blur' } });
+  // 등장 애니메이션이 실제로 움직이는 구간(장면 앞 1.8초)만 재서 가장 비싼 프레임을 놓치지 않게 합니다
+  const scenes = await captionScenes();
+  const c = document.createElement('canvas');
+  const results = [];
+  for (const st of list) {
+    const p = { ...BASE, ...st.visual, scenes };
+    await ensureFonts(p);
+    const { W, H } = dims(p.aspect);
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    const tl = buildTimeline(p);
+    const at = (k) => (k < frames / 2 ? (1.8 * (k + 0.5)) / (frames / 2) : (tl.total * (k + 0.5)) / frames);
+    for (let k = 0; k < frames; k++) drawFrame(ctx, p, W, H, at(k), tl);
+    ctx.getImageData(0, 0, 1, 1);
+    const t0 = performance.now();
+    for (let k = 0; k < frames; k++) drawFrame(ctx, p, W, H, at(k), tl);
+    ctx.getImageData(0, 0, 1, 1);
+    const ms = (performance.now() - t0) / frames;
+    results.push({ id: st.id, ms: Math.round(ms * 100) / 100 });
+  }
+  const avg = results.reduce((s, r) => s + r.ms, 0) / Math.max(1, results.length);
+  return { avg: Math.round(avg * 100) / 100, max: Math.max(...results.map((r) => r.ms)), results };
 }
 
 /** 어휘 점검용 스타일 20개: template/captionAnim/captionStyle/overlay/transition/titleMode/motion 을 모두 한 번씩 */
@@ -213,7 +362,7 @@ async function sweepAll() {
   const c = document.createElement('canvas');
   for (const template of VOCAB.template) for (const overlay of VOCAB.overlay) for (const captionAnim of VOCAB.captionAnim) for (const transition of VOCAB.transition) {
     const titleMode = VOCAB.titleMode[count % 3];
-    const captionStyle = VOCAB.captionStyle[count % 4];
+    const captionStyle = VOCAB.captionStyle[count % VOCAB.captionStyle.length];
     const p = { ...BASE, scenes, template, overlay, captionAnim, transition, titleMode, captionStyle, bandColor: count % 2 ? '#e9e7e2' : '#0b0d14' };
     const tl = buildTimeline(p);
     const { W, H } = { W: 270, H: 480 };
@@ -228,7 +377,7 @@ async function sweepAll() {
   return { combos: count, errors };
 }
 
-window.sheet = { STYLES, VOCAB, renderSheet, vocabStyles, measurePerf, sweepAll };
+window.sheet = { STYLES, VOCAB, renderSheet, vocabStyles, measurePerf, sweepAll, renderCaptionSheet, renderCaptionExtra, sweepCaptions, measureCaptionPerf };
 window.sheetReady = true;
 log(`스타일 ${STYLES.length}개 준비됨`);
 </script>

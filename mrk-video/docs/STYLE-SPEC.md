@@ -1,6 +1,6 @@
 # 쇼츠 스타일 사양 (렌더 엔진 어휘 + 스타일 데이터 형식)
 
-"잘 나가는 쇼츠 형식 20가지"를 **스타일 모델**로 넣어 두고, 사용자가 만든 장면(사진+자막)을 어떤 스타일로든 바꿔 렌더링한다.
+"잘 나가는 쇼츠 형식 30가지"를 **스타일 모델**로 넣어 두고, 사용자가 만든 장면(사진+자막)을 어떤 스타일로든 바꿔 렌더링한다.
 스타일은 데이터(`js/styles-data.js`)이고, 렌더 엔진(`js/shorts-render.js`)은 아래 어휘만 이해하면 된다.
 
 ## 1. 프로젝트 시각 필드 (`p.*`) — 렌더 엔진이 읽는 값
@@ -9,8 +9,8 @@
 |---|---|---|
 | `aspect` | `9:16` `1:1` `16:9` | 화면 비율 |
 | `template` | `band` `blur` `full` `split` `card` `dark` | 레이아웃. band=위 제목·가운데 사진·아래 자막(기존), blur=흐린 배경+사진 contain(기존), full=사진 꽉+위아래 그라데이션(기존), **split**=위 55% 사진·아래 45% 단색 패널(`panelColor`)에 큰 자막 왼쪽 정렬, **card**=배경 `bandColor`(+옅은 도트 격자)·사진은 흰 테두리 카드(살짝 기울기 -2°)·자막은 카드 아래, **dark**=배경 `bandColor`에 자막을 아주 크게(사진이 있으면 위쪽 둥근 사각 썸네일로 작게) |
-| `captionAnim` | `none` `words` `karaoke` `type` `pop` | 자막 등장. none=장면 시작에 통째로(기존 페이드), words=단어가 순서대로 아래에서 떠오름(장면 길이 앞 60% 안에 분배), karaoke=문장은 흐리게 깔리고 읽는 단어가 `highlightColor`로 채워지며 살짝 커짐(모션 스킬 가라오케), type=한 글자씩 타자기, pop=한 번에 1~2단어만 크게 튀어나오며(scale 1.35→1) 교체되는 틱톡식 |
-| `captionStyle` | `outline` `box` `plain` `pill` | 자막 모양. pill=`highlightColor` 둥근 배경 + `inkColor` 글자 |
+| `captionAnim` | `none` `words` `karaoke` `type` `pop` `bounce` `scale` `slide` `wave` `flash` | 자막 등장. none=장면 시작에 통째로(기존 페이드), words=단어가 순서대로 아래에서 떠오름(장면 길이 앞 60% 안에 분배), karaoke=문장은 흐리게 깔리고 읽는 단어가 `highlightColor`로 채워지며 살짝 커짐(모션 스킬 가라오케), type=한 글자씩 타자기, pop=한 번에 1~2단어만 크게 튀어나오며(scale 1.35→1) 교체되는 틱톡식, **bounce**=단어가 위에서 떨어져 바닥에서 한 번 튀며 자리 잡음(easeOutBounce, 장면 앞 55% 안에 단어 분배), **scale**=자막 전체가 0.6→1.0 으로 커지며 알파 0→1(0.35초) 뒤 정지, **slide**=줄 단위로 왼쪽 화면 밖에서 미끄러져 들어옴(줄마다 0.12초 지연, easeOut; 줄 배경·칩·패널도 함께 움직이거나 패널 안에서 나타남), **wave**=단어가 순서대로 살짝 위아래로 물결치며 계속 움직임(진폭 글자 크기의 0.06, 주기 1.6초, 등장은 0.4초 알파 페이드), **flash**=읽는 단어(karaoke 와 같은 시간 분배)가 `highlightColor`로 0.1초 간격 깜빡임(알파 1↔0.55), 나머지 단어는 평소대로(본문색, `*강조*`는 강조색). 모르는 값은 none |
+| `captionStyle` | `outline` `box` `plain` `pill` `neon` `shadow3d` `marker` `glass` `tag` `underline` `gradient` `bubble` | 자막 모양. 모두 배경 밝기(`captionLook`)에 따라 글자색·테두리를 자동으로 고른다. outline=글자 테두리(밝은 글자엔 검정, 어두운 글자엔 흰색), box=줄마다 검은 반투명 띠, plain=글자만(밝은 글자엔 살짝 어긋난 그림자), pill=`highlightColor` 둥근 배경 + `inkColor` 글자. **neon**=흰 글자(밝은 배경에선 `inkColor`) 둘레에 넓은 반투명 `highlightColor` 스트로크 2겹 빛무리(shadowBlur 없음, 사진 위에서는 가는 검은 테두리 한 겹 추가), **shadow3d**=오른쪽 아래로 4단 쌓인 단색 그림자 블록(총 글자 크기의 0.1; 밝은 글자엔 `inkColor`/검정, 어두운 글자엔 `highlightColor`) + 본문색 글자, **marker**=줄마다 살짝 기울어진(±0.7°) `highlightColor` 형광펜 띠(줄 높이의 0.7) + 띠 밝기에 맞춘 `inkColor`/`textColor` 글자(강조 단어도 같은 색), **glass**=줄 블록 뒤에 반투명 흰 둥근 패널(알파 0.22, 흰 테두리 1.5px) + 흰 글자(얇은 검정 그림자); 밝은 배경에선 어두운 반투명 패널 + `inkColor` 글자, **tag**=단어마다 둥근 칩(본문 단어는 어두운 반투명, `*강조*` 단어는 `highlightColor`), 칩 안 글자색은 칩 밝기에 맞춤, 줄 간격 1.5·띄어쓰기 2.3배로 칩 사이 틈, **underline**=plain 글자 + 줄 아래 `highlightColor` 굵은 밑줄(강조 단어 구간은 두 배 두껍게), **gradient**=글자 채움을 세로 그라데이션(본문색→`highlightColor`, 줄마다 createLinearGradient 1회) + 얇은 검정 테두리, 강조 단어는 `highlightColor` 단색, **bubble**=자막 블록을 흰 말풍선(둥근 사각 + 왼쪽 아래 꼬리 + 옅은 그림자)에 담고 `inkColor` 글자(밝은 강조색은 `inkColor`로). overlay=`comment`(댓글 말풍선)일 때 bubble 은 plain 으로 내려간다. glass·bubble·tag 는 패널·칩이 상자 밖으로 나가지 않게 글자 영역을 안쪽으로 들인다(자동 축소·maxLines 는 그대로). 모르는 값은 outline |
 | `overlay` | 아래 표 | 장식 레이어(스타일의 개성). 한 스타일에 하나 |
 | `transition` | `fade` `slide` `zoom` `none` `wipe` | wipe=사선 `highlightColor` 띠가 화면을 쓸고 지나가며 장면이 바뀜(레퍼런스 영상) |
 | `motion` | `auto` `in` `out` `none` | 사진 움직임(기존) |
@@ -75,12 +75,14 @@ export const STYLE_DATA = [{
       { caption: '*용도지역*부터 확인', img: 's01-land-zoning', duration: 3 },
     ],
   },
+  music: 'calm',                              // 배경 음악 분위기 — js/music.js 의 MOODS id 하나(upbeat news calm lofi corporate drama quiz warning epic playful)
   prompt: '강의형: 첫 장면은 손해 경고, 이어서 원칙 3개를 한 문장씩, 마지막은 한 줄 요약. 각 장면 자막 35자 이내.',  // AI 대본에 덧붙일 지시
 }];
 ```
 
 규칙
-- 20개 스타일은 `template × captionAnim × overlay` 조합이 서로 겹치지 않아야 한다(최소 overlay 는 모두 다르거나, 같다면 template 이 달라야 함).
+- 30개 스타일은 `template × captionAnim × overlay` 조합이 서로 겹치지 않아야 한다(최소 overlay 는 모두 다르거나, 같다면 template 이 달라야 함).
+- `music` 은 `js/music.js` 의 `MOODS` id 하나(10가지 분위기가 모두 최소 한 번 쓰이게). `js/styles.js` 의 `makeStyle` 은 데이터를 그대로 펼치므로(`...data`) `style.music` 으로 읽히고, `VISUAL_KEYS` 에는 없어 `apply(p)` 가 프로젝트에 입히지는 않는다(소리 패널이 `style.music` 을 기본값으로 쓰면 된다).
 - 색은 모두 hex. 밝은 배경(`bandColor`/`panelColor` 가 밝음)이면 `inkColor` 로 읽히게.
 - 샘플 자막은 MR.K(부동산 공법·토지·매물·부동산 AI) 소재, 한 장면 35자 이내, `*강조*` 한 개씩.
 - `ref.search` 는 한국어 유튜브 검색어.
@@ -91,4 +93,5 @@ export const STYLE_DATA = [{
 - 미리보기(540px)와 내보내기(1080/720)가 같은 함수. 성능: 1080×1920 30fps 로 그릴 수 있어야 한다(장면당 그리기 비용 큰 것은 캐시).
 - 글꼴은 `"Pretendard Variable", Pretendard, sans-serif` 만. `fontCss(weight, px)`.
 - `buildSrt`, `buildTimeline`, `plainText`, `parseRuns`, `dims`, `ensureFonts` 유지.
+- 자막 어휘 목록은 엔진이 `CAPTION_STYLES`(모양 12종)·`CAPTION_ANIMS`(등장 10종)로 내보낸다. 화면의 `#captionStyle`·`#captionAnim` select 와 점검 시트(`tests/caption-sheet.cjs` → `tests/out/caption-sheet.png`)는 이 목록을 기준으로 한다. 자막 모양은 1080×1920 평균 12ms 안에 그려야 하므로 shadowBlur·filter 를 쓰지 않고, 그라데이션·패스는 줄 단위로만 만든다.
 - `js/styles.js` 는 `STYLE_DATA` 를 읽어 `STYLES` (각 항목에 `apply(p)` → p 에 visual 을 입히고 돌려줌)와 `styleProject(base, style)` 를 내보낸다. `apply` 는 장면을 바꾸지 않는다(시각 설정만).

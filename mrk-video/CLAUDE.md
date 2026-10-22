@@ -7,7 +7,7 @@
 - 빌드 단계 없는 정적 사이트(ES 모듈). `index.html` + `css/style.css` + `js/*.js`.
 - 서버 기능은 Vercel 함수(`api/*.js`, Node 20, ESM, 의존성 없음 — Anthropic 은 fetch 로 직접 호출). ko372.com 저장소에서는 같은 코드가 `lib/mrk-video/*.mjs` 에 있고 `api/mrk-video/*.js` 가 감싼다.
 - 영상 모양은 `js/shorts-render.js`의 `drawFrame()` 하나가 결정한다. 미리보기·스타일 썸네일·내보내기가 같은 함수를 쓰므로 둘이 어긋나지 않게 여기만 고친다. 크기는 1080 기준 값 × `u`. 어휘(레이아웃·자막 등장·장식·전환)는 `docs/STYLE-SPEC.md`.
-- 쇼츠 스타일 20가지는 `js/styles-data.js` 데이터다. 스타일을 추가하면 갤러리·"20가지 전부 만들기"·사례 화면에 자동으로 들어간다. 추가 후 `node tests/style-sheet.cjs`로 시트를 만들어 눈으로 확인한다.
+- 쇼츠 스타일 30가지는 `js/styles-data.js` 데이터다. 스타일을 추가하면 갤러리·"전부 만들기" 버튼·사례 화면에 자동으로 들어가고, 화면 문구의 숫자(`index.html`의 `<span data-style-count>` 자리표시 — `main.js`의 `fillStyleCount()`가 `STYLES.length`로 채움)도 따라 바뀐다. 숫자를 HTML·JS 에 직접 적지 말고 자리표시를 쓴다. README·CLAUDE.md·docs 같은 정적 문서의 숫자는 직접 고친다. 추가 후 `node tests/style-sheet.cjs`로 시트를 만들어 눈으로 확인한다.
 - 내보내기는 `js/export.js`(exportProject / exportStyles). 화면 움직임은 `js/motion.js`.
 - AI 대본 프롬프트·JSON 스키마는 `js/script-prompt.js` 한 곳. 브라우저(아티팩트)와 `api/ai.js`가 함께 import한다.
 - 환경 차이(Claude 아티팩트 vs 일반 웹)는 `js/platform.js`에서만 처리한다. 아티팩트에서는 `<a download>`와 외부 fetch가 막혀 있으므로 저장은 `saveBlob()`/`openSink()`만 쓴다.

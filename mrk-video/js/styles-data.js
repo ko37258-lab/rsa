@@ -1,5 +1,6 @@
-// 쇼츠 스타일 데이터 — "잘 나가는 쇼츠 형식" 20가지를 스타일 모델로 담아 둔 파일입니다.
-// 사용자가 만든 장면(사진+자막)에 어떤 스타일이든 입혀 렌더링하고, 갤러리·"20가지 전부 만들기"·사례 화면이 이 배열을 그대로 읽습니다.
+// 쇼츠 스타일 데이터 — "잘 나가는 쇼츠 형식" 30가지를 스타일 모델로 담아 둔 파일입니다.
+// 사용자가 만든 장면(사진+자막)에 어떤 스타일이든 입혀 렌더링하고, 갤러리·"전부 만들기"·사례 화면이 이 배열을 그대로 읽습니다.
+// music 은 js/music.js 의 MOODS id(배경 음악 분위기) 하나입니다: upbeat news calm lofi corporate drama quiz warning epic playful.
 // 형식과 어휘(template·captionAnim·overlay·transition·titleMode 등)는 docs/STYLE-SPEC.md 를 따릅니다.
 // 스타일을 추가하려면 이 배열에 항목을 하나 넣으면 됩니다. (id 는 영문 소문자-하이픈으로 고유하게, 색은 hex, 샘플 이미지는 js/samples.js 의 SAMPLES 키)
 // 추가한 뒤 `node tests/style-sheet.cjs` 로 시트를 만들어 눈으로 확인하세요.
@@ -32,6 +33,7 @@ export const STYLE_DATA = [
         { caption: '세 가지만 기억하면\n*토지투자* 실패가 줄어듭니다', img: null, kind: 'cta', duration: 3.4 },
       ],
     },
+    music: 'calm',
     prompt: '강의형: 첫 장면은 손해 경고, 이어서 원칙 3개를 한 문장씩, 마지막은 한 줄 요약. 각 장면 자막 35자 이내.',
   },
 
@@ -63,6 +65,7 @@ export const STYLE_DATA = [
         { caption: '다섯 가지 체크하고\n*안전하게* 계약하세요', img: null, kind: 'cta', duration: 3 },
       ],
     },
+    music: 'corporate',
     prompt: '체크형: 첫 장면은 "이 서류 안 보면 손해" 경고, 이어서 확인 항목을 한 장면에 하나씩 서류명+한 줄 설명으로, 마지막은 요약. 각 장면 자막 35자 이내, 항목명을 *강조*.',
   },
 
@@ -93,6 +96,7 @@ export const STYLE_DATA = [
         { caption: '땅값은 *건폐율*이\n정합니다', img: null, kind: 'cta', duration: 2.8 },
       ],
     },
+    music: 'upbeat',
     prompt: '가라오케형: 첫 장면은 "99%가 모르는 ~" 호기심 훅, 이어서 사실 3개를 말하듯 한 문장씩, 마지막은 한 줄 정리. 음성과 자막이 같은 말이어야 한다.',
   },
 
@@ -123,6 +127,7 @@ export const STYLE_DATA = [
         { caption: '하나라도 걸리면\n*MR.K*에게 먼저 물어보세요', img: null, kind: 'cta', duration: 3 },
       ],
     },
+    music: 'warning',
     prompt: 'TOP3형: 첫 장면에 "TOP3 공개"를 선언하고, 항목 3개를 각각 명사구 중심 짧은 자막(20자 안팎)으로, 마지막은 정리와 행동 유도.',
   },
 
@@ -153,6 +158,7 @@ export const STYLE_DATA = [
         { caption: '자세한 분석은 *MR.K* 채널에서', img: null, kind: 'cta', duration: 2.8 },
       ],
     },
+    music: 'news',
     prompt: '속보형: 첫 장면은 "방금 발표/확정"으로 시작, 바뀐 것·영향받는 사람·지금 할 일 순서로 뉴스 앵커 말투. 추측은 "예정·검토"로 표시.',
   },
 
@@ -184,6 +190,7 @@ export const STYLE_DATA = [
         { caption: '헷갈리는 땅은 *MR.K*에게', img: null, kind: 'cta', duration: 2.6 },
       ],
     },
+    music: 'upbeat',
     prompt: '오해vs진실형: 첫 장면은 사람들이 흔히 믿는 말을 그대로, 이후 "오해:"와 "진실:"을 번갈아 짝지어 2~3쌍, 마지막은 정리. 진실 장면은 근거 한 구절 포함.',
   },
 
@@ -214,6 +221,7 @@ export const STYLE_DATA = [
         { caption: '다음 퀴즈는\n*댓글*로 신청하세요', img: 's06-consultant-desk', kind: 'cta', duration: 2.6 },
       ],
     },
+    music: 'quiz',
     prompt: '퀴즈형: 첫 장면은 "~할 수 있을까?" 질문(kind:hook), 힌트 1~2개, 정답 장면은 kind:answer로 "정답:"으로 시작, 이어서 이유 한 줄. 각 장면 35자 이내.',
   },
 
@@ -245,6 +253,7 @@ export const STYLE_DATA = [
         { caption: '이런 사례 더 보려면 *구독*', img: null, kind: 'cta', duration: 2.6 },
       ],
     },
+    music: 'drama',
     prompt: '썰형: 1인칭 구어체로 실제 사례처럼 서술. 발단→문제 발견→결과→교훈 순서, 개인정보는 익명 처리하고 마지막에 교훈 한 줄.',
   },
 
@@ -275,6 +284,7 @@ export const STYLE_DATA = [
         { caption: '따라 했으면 *저장*해 두세요', img: null, kind: 'cta', duration: 2.6 },
       ],
     },
+    music: 'corporate',
     prompt: '튜토리얼형: 첫 장면은 소요 시간 약속, 이어서 "1단계: / 2단계: / 3단계:"로 시작하는 행동 문장, 마지막은 저장 유도. 단계는 3~4개.',
   },
 
@@ -305,6 +315,7 @@ export const STYLE_DATA = [
         { caption: '하나라도 해당되면 *멈추세요*', img: null, kind: 'cta', duration: 2.8 },
       ],
     },
+    music: 'warning',
     prompt: '경고형: 첫 장면은 "절대 ~하지 마세요" 금지문, 이어서 위험 항목 3개를 명사구로, 마지막은 "하나라도 해당되면 멈추세요". 공포 조장 없이 근거 있는 위험만.',
   },
 
@@ -335,6 +346,7 @@ export const STYLE_DATA = [
         { caption: '이제 *구분* 되시죠?', img: null, kind: 'cta', duration: 2.4 },
       ],
     },
+    music: 'calm',
     prompt: '용어형: 첫 장면은 "이 ○단어 구분 되세요?", 이후 장면마다 "*용어*: 뜻" 형식으로 한 줄 정의(비유 허용), 마지막은 "이제 구분 되시죠?". 용어는 3~4개.',
   },
 
@@ -365,6 +377,7 @@ export const STYLE_DATA = [
         { caption: '궁금한 건 *댓글*에 남겨 주세요', img: null, kind: 'cta', duration: 2.8 },
       ],
     },
+    music: 'lofi',
     prompt: '댓글답변형: 첫 장면은 따옴표로 감싼 시청자 질문 한 문장, 둘째 장면은 "결론부터,"로 시작, 이어서 조건·예외 두 장면, 마지막은 댓글 유도.',
   },
 
@@ -395,6 +408,7 @@ export const STYLE_DATA = [
         { caption: '숫자로 보는 공법, *MR.K*', img: null, kind: 'cta', duration: 2.6 },
       ],
     },
+    music: 'epic',
     prompt: '숫자형: 장면마다 핵심 숫자 하나(금액·면적·기간)를 자막 앞쪽에 두고 counter{from,to,suffix}로 제공. 숫자는 예시임을 전제로 단순하게, 마지막은 채널 안내.',
   },
 
@@ -425,6 +439,7 @@ export const STYLE_DATA = [
         { caption: '시행 날짜 놓치지 말고 *저장*', img: null, kind: 'cta', duration: 2.6, tag: '지금' },
       ],
     },
+    music: 'news',
     prompt: '타임라인형: 장면마다 tag에 시점(연도·월)을 넣고 자막은 "시점: 바뀌는 내용" 형식. 시행일이 불확실하면 "예정"으로 쓰고, 마지막은 저장 유도.',
   },
 
@@ -455,6 +470,7 @@ export const STYLE_DATA = [
         { caption: '내일도 *3줄*로\n정리해 드립니다', img: null, kind: 'cta', duration: 2.6 },
       ],
     },
+    music: 'news',
     prompt: '브리핑형: 첫 장면은 "오늘 꼭 알 소식 N가지", 이어서 소식을 제목처럼 짧게 하나씩, 마지막은 내일 예고. 각 장면 35자 이내. 날짜는 p.dateLabel에 넣는다.',
   },
 
@@ -485,6 +501,7 @@ export const STYLE_DATA = [
         { caption: '답사 포인트 더 보려면 *구독*', img: null, kind: 'cta', duration: 2.6, label: 'MR.K' },
       ],
     },
+    music: 'playful',
     prompt: '답사형: 첫 장면은 "직접 가봤습니다"와 지역명(label), 이후 장면마다 현장에서 본 것 하나를 관찰 문장으로, label에 장소·지점명을 넣는다.',
   },
 
@@ -514,6 +531,7 @@ export const STYLE_DATA = [
         { caption: '딱 이 한 줄만 *기억*하세요', img: null, kind: 'cta', duration: 3 },
       ],
     },
+    music: 'calm',
     prompt: '한줄형: 사진 없이 문장만. 첫 장면은 단정적인 한 문장(20자 이내), 이어서 이유 두 문장, 마지막은 "이 한 줄만 기억하세요". 모든 장면 25자 이내.',
   },
 
@@ -544,6 +562,7 @@ export const STYLE_DATA = [
         { caption: '못 받으면\n*그냥 밭*입니다', img: null, kind: 'cta', duration: 2.6 },
       ],
     },
+    music: 'upbeat',
     prompt: '키네틱형: 사진 없이 글자만으로. 첫 장면은 한 단어 질문, 이어서 결론·이유를 3~5단어 문장으로 짧게 끊어서. 장면마다 강조 단어 1개.',
   },
 
@@ -574,6 +593,7 @@ export const STYLE_DATA = [
         { caption: '매물 문의는 *MR.K* 프로필', img: null, kind: 'cta', duration: 2.6, tag: '문의' },
       ],
     },
+    music: 'lofi',
     prompt: '매물형: 장면마다 위치·교통·면적·용도지역·가격 중 하나만, tag에 가격·키워드를 짧게. 과장 표현(최고·무조건) 금지, 마지막은 문의 안내.',
   },
 
@@ -604,6 +624,326 @@ export const STYLE_DATA = [
         { caption: '프로필 링크에서 *상담* 신청', img: null, kind: 'cta', duration: 3 },
       ],
     },
+    music: 'corporate',
     prompt: 'CTA형: 첫 장면은 "이런 고민 있으세요?" 공감 질문, 고민을 구체화한 뒤 해결 가능성과 전문가 근거를 짚고, 마지막 장면(kind: cta)은 상담·링크 안내 한 문장.',
+  },
+
+  // ───────── 21~30: 새 자막 모양(neon·shadow3d·marker·glass·tag·underline·gradient·bubble)과 등장(bounce·scale·slide·wave·flash)을 쓰는 형식 ─────────
+
+  {
+    id: 'before-after',
+    name: '비포애프터형 — 좌우 비교 카드',
+    tagline: '크림색 카드 배경에 사진 두 장 좌우 비교, 3D 그림자 자막이 옆에서 밀려온다',
+    ref: {
+      format: '비포·애프터 비교 숏츠',
+      why: '"전"과 "후"가 한 화면에 나란히 놓이면 설명 없이도 차이를 알아보고 저장한다',
+      search: '토지 개발 전후 비교 쇼츠',
+    },
+    platforms: ['instagram', 'youtube', 'facebook', 'threads'],
+    hook: '전후 대비 — "이 땅, 1년 만에 이렇게 바뀌었습니다"',
+    beats: ['훅: 전→후 한 장면 대비', '전: 문제 상태', '후: 바뀐 상태', '무엇을 바꿨나', '비용·결과', '문의 안내'],
+    visual: {
+      aspect: '9:16', template: 'card', captionAnim: 'slide', captionStyle: 'shadow3d', overlay: 'vs', transition: 'wipe', motion: 'none', titleMode: 'band',
+      bandColor: '#fff4e6', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#1f1a14', highlightColor: '#f97316', // 크림 배경 위 검은 글자 + 주황 3D 그림자
+      font: '900', captionSize: 60, showProgress: true,
+    },
+    sample: {
+      title: '맹지가 *건축 가능 땅*으로\n바뀌는 과정',
+      scenes: [
+        { caption: '이 땅, *1년* 만에 이렇게 바뀌었습니다', img: 's02-landlocked', img2: 's03-permit-site', kind: 'hook', duration: 2.8 },
+        { caption: '전: 도로 없는 *맹지*, 매수자 0명', img: 's02-landlocked', img2: 's03-permit-site', duration: 3 },
+        { caption: '후: 진입로 확보 뒤 *허가* 완료', img: 's02-landlocked', img2: 's03-permit-site', duration: 3 },
+        { caption: '바꾼 건 *토지사용승낙서* 한 장', img: 's06-consultant-desk', duration: 3 },
+        { caption: '비용 3천만원, 땅값은 *3배*', img: 's01-land-zoning', img2: 'h01-hero-land', duration: 3 },
+        { caption: '내 땅도 바뀔지 *MR.K*에게 물어보세요', img: null, kind: 'cta', duration: 2.8 },
+      ],
+    },
+    music: 'upbeat',
+    prompt: '비포애프터형: 장면마다 img(전)·img2(후) 두 장을 짝지어 "전:"·"후:" 문장으로 대비, 이어서 무엇을 바꿨는지·비용과 결과를 한 줄씩. 수치는 예시임을 전제로, 마지막은 문의 안내.',
+  },
+
+  {
+    id: 'top5-neon',
+    name: '실수 TOP5형 — 네온 바운스',
+    tagline: '사진 꽉 채운 화면에 자홍 번호 배지, 네온 자막이 위에서 튕기며 떨어진다',
+    ref: {
+      format: '초보 실수 TOP5 숏츠',
+      why: '"5가지"라고 개수를 정해 두면 몇 개 남았는지 세며 끝까지 보고, 내 실수가 있나 댓글을 단다',
+      search: '토지 투자 초보 실수 TOP5 쇼츠',
+    },
+    platforms: ['tiktok', 'youtube', 'instagram'],
+    hook: '실수 예고 — "초보 90%가 하는 실수 5가지"',
+    beats: ['훅: 실수 5가지 예고', '실수 1', '실수 2', '실수 3', '실수 4', '실수 5 + 정리'],
+    visual: {
+      aspect: '9:16', template: 'full', captionAnim: 'bounce', captionStyle: 'neon', overlay: 'number', transition: 'zoom', motion: 'in', titleMode: 'hook',
+      bandColor: '#12061f', panelColor: '#1e1133', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#e879f9', // 어두운 자주 바탕, 자홍 네온 빛무리
+      font: '900', captionSize: 70, showProgress: true,
+    },
+    sample: {
+      title: '땅 살 때 초보가 하는\n*실수* TOP5',
+      scenes: [
+        { caption: '초보 *90%*가 하는\n실수 5가지', img: 's01-land-zoning', kind: 'hook', duration: 2.6 },
+        { caption: '*등기부* 안 보고 가계약', img: 's06-consultant-desk', duration: 3 },
+        { caption: '현황도로를 *법정도로*로 착각', img: 's02-landlocked', duration: 3 },
+        { caption: '*용도지역* 확인 없이 평당가만 비교', img: 's01-land-zoning', duration: 3 },
+        { caption: '허가 *가능 여부* 안 묻고 계약', img: 's03-permit-site', duration: 3 },
+        { caption: '*현장* 안 가고 지도만 보기, 하나라도 했다면 구독', img: null, kind: 'cta', duration: 3.2 },
+      ],
+    },
+    music: 'playful',
+    prompt: 'TOP5형: 첫 장면에 "실수 5가지"를 예고하고, 장면마다 실수 하나를 명사구(20자 안팎)로 — 순서 번호는 배지가 붙이므로 자막에 쓰지 않는다. 마지막 실수 장면에 정리·구독 유도를 붙인다.',
+  },
+
+  {
+    id: 'law-update-flash',
+    name: '개정속보형 — 날짜 플래시',
+    tagline: '남색 바탕에 큰 시행일 라벨, 3D 그림자 자막의 읽는 단어가 호박색으로 깜빡인다',
+    ref: {
+      format: '법 개정 속보 숏츠',
+      why: '"○월 ○일부터 바뀝니다"라는 날짜 하나가 지금 당장 확인하게 만든다',
+      search: '개발행위허가 기준 개정 시행 쇼츠',
+    },
+    platforms: ['youtube', 'threads', 'facebook', 'instagram'],
+    hook: '시행일 선언 — "다음 달 1일부터 바뀝니다"',
+    beats: ['훅: 시행일 선언', '무엇이 바뀌나', '누가 해당되나', '안 지키면', '지금 할 일'],
+    visual: {
+      aspect: '9:16', template: 'dark', captionAnim: 'flash', captionStyle: 'shadow3d', overlay: 'date', transition: 'none', motion: 'none', titleMode: 'band',
+      bandColor: '#0b1a33', panelColor: '#13264a', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#ffb020', // 남색 위 흰 글자 + 호박색 3D 그림자
+      font: '900', captionSize: 74, showProgress: true,
+    },
+    sample: {
+      title: '*개발행위허가* 기준\n이렇게 바뀝니다',
+      scenes: [
+        { caption: '다음 달 1일부터\n허가 기준이 *바뀝니다*', img: 's03-permit-site', kind: 'hook', duration: 2.8, tag: '11월 1일' },
+        { caption: '바뀌는 것: *경사도* 기준 강화', img: 's01-land-zoning', duration: 3, tag: '시행' },
+        { caption: '해당되는 땅: *비도시지역* 임야', img: 'h01-hero-land', duration: 3, tag: '대상' },
+        { caption: '모르고 공사하면 *원상복구* 명령', img: 's03-permit-site', duration: 3, tag: '주의' },
+        { caption: '지금 할 일: 우리 시군 *조례* 확인', img: null, kind: 'cta', duration: 2.8, tag: '지금' },
+      ],
+    },
+    music: 'news',
+    prompt: '개정속보형: 첫 장면은 시행일(tag)과 "바뀝니다" 선언, 이어서 바뀌는 내용·대상·위반 시 결과·지금 할 일을 "항목: 내용" 한 줄씩. 확정되지 않은 것은 "예정·검토"로 쓰고 날짜·키워드는 tag에.',
+  },
+
+  {
+    id: 'calc-marker',
+    name: '계산형 — 숫자 형광펜',
+    tagline: '위 사진·아래 밝은 패널, 숫자가 커지는 동안 형광펜 자막이 커지며 등장',
+    ref: {
+      format: '숫자 계산(수익·비용) 숏츠',
+      why: '"얼마 남나"를 숫자가 올라가며 보여 주면 계산 결과가 나올 때까지 눈을 떼지 못한다',
+      search: '경매 낙찰 수익 계산 쇼츠',
+    },
+    platforms: ['youtube', 'instagram', 'facebook'],
+    hook: '결과 숫자 질문 — "이 경매, 얼마 남았을까요?"',
+    beats: ['훅: 결과 숫자 질문', '낙찰가', '들어간 비용', '시세', '남는 돈', '채널 안내'],
+    visual: {
+      aspect: '9:16', template: 'split', captionAnim: 'scale', captionStyle: 'marker', overlay: 'counter', transition: 'slide', motion: 'in', titleMode: 'band',
+      bandColor: '#0f172a', panelColor: '#eef2f7', textColor: '#ffffff', inkColor: '#1c1917', highlightColor: '#facc15', // 연회색 패널 위 노란 형광펜 띠 + 검은 글자
+      font: '900', captionSize: 58, showProgress: true,
+    },
+    sample: {
+      title: '경매 낙찰 *수익*\n계산해 보니',
+      scenes: [
+        { caption: '이 경매, 얼마 *남았을까요*?', img: 's05-apartment', kind: 'hook', duration: 2.8 },
+        { caption: '낙찰가 *2억 1천*만원', img: 's05-apartment', duration: 3, counter: { from: 0, to: 21000, suffix: '만원' } },
+        { caption: '취득세·명도비 *1천 2백*만원', img: 's06-consultant-desk', duration: 3, counter: { from: 0, to: 1200, suffix: '만원' } },
+        { caption: '시세는 *2억 8천*만원', img: 'c03-listing-main', duration: 3, counter: { from: 21000, to: 28000, suffix: '만원' } },
+        { caption: '남는 돈 *5천 8백*만원', img: null, duration: 3.2, counter: { from: 0, to: 5800, suffix: '만원' } },
+        { caption: '숫자로 보는 경매, *MR.K*', img: null, kind: 'cta', duration: 2.6 },
+      ],
+    },
+    music: 'corporate',
+    prompt: '계산형: 첫 장면은 "얼마 남았을까요?" 질문, 이어서 낙찰가·비용·시세·남는 돈 순서로 장면마다 숫자 하나를 자막 앞쪽에 두고 counter{from,to,suffix}로 제공. 숫자는 예시임을 전제로 단순하게, 세금·비용은 "대략"으로.',
+  },
+
+  {
+    id: 'ai-tool-glass',
+    name: 'AI시연형 — 유리 패널',
+    tagline: '사진 꽉 채운 화면 위 STEP 헤더, 반투명 유리 패널 자막이 옆에서 밀려온다',
+    ref: {
+      format: 'AI 도구 시연(화면 녹화) 숏츠',
+      why: '"AI로 1분이면 됩니다" 시연은 바로 따라 하고 싶어 저장·공유가 많다',
+      search: '부동산 AI 활용 쇼츠 토지이용계획 분석',
+    },
+    platforms: ['youtube', 'instagram', 'threads', 'tiktok'],
+    hook: '시간 단축 선언 — "토지이용계획, AI로 1분이면 읽습니다"',
+    beats: ['훅: AI로 1분', '1단계: 서류 사진 올리기', '2단계: 질문 한 줄', '3단계: 결과 확인', '주의: 공식 자료 재확인', '저장 유도'],
+    visual: {
+      aspect: '9:16', template: 'full', captionAnim: 'slide', captionStyle: 'glass', overlay: 'steps', transition: 'slide', motion: 'auto', titleMode: 'band',
+      bandColor: '#0f1b2d', panelColor: '#1e293b', textColor: '#ffffff', inkColor: '#0f172a', highlightColor: '#38bdf8',
+      font: '800', captionSize: 60, showProgress: true,
+    },
+    sample: {
+      title: '*토지이용계획*\nAI로 1분 분석',
+      scenes: [
+        { caption: '토지이용계획, *AI*로 1분이면 읽습니다', img: 'h02-hero-studio', kind: 'hook', duration: 2.6 },
+        { caption: '1단계: 확인원 *사진*을 올립니다', img: 's06-consultant-desk', duration: 3 },
+        { caption: '2단계: "이 땅에 *집* 지을 수 있어?"', img: 'h02-hero-studio', duration: 3 },
+        { caption: '3단계: 용도지역·규제를 *한 줄*로 답함', img: 's01-land-zoning', duration: 3 },
+        { caption: '단, 결과는 *토지이음*에서 꼭 재확인', img: 's03-permit-site', duration: 3 },
+        { caption: '프롬프트는 *저장*해 두세요', img: null, kind: 'cta', duration: 2.6 },
+      ],
+    },
+    music: 'lofi',
+    prompt: 'AI시연형: 첫 장면은 "AI로 N분" 시간 단축 선언, 이어서 "1단계:/2단계:/3단계:"로 화면에서 하는 행동을 한 문장씩(입력한 질문은 따옴표로), 마지막 전 장면에 반드시 "공식 자료로 재확인" 주의를 넣고 저장 유도.',
+  },
+
+  {
+    id: 'qna-bubble',
+    name: '인터뷰형 — 질문 말풍선',
+    tagline: '흐린 배경 위 흰 말풍선 자막이 톡 커지며 등장, 아래 점 진행으로 질문 수를 보여 준다',
+    ref: {
+      format: '질문·답변 인터뷰 숏츠',
+      why: '질문을 말풍선으로 던지고 바로 답하면 대화를 엿보는 느낌이 들어 끝까지 본다',
+      search: '부동산 전문가 인터뷰 질문 답변 쇼츠',
+    },
+    platforms: ['youtube', 'instagram', 'facebook'],
+    hook: '첫 질문을 말풍선으로 — "경매 초보가 가장 먼저 볼 서류는?"',
+    beats: ['훅: Q1 질문', 'A1 답', 'Q2 질문', 'A2 답', 'Q3 질문', 'A3 답 + 댓글 유도'],
+    visual: {
+      aspect: '9:16', template: 'blur', captionAnim: 'scale', captionStyle: 'bubble', overlay: 'dots', transition: 'fade', motion: 'in', titleMode: 'band',
+      bandColor: '#1e293b', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#0f172a', highlightColor: '#0ea5e9', // 흰 말풍선 위 짙은 남색 글자
+      font: '700', captionSize: 58, showProgress: false,
+    },
+    sample: {
+      title: '경매 초보 *질문*\n3개에 답합니다',
+      scenes: [
+        { caption: 'Q. 경매 초보가 *가장 먼저* 볼 서류는?', img: 's06-consultant-desk', kind: 'hook', duration: 2.8 },
+        { caption: 'A. *매각물건명세서*, 권리가 다 나옵니다', img: 's05-apartment', duration: 3.2 },
+        { caption: 'Q. *임차인*이 있으면 무조건 피하나요?', img: 'c03-listing-main', duration: 2.8 },
+        { caption: 'A. *대항력* 날짜만 보면 됩니다', img: 'c03-listing-main', duration: 3 },
+        { caption: 'Q. 토지 경매는 뭘 더 *봐야* 하죠?', img: 's01-land-zoning', duration: 2.8 },
+        { caption: 'A. *용도지역*과 도로, 더 궁금하면 댓글로', img: null, kind: 'cta', duration: 3.2 },
+      ],
+    },
+    music: 'calm',
+    prompt: '인터뷰형: "Q."로 시작하는 질문 장면과 "A."로 시작하는 답 장면을 짝지어 3쌍, 답은 결론 먼저 한 문장. 마지막 답 장면은 kind:cta 로 댓글 유도까지 넣는다.',
+  },
+
+  {
+    id: 'case-gradient',
+    name: '사례형 — 그라데이션 인용',
+    tagline: '흐린 배경에 큰 따옴표, 흰색에서 금색으로 물드는 자막이 줄마다 밀려온다',
+    ref: {
+      format: '실제 사례 재구성 숏츠',
+      why: '"실제 있었던 일입니다"로 시작하는 사례는 정보보다 오래 보고 공유된다',
+      search: '경매 유치권 실패 사례 쇼츠',
+    },
+    platforms: ['youtube', 'facebook', 'threads'],
+    hook: '사례 예고 — "실제 있었던 경매 사건입니다"',
+    beats: ['훅: 실제 사건 예고', '상황', '놓친 것', '결과', '교훈', '구독 유도'],
+    visual: {
+      aspect: '9:16', template: 'blur', captionAnim: 'slide', captionStyle: 'gradient', overlay: 'quote', transition: 'fade', motion: 'out', titleMode: 'none',
+      bandColor: '#1a1410', panelColor: '#2a211a', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#e8b04b',
+      font: '800', captionSize: 64, showProgress: true,
+    },
+    sample: {
+      title: '*유치권* 사건,\n실제 있었던 일',
+      scenes: [
+        { caption: '실제 있었던 *경매* 사건입니다', img: 's05-apartment', kind: 'hook', duration: 2.6 },
+        { caption: '시세 반값 아파트에 *단독* 입찰', img: 's05-apartment', duration: 3 },
+        { caption: '현장에 붙은 *유치권* 신고 안내문', img: 'c04-listing-sub', duration: 3 },
+        { caption: '공사대금 *1억*을 떠안게 됐죠', img: 'c03-listing-main', duration: 3 },
+        { caption: '입찰 전 *현장 방문* 한 번이면 막습니다', img: 's06-consultant-desk', duration: 3.2 },
+        { caption: '이런 사례 더 보려면 *구독*', img: null, kind: 'cta', duration: 2.6 },
+      ],
+    },
+    music: 'drama',
+    prompt: '사례형: "실제 있었던 일입니다"로 시작해 상황→놓친 것→결과→교훈 순서로 3인칭 재구성. 인물·지역은 익명 처리, 금액은 대략으로, 마지막은 구독 유도.',
+  },
+
+  {
+    id: 'site-tour-tag',
+    name: '투어형 — 현장 단어 칩',
+    tagline: '위 사진에 지도 핀, 아래 연두 패널에 단어 칩 자막이 톡톡 떨어진다',
+    ref: {
+      format: '현장 투어(임장) 숏츠',
+      why: '핀이 찍힌 장소마다 포인트를 하나씩 넘기면 함께 걷는 느낌으로 끝까지 본다',
+      search: '경매 임장 현장 투어 쇼츠',
+    },
+    platforms: ['instagram', 'youtube', 'tiktok'],
+    hook: '동행 선언 — "낙찰 전 임장, 같이 가 봅시다"',
+    beats: ['훅: 같이 가 봅시다 (위치 핀)', '포인트 1: 진입로', '포인트 2: 건물 상태', '포인트 3: 주변 시세', '포인트 4: 점유자', '정리 + 저장'],
+    visual: {
+      aspect: '9:16', template: 'split', captionAnim: 'bounce', captionStyle: 'tag', overlay: 'pin', transition: 'slide', motion: 'auto', titleMode: 'band',
+      bandColor: '#14532d', panelColor: '#f0fdf4', textColor: '#ffffff', inkColor: '#052e16', highlightColor: '#16a34a', // 연두 패널 위 어두운 칩 + 초록 강조 칩
+      font: '800', captionSize: 56, showProgress: true,
+    },
+    sample: {
+      title: '낙찰 전 *임장*\n이렇게 봅니다',
+      scenes: [
+        { caption: '낙찰 전 *임장*, 같이 가 봅시다', img: 's05-apartment', kind: 'hook', duration: 2.6, label: '경기 화성' },
+        { caption: '진입로 폭 *4m* 되는지 확인', img: 's02-landlocked', duration: 3, label: '진입로' },
+        { caption: '외벽 *균열*·누수 흔적 체크', img: 'c04-listing-sub', duration: 3, label: '외벽' },
+        { caption: '옆 단지 *실거래가* 바로 비교', img: 's05-apartment', duration: 3, label: '주변 시세' },
+        { caption: '우편물로 *점유자* 확인', img: 'c03-listing-main', duration: 3, label: '우편함' },
+        { caption: '임장 체크리스트 *저장*해 두세요', img: null, kind: 'cta', duration: 2.6, label: 'MR.K' },
+      ],
+    },
+    music: 'playful',
+    prompt: '투어형: 첫 장면은 "같이 가 봅시다"와 지역명(label), 이후 장면마다 현장 포인트 하나를 확인 행동 문장으로, label에 지점명을 넣는다. 마지막은 저장 유도.',
+  },
+
+  {
+    id: 'factcheck-flash',
+    name: '팩트체크형 — 네온 플래시',
+    tagline: '사진 꽉 채운 화면에 ✓ 칩이 쌓이고, 네온 자막의 읽는 단어가 깜빡인다',
+    ref: {
+      format: '빠른 팩트체크(O/X) 숏츠',
+      why: '"사실일까요?" 질문 뒤 O·X가 빠르게 이어지면 내가 틀릴까 봐 끝까지 본다',
+      search: '부동산 상식 팩트체크 쇼츠',
+    },
+    platforms: ['tiktok', 'instagram', 'youtube', 'threads'],
+    hook: '사실 여부 질문 — "떠도는 부동산 상식, 사실일까요?"',
+    beats: ['훅: 떠도는 말 제시', '1: O/X + 근거', '2: O/X + 근거', '3: O/X + 근거', '정리 + 공유 유도'],
+    visual: {
+      aspect: '9:16', template: 'full', captionAnim: 'flash', captionStyle: 'neon', overlay: 'check', transition: 'zoom', motion: 'in', titleMode: 'hook',
+      bandColor: '#052e2b', panelColor: '#0f3d39', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#2dd4bf', // 청록 네온 빛무리
+      font: '900', captionSize: 64, showProgress: true,
+    },
+    sample: {
+      title: '부동산 *상식*\n팩트체크 3개',
+      scenes: [
+        { caption: '떠도는 부동산 상식,\n*사실*일까요?', img: 's06-consultant-desk', kind: 'hook', duration: 2.6 },
+        { caption: '"농지는 누구나 산다" → *X*, 자격 필요', img: 's01-land-zoning', duration: 3.2 },
+        { caption: '"맹지는 건축 불가" → *조건부 O*', img: 's02-landlocked', duration: 3.2 },
+        { caption: '"경매는 명도가 전부" → *X*, 권리가 먼저', img: 's05-apartment', duration: 3.2 },
+        { caption: '헷갈리는 상식은 *공유*해서 물어보세요', img: null, kind: 'cta', duration: 2.8 },
+      ],
+    },
+    music: 'quiz',
+    prompt: '팩트체크형: 첫 장면은 "~사실일까요?" 질문, 이어서 장면마다 따옴표 속 떠도는 말 → O/X 판정과 근거 한 구절(판정을 *강조*), 마지막은 공유 유도. 판정은 근거 있는 것만.',
+  },
+
+  {
+    id: 'quote-wave',
+    name: '동기부여형 — 물결 밑줄',
+    tagline: '검은 바탕에 아주 큰 글씨, 단어가 물결치고 줄 아래 금색 밑줄',
+    ref: {
+      format: '명언·동기부여 숏츠',
+      why: '사진 없이 한 문장만 큼직하게 띄우면 소리 없이도 읽히고 저장·공유로 퍼진다',
+      search: '부동산 공부 동기부여 명언 쇼츠',
+    },
+    platforms: ['instagram', 'threads', 'tiktok', 'youtube'],
+    hook: '단정 문장 — "땅은 아는 사람이 삽니다"',
+    beats: ['훅: 단정 한 문장', '뒤집기(모르는 사람은)', '근거 한 줄', '행동 한 줄', '여운 문장'],
+    visual: {
+      aspect: '9:16', template: 'dark', captionAnim: 'wave', captionStyle: 'underline', overlay: 'none', transition: 'fade', motion: 'none', titleMode: 'none',
+      bandColor: '#0a0a0a', panelColor: '#1c1c1c', textColor: '#f5f5f4', inkColor: '#111111', highlightColor: '#eab308',
+      font: '900', captionSize: 92, showProgress: false,
+    },
+    sample: {
+      title: '오늘의 *한 문장*',
+      scenes: [
+        { caption: '땅은 *아는 사람*이 삽니다', img: null, kind: 'hook', duration: 3 },
+        { caption: '모르는 사람은\n*싼 값*에 팔고요', img: null, duration: 3 },
+        { caption: '차이는 *공법* 한 줄입니다', img: null, duration: 3 },
+        { caption: '오늘 *10분*만 공부하세요', img: 'h02-hero-studio', duration: 3 },
+        { caption: '내년의 당신이 *고마워*할 겁니다', img: null, kind: 'cta', duration: 3 },
+      ],
+    },
+    music: 'epic',
+    prompt: '동기부여형: 사진 없이 문장만. 첫 장면은 단정적인 한 문장(15자 이내), 이어서 뒤집는 문장·근거·행동을 한 줄씩, 마지막은 여운 있는 문장. 모든 장면 20자 이내, 강조 단어 1개.',
   },
 ];

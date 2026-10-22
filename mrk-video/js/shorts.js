@@ -1,4 +1,4 @@
-// 01 숏폼 영상 만들기 — 스타일 갤러리, 장면 편집, 미리보기 재생, 소리, 내보내기(한 편 / 20가지 전부), 바로 올리기
+// 01 숏폼 영상 만들기 — 스타일 갤러리, 장면 편집, 미리보기 재생, 소리, 내보내기(한 편 / 모든 스타일 전부), 바로 올리기
 
 import {
   $, clamp, debounce, formatTime, srtTime, uid, store, toast, wireDrop,
@@ -10,11 +10,12 @@ import { inArtifact, saveBlob, openSink, copyText, aiAvailable, generateScript, 
 import { SCRIPT_STYLES } from './script-prompt.js';
 import { sample, SHORTS_CASE } from './samples.js';
 import { popIn } from './motion.js';
+import { MOODS, renderMood, playMood } from './music.js';
 
 const SETTINGS_KEYS = [
   'aspect', 'template', 'font', 'captionSize', 'captionStyle', 'captionAnim', 'overlay', 'titleMode', 'motion', 'transition',
   'textColor', 'highlightColor', 'bandColor', 'panelColor', 'inkColor', 'showProgress', 'title', 'channel', 'ending',
-  'bgmVolume', 'narrVolume', 'quality', 'style',
+  'bgmVolume', 'narrVolume', 'quality', 'style', 'styleMusic',
 ];
 
 const DEFAULTS = {
@@ -41,6 +42,7 @@ const DEFAULTS = {
   narrVolume: 1,
   quality: '1080',
   style: '',
+  styleMusic: 'auto', // 'auto' = 스타일이 추천하는 분위기, 'off' = 끄기, 그 외 = music.js MOODS 의 id
 };
 
 const project = {
@@ -56,9 +58,12 @@ let uploadInfo = null; // AI가 만든 업로드용 제목·설명·해시태그
 let tl = buildTimeline(project);
 let curT = 0;
 let playing = null; // { t0, from, stopAudio }
+let playPrep = false; // 재생 직전 스타일 음악을 만드는 중(이때 ▶ 를 다시 누르면 취소)
+let playJob = 0; // 준비 중 멈춤·화면 이동이 있었는지 가리는 번호
+let musicPreview = null; // 스타일 음악 미리듣기 { handle, moodId }
 let exporting = null; // { abort }
 let batch = null; // { abort, results }
-let lastBatch = []; // 마지막으로 만든 20가지 결과
+let lastBatch = []; // 마지막으로 만든 전체 스타일 결과
 let resultBlob = null;
 let resultExt = 'mp4';
 let resultMeta = null; // { W, H, duration }
@@ -311,11 +316,19 @@ function seek(t) {
   draw();
 }
 
-function startPlayback() {
-  if (!tl.total) return;
+async function startPlayback() {
+  if (!tl.total || playing || playPrep) return;
+  stopMusicPreview();
+  // 배경음악 파일이 없으면 스타일 음악을 먼저 만든다(캐시돼 있으면 바로). 그동안 ▶ 를 다시 누르면 취소.
+  const job = ++playJob;
+  playPrep = true;
+  $('#playBtn').setAttribute('aria-label', '소리 준비 중 — 누르면 취소');
+  const bgm = await bgmSource(tl.total);
+  playPrep = false;
+  if (job !== playJob) return; // 준비 중에 멈췄거나 화면을 떠났다
   if (curT >= tl.total - 0.05) curT = 0;
   const from = curT;
-  const stopAudio = startAudio(audioCtx().destination, from, tl.total);
+  const stopAudio = startAudio(audioCtx().destination, from, tl.total, bgm);
   playing = { t0: performance.now(), from, stopAudio };
   $('#playBtn').textContent = '❚❚';
   $('#playBtn').setAttribute('aria-label', '일시정지');
@@ -331,6 +344,8 @@ function startPlayback() {
 }
 
 function stopPlayback() {
+  playJob++; // 소리를 준비하던 재생도 취소
+  playPrep = false;
   playing?.stopAudio?.();
   playing = null;
   $('#playBtn').textContent = '▶';
@@ -350,17 +365,20 @@ async function loadAudioFile(file) {
   return audioCtx().decodeAudioData(buf);
 }
 
-/** offset초부터 total초까지 배경음악·내레이션을 dest로 보냅니다. 멈추는 함수를 돌려줍니다. */
-function startAudio(dest, offset, total) {
-  if (!audio.bgm && !audio.narr) return () => {};
+/**
+ * offset초부터 total초까지 배경음악·내레이션을 dest로 보냅니다. 멈추는 함수를 돌려줍니다.
+ * @param {{buffer: AudioBuffer, loop: boolean}|null} bgm  배경음악 소스 — 사용자 파일(loop) 또는 스타일 음악 버퍼(bgmSource 가 만듦). 없으면 내레이션만.
+ */
+function startAudio(dest, offset, total, bgm) {
+  if (!bgm?.buffer && !audio.narr) return () => {};
   const ctx = audioCtx();
   const now = ctx.currentTime + 0.05;
   const remain = Math.max(0.1, total - offset);
   const nodes = [];
-  if (audio.bgm) {
+  if (bgm?.buffer) {
     const src = ctx.createBufferSource();
-    src.buffer = audio.bgm.buffer;
-    src.loop = true;
+    src.buffer = bgm.buffer;
+    src.loop = !!bgm.loop;
     const g = ctx.createGain();
     const vol = project.bgmVolume;
     g.gain.setValueAtTime(vol, now);
@@ -368,7 +386,9 @@ function startAudio(dest, offset, total) {
     g.gain.setValueAtTime(vol, fadeAt);
     g.gain.linearRampToValueAtTime(0.0001, now + remain);
     src.connect(g).connect(dest);
-    src.start(now, offset % src.buffer.duration);
+    // 파일은 반복이라 길이로 나눈 자리에서, 스타일 음악은 영상 길이에 맞춰 만들었으니 그 자리에서 시작
+    const at = bgm.loop ? offset % src.buffer.duration : Math.min(offset, Math.max(0, src.buffer.duration - 0.01));
+    src.start(now, at);
     src.stop(now + remain + 0.05);
     nodes.push(src);
   }
@@ -385,12 +405,90 @@ function startAudio(dest, offset, total) {
   return () => nodes.forEach((n) => { try { n.stop(); } catch { /* 이미 멈춤 */ } });
 }
 
-function renderAudioInfo() {
+/** 지금 무엇이 깔리는지 보여 줍니다. busy 가 있으면(스타일 음악 만드는 중) 그 글을 대신 보여 줍니다. */
+function renderAudioInfo(busy = '') {
   const parts = [];
   if (audio.bgm) parts.push(`배경음악 ${audio.bgm.name} (${formatTime(audio.bgm.buffer.duration)})`);
+  else if (busy) parts.push(busy);
+  else {
+    const mood = currentMood();
+    if (mood) parts.push(`스타일 음악: ${mood.name}${project.styleMusic === 'auto' ? ' (자동)' : ''}`);
+  }
   if (audio.narr) parts.push(`내레이션 ${audio.narr.name} (${formatTime(audio.narr.buffer.duration)})`);
-  $('#audioInfo').textContent = parts.length ? parts.join(' · ') : '소리 파일이 없으면 무음 영상이 만들어집니다.';
+  $('#audioInfo').textContent = parts.length ? parts.join(' · ') : '스타일 음악을 꺼 두었습니다. 소리 파일이 없으면 무음 영상이 만들어집니다.';
   $('#fitToNarr').disabled = !audio.narr || !project.scenes.length;
+}
+
+// ── 스타일 음악(music.js) ────────────────────────────
+/** 이 스타일에 깔 분위기(MOODS 항목). 끄기면 null. 자동이면 스타일의 music, 없으면 '깔끔 기업'. */
+function moodFor(style) {
+  const pick = project.styleMusic || 'auto';
+  if (pick === 'off') return null;
+  const id = pick === 'auto' ? (style?.music || 'corporate') : pick;
+  return MOODS.find((m) => m.id === id) || MOODS.find((m) => m.id === 'corporate') || null;
+}
+const currentMood = () => moodFor(currentStyle());
+
+/**
+ * 지금 영상에 깔릴 배경음악 소스. 사용자 파일이 있으면 그 파일(반복), 없으면 스타일 음악을 영상 길이+1초로 만들어 돌려줍니다
+ * (renderMood 가 끝 1.2초 페이드아웃을 넣으므로 1초 여유를 두면 영상 끝에서 자연스럽게 꺼집니다). 만들지 못하면 null(음악 없이).
+ * @returns {Promise<{buffer: AudioBuffer, loop: boolean, name: string}|null>}
+ */
+async function bgmSource(total, style = currentStyle()) {
+  if (audio.bgm) return { buffer: audio.bgm.buffer, loop: true, name: audio.bgm.name };
+  const mood = moodFor(style);
+  if (!mood) return null;
+  renderAudioInfo(`스타일 음악 「${mood.name}」 만드는 중…`);
+  try {
+    const buffer = await renderMood(mood.id, total + 1, { sampleRate: audioCtx().sampleRate });
+    return { buffer, loop: false, name: mood.name };
+  } catch (e) {
+    console.warn('스타일 음악', e);
+    toast(`스타일 음악을 만들지 못해 음악 없이 진행합니다: ${e.message || e}`);
+    return null;
+  } finally {
+    renderAudioInfo();
+  }
+}
+
+function setMusicPreviewButton(on, mood) {
+  const b = $('#musicPreview');
+  if (!b) return;
+  b.textContent = on ? '■' : '▶';
+  b.setAttribute('aria-pressed', String(on));
+  b.setAttribute('aria-label', on ? `「${mood?.name || ''}」 미리듣기 멈춤` : '스타일 음악 미리듣기');
+}
+
+function stopMusicPreview() {
+  if (!musicPreview) return;
+  musicPreview.handle.stop();
+  musicPreview = null;
+  setMusicPreviewButton(false);
+}
+
+/** 고른 분위기를 루프로 들려 줍니다. 미리보기 재생 중이면 그쪽을 멈춥니다(둘이 겹치지 않게). */
+function startMusicPreview() {
+  const mood = currentMood();
+  if (!mood) return toast('스타일 음악이 꺼져 있습니다. 분위기를 고르거나 "스타일 추천 (자동)"으로 바꿔 주세요.');
+  stopMusicPreview();
+  if (playing || playPrep) stopPlayback();
+  const handle = playMood(audioCtx(), mood.id, { gain: project.bgmVolume });
+  musicPreview = { handle, moodId: mood.id };
+  setMusicPreviewButton(true, mood);
+  handle.ready.catch((e) => {
+    console.warn('미리듣기', e);
+    if (musicPreview?.handle === handle) { stopMusicPreview(); toast(`스타일 음악을 만들지 못했습니다: ${e.message || e}`); }
+  });
+}
+
+/** 분위기 선택·스타일이 바뀌었을 때: 미리듣기 중이면 새 분위기로 갈아타고, 끄기면 버튼을 잠급니다. */
+function syncMusicPreview() {
+  const mood = currentMood();
+  const b = $('#musicPreview');
+  if (b) b.disabled = !mood;
+  if (!musicPreview) return;
+  if (!mood) stopMusicPreview();
+  else if (musicPreview.moodId !== mood.id) startMusicPreview();
 }
 
 function fitToNarration() {
@@ -417,6 +515,10 @@ function exportLabel() {
   const st = currentStyle();
   return st ? `"${st.name.split(' — ')[0]}" 스타일로 영상 만들기` : '이 스타일로 영상 만들기';
 }
+
+/** 스타일 수. 데이터를 못 읽었을 때는 index.html 자리표시(data-style-count)에 적힌 수를 쓴다 */
+const styleCount = () => STYLES.length || Number(document.querySelector('[data-style-count]')?.textContent) || 0;
+const batchLabel = () => `${styleCount()}가지 전부 만들기`;
 
 function markStyleCards() {
   for (const card of document.querySelectorAll('#styleStrip .style-card')) card.setAttribute('aria-pressed', String(card.dataset.id === project.style));
@@ -510,6 +612,8 @@ function applyStyle(st) {
     syncControls();
     renderStyleDesc();
     changed(true);
+    renderAudioInfo(); // 자동이면 스타일에 따라 음악이 바뀐다
+    syncMusicPreview();
     if (!exporting) $('#exportBtn').textContent = exportLabel(); // 녹화 중이면 '만들기 멈춤' 글자를 지키기
   };
   finish();
@@ -611,26 +715,32 @@ async function useViral(v) {
 // ── 내보내기(한 편) ───────────────────────────────────
 async function exportVideo() {
   if (exporting) { exporting.abort.abort(); return; }
-  if (batch) return toast('20가지 전부 만들기가 진행 중입니다. 먼저 멈춰 주세요.');
+  if (batch) return toast(`${batchLabel()}가 진행 중입니다. 먼저 멈춰 주세요.`);
   if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
   stopPlayback();
+  stopMusicPreview();
   const btn = $('#exportBtn');
   const bar = $('#exportProgress');
   const status = $('#exportStatus');
   $('#exportResult').hidden = true;
   btn.textContent = '만들기 멈춤';
-  $('#styleBatchBtn').disabled = true; // 한 편과 20가지가 동시에 돌지 않게
+  $('#styleBatchBtn').disabled = true; // 한 편과 전부 만들기가 동시에 돌지 않게
   bar.hidden = false;
   bar.classList.add('rec');
-  status.textContent = '글꼴과 사진을 준비하는 중…';
+  status.textContent = '소리를 준비하는 중…';
   const abort = new AbortController();
   exporting = { abort };
   try {
-    const withAudio = !!(audio.bgm || audio.narr);
+    const snap = previewProject();
+    // 배경음악 파일이 없으면 스타일 음악을 영상 길이에 맞춰 먼저 만든다(비동기). 그동안 멈춤을 눌렀으면 여기서 끝.
+    const bgm = await bgmSource(buildTimeline(snap).total);
+    if (abort.signal.aborted) throw new DOMException('내보내기를 멈췄습니다.', 'AbortError');
+    status.textContent = '글꼴과 사진을 준비하는 중…';
+    const withAudio = !!(bgm || audio.narr);
     const r = await exportProject({
-      project: previewProject(),
+      project: snap,
       quality: project.quality,
-      startAudio: withAudio ? startAudio : null,
+      startAudio: withAudio ? (dest, offset, total) => startAudio(dest, offset, total, bgm) : null,
       audioCtx: withAudio ? audioCtx() : null,
       signal: abort.signal,
       onProgress: ({ t, total, text }) => {
@@ -673,14 +783,16 @@ function videoFileName(ext = resultExt, suffix = '') {
   return `${safeFileName(first || 'MRK-shorts')}${suffix}.${ext}`;
 }
 
-// ── 내보내기(20가지 전부) ─────────────────────────────
+// ── 내보내기(모든 스타일 전부) ─────────────────────────────
 async function exportAllStyles() {
   if (batch) { batch.abort.abort(); return; }
   if (exporting) return toast('한 편 만들기가 진행 중입니다. 먼저 멈춰 주세요.');
   if (!STYLES.length) return toast('스타일 데이터가 없습니다.');
   if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
   stopPlayback();
-  const snap = previewProject(); // 20편 모두 시작 시점의 장면·설정으로
+  stopMusicPreview();
+  const snap = previewProject(); // 모든 스타일을 시작 시점의 장면·설정으로
+  const snapTotal = buildTimeline(snap).total;
   $('#exportBtn').disabled = true;
   const panel = $('#batchPanel');
   const bar = $('#batchProgress');
@@ -695,15 +807,19 @@ async function exportAllStyles() {
   $('#styleBatchBtn').textContent = '멈춤';
   status.textContent = `${STYLES.length}가지 × ${tl.total.toFixed(0)}초 ≈ ${formatTime(tl.total * STYLES.length)} 걸립니다. 이 탭을 띄워 두세요.`;
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  const withAudio = !!(audio.bgm || audio.narr);
   // 한 스타일씩 돌려서, 중간에 멈춰도 그때까지 만든 것은 남깁니다.
   for (let i = 0; i < STYLES.length; i++) {
     if (abort.signal.aborted) break;
     const st = STYLES[i];
     try {
+      // 배경음악 파일이 없고 '자동'이면 스타일마다 그 스타일이 추천하는 분위기로(파일이 있으면 모두 그 파일)
+      status.textContent = `${i + 1}/${STYLES.length} ${st.name} — 소리 준비 중…`;
+      const bgm = await bgmSource(snapTotal, st);
+      if (abort.signal.aborted) break;
+      const withAudio = !!(bgm || audio.narr);
       const [r] = await exportStyles({
         project: snap, styles: [st], quality: project.quality,
-        startAudio: withAudio ? startAudio : null,
+        startAudio: withAudio ? (dest, offset, total) => startAudio(dest, offset, total, bgm) : null,
         audioCtx: withAudio ? audioCtx() : null,
         signal: abort.signal,
         onProgress: ({ t, total }) => {
@@ -722,7 +838,7 @@ async function exportAllStyles() {
   lastBatch = results;
   status.textContent = results.length ? `${results.length}개 완성. 하나씩 저장하거나 ZIP으로 한 번에 저장하세요.` : '만든 영상이 없습니다.';
   zipBtn.disabled = !results.length;
-  $('#styleBatchBtn').textContent = '20가지 전부 만들기';
+  $('#styleBatchBtn').textContent = batchLabel();
   $('#exportBtn').disabled = false;
   batch = null;
   if (results.length) { showResult(results[0]); toast(`${results.length}가지 스타일 영상이 완성됐습니다.`); }
@@ -894,6 +1010,8 @@ async function openProject(file) {
     changed(true);
     markStyleCards();
     renderStyleDesc();
+    renderAudioInfo();
+    syncMusicPreview();
     $('#exportBtn').textContent = exportLabel();
     $('#scriptText').value = project.scenes.map((s) => s.caption).join('\n');
     toast('프로젝트를 열었습니다.');
@@ -945,7 +1063,7 @@ const BINDINGS = [
   ['captionSize', 'captionSize', Number], ['captionStyle', 'captionStyle'], ['captionAnim', 'captionAnim'], ['overlay', 'overlay'], ['titleMode', 'titleMode'],
   ['motion', 'motion'], ['transition', 'transition'], ['textColor', 'textColor'], ['highlightColor', 'highlightColor'],
   ['bandColor', 'bandColor'], ['panelColor', 'panelColor'], ['inkColor', 'inkColor'], ['showProgress', 'showProgress', 'check'], ['title', 'title'],
-  ['channel', 'channel'], ['quality', 'quality'],
+  ['channel', 'channel'], ['quality', 'quality'], ['styleMusic', 'styleMusic'],
   ['bgmVolume', 'bgmVolume', Number], ['narrVolume', 'narrVolume', Number],
 ];
 const ENDING_BINDINGS = [
@@ -981,6 +1099,8 @@ function wireControls() {
       project[key] = kind === 'check' ? el.checked : kind ? kind(el.value) : el.value;
       if (key === 'aspect') sizePreview();
       if (key === 'bgmVolume' || key === 'narrVolume') syncControls();
+      if (key === 'bgmVolume') musicPreview?.handle.setGain(project.bgmVolume); // 미리듣기 크기도 바로 따라가게
+      if (key === 'styleMusic') { renderAudioInfo(); syncMusicPreview(); }
       changed(false);
     });
   }
@@ -1000,6 +1120,8 @@ export async function initShorts() {
   if (!FONTS.some((f) => f.id === project.font)) project.font = FONTS[0]?.id ?? '900';
   const styleSel = $('#aiStyle');
   for (const [k, v] of Object.entries(SCRIPT_STYLES)) styleSel.append(new Option(v, k));
+  const musicSel = $('#styleMusic');
+  if (musicSel) for (const m of MOODS) musicSel.append(new Option(m.name, m.id)); // 저장된 값이 목록에 없으면 syncControls 가 '자동'으로 되돌린다
   document.body.append(replaceInput);
 
   try { ({ STYLES } = await import('./styles.js')); } catch (e) { console.warn('styles.js 없음', e); STYLES = []; }
@@ -1022,7 +1144,8 @@ export async function initShorts() {
   });
   $('#applyScript').addEventListener('click', () => applyLines($('#scriptText').value.split('\n')));
 
-  $('#playBtn').addEventListener('click', () => (playing ? stopPlayback() : startPlayback()));
+  $('#playBtn').addEventListener('click', () => ((playing || playPrep) ? stopPlayback() : startPlayback()));
+  $('#musicPreview')?.addEventListener('click', () => (musicPreview ? stopMusicPreview() : startMusicPreview()));
   $('#scrub').addEventListener('input', (e) => seek((Number(e.target.value) / 1000) * tl.total));
 
   $('#logoFile').addEventListener('change', async (e) => {
@@ -1107,6 +1230,9 @@ export async function initShorts() {
     $('#exportBtn').textContent = exportLabel();
   }
   renderStyleStrip();
+  renderAudioInfo();
+  syncMusicPreview();
+  $('#styleBatchBtn').textContent = batchLabel();
   changed(true);
   curT = 1.2;
   await ensureFonts(project);
@@ -1117,4 +1243,4 @@ export async function initShorts() {
   serverInfo().then((info) => { if (!info.youtube) $('#viralToggle').textContent = '빵터진 영상 찾기 ↗'; });
 }
 
-export function pauseShorts() { stopPlayback(); }
+export function pauseShorts() { stopPlayback(); stopMusicPreview(); }

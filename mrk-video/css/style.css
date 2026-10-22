@@ -209,6 +209,9 @@ h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
 .field.check, label.check { flex-direction: row; align-items: center; gap: 8px; cursor: pointer; }
 .field.check span, label.check span { font-size: 14px; font-weight: 700; color: var(--ink); }
 .field.color input { width: 100%; height: 36px; padding: 2px; }
+.music-field .row > select { flex: 1 1 auto; width: auto; }
+.music-field .row > .btn { flex: 0 0 auto; min-width: 40px; }
+.music-field .row > .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 input[type="text"], input[type="number"], input[type="password"], input[type="search"], select, textarea {
   width: 100%; font: inherit; font-size: 14px; color: var(--ink);
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; min-width: 0;

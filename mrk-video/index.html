@@ -7,7 +7,7 @@
 <title>MR.K 영상만들기</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="사진과 대본으로 잘 나가는 쇼츠 형식 20가지 영상을 만들고, 상품 대표 이미지를 일괄 합성·다운로드하는 MR.K 웹 도구">
+<meta name="description" content="사진과 대본으로 잘 나가는 쇼츠 형식 30가지 영상을 만들고, 상품 대표 이미지를 일괄 합성·다운로드하는 MR.K 웹 도구">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f1222'/%3E%3Cpath d='M20 16h8v13l11-13h10L36 31l14 17H39L28 34v14h-8z' fill='%231a7dff'/%3E%3C/svg%3E">
 <link rel="preload" href="assets/fonts/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
@@ -43,9 +43,9 @@
           <h1 class="hero-title" data-kinetic>사진 넣고
 대본 쓰면
 *쇼츠*가 나옵니다.</h1>
-          <p class="lede">잘 나가는 쇼츠 형식 20가지를 스타일로 골라, 같은 내용을 20가지 영상으로 만들고 바로 올립니다. 사진·소리는 서버로 가지 않고 이 브라우저 안에서 처리됩니다.</p>
+          <p class="lede">잘 나가는 쇼츠 형식 <span data-style-count>30</span>가지를 스타일로 골라, 같은 내용을 <span data-style-count>30</span>가지 영상으로 만들고 바로 올립니다. 사진·소리는 서버로 가지 않고 이 브라우저 안에서 처리됩니다.</p>
           <div class="hero-chips" id="heroChips">
-            <span class="chip" data-pop><span class="chk">✓</span>스타일 20가지</span>
+            <span class="chip" data-pop><span class="chk">✓</span>스타일 <span data-style-count>30</span>가지</span>
             <span class="chip" data-pop><span class="chk">✓</span>자막·제목 자동</span>
             <span class="chip" data-pop><span class="chk">✓</span>배경음악·내레이션</span>
             <span class="chip ok" data-pop><span class="chk">✓</span>MP4 바로 저장</span>
@@ -102,7 +102,7 @@
         <div class="case-head">
           <span class="case-no">사례 02</span>
           <h2 data-kinetic-title>같은 내용이
-*20가지 스타일*로 나옵니다</h2>
+*<span data-style-count>30</span>가지 스타일*로 나옵니다</h2>
           <i class="rule" data-underline></i>
         </div>
         <div class="case-grid">
@@ -164,7 +164,7 @@
         <div>
           <p class="kicker">01 — Shorts</p>
           <h1 data-kinetic>숏폼 *영상* 만들기</h1>
-          <p class="lede">사진과 대본을 넣고 스타일을 고르면 자막·제목·배경음악이 들어간 쇼츠가 나옵니다. 20가지 스타일로 한꺼번에 만들어 바로 올릴 수도 있습니다.</p>
+          <p class="lede">사진과 대본을 넣고 스타일을 고르면 자막·제목·배경음악이 들어간 쇼츠가 나옵니다. <span data-style-count>30</span>가지 스타일로 한꺼번에 만들어 바로 올릴 수도 있습니다.</p>
         </div>
         <div class="head-actions">
           <button type="button" class="btn ghost" id="projOpenBtn">프로젝트 열기</button>
@@ -181,7 +181,7 @@
               <h2 id="h-styles">잘 나가는 쇼츠 스타일 <span class="hint" id="styleCount"></span></h2>
               <div class="row wrap">
                 <button type="button" class="btn small ghost" id="viralToggle" aria-expanded="false" aria-controls="viralBox">빵터진 영상 찾기</button>
-                <button type="button" class="btn small accent" id="styleBatchBtn">20가지 전부 만들기</button>
+                <button type="button" class="btn small accent" id="styleBatchBtn"><span data-style-count>30</span>가지 전부 만들기</button>
               </div>
             </div>
             <div class="viral" id="viralBox" hidden>
@@ -292,6 +292,11 @@
                   <option value="karaoke">가라오케 강조</option>
                   <option value="type">타자기</option>
                   <option value="pop">틱톡식 팝</option>
+                  <option value="bounce">튕기며 떨어지기</option>
+                  <option value="scale">커지며 등장</option>
+                  <option value="slide">옆에서 밀려오기</option>
+                  <option value="wave">물결</option>
+                  <option value="flash">깜빡 강조</option>
                 </select>
               </label>
               <label class="field"><span>자막 모양</span>
@@ -300,6 +305,14 @@
                   <option value="box">검은 띠 위 글씨</option>
                   <option value="plain">글씨만</option>
                   <option value="pill">강조색 알약</option>
+                  <option value="neon">네온 빛</option>
+                  <option value="shadow3d">3D 그림자</option>
+                  <option value="marker">형광펜</option>
+                  <option value="glass">유리 패널</option>
+                  <option value="tag">단어 칩</option>
+                  <option value="underline">밑줄</option>
+                  <option value="gradient">그라데이션</option>
+                  <option value="bubble">말풍선</option>
                 </select>
               </label>
               <label class="field"><span>장식</span>
@@ -367,6 +380,18 @@
               <label class="field"><span>내레이션 녹음</span><input type="file" id="narrFile" accept="audio/*"></label>
               <label class="field" for="narrVolume"><span>내레이션 크기 <output id="narrVolOut"></output></span><input type="range" id="narrVolume" min="0" max="1.5" step="0.05"></label>
             </div>
+            <!-- 스타일 음악: 배경음악 파일이 없을 때 스타일에 맞는 분위기를 코드로 만들어 깔아 줍니다(목록은 shorts.js 가 MOODS 로 채움) -->
+            <div class="field music-field">
+              <span id="l-styleMusic">스타일 음악</span>
+              <div class="row">
+                <select id="styleMusic" aria-labelledby="l-styleMusic">
+                  <option value="auto">스타일 추천 (자동)</option>
+                  <option value="off">끄기</option>
+                </select>
+                <button type="button" class="btn small ghost" id="musicPreview" aria-pressed="false" aria-label="스타일 음악 미리듣기" title="미리듣기">▶</button>
+              </div>
+              <small class="hint">배경음악 파일을 넣으면 그 파일이 우선합니다.</small>
+            </div>
             <div class="row wrap">
               <span class="hint" id="audioInfo">소리 파일이 없으면 무음 영상이 만들어집니다.</span>
               <button type="button" class="btn small" id="fitToNarr" disabled>장면 길이를 내레이션에 맞추기</button>
@@ -423,7 +448,7 @@
           </div>
 
           <div class="panel" id="batchPanel" hidden>
-            <div class="panel-head"><h2>20가지 스타일 영상</h2><button type="button" class="btn small ghost" id="batchStop">멈춤</button></div>
+            <div class="panel-head"><h2><span data-style-count>30</span>가지 스타일 영상</h2><button type="button" class="btn small ghost" id="batchStop">멈춤</button></div>
             <div class="progress" id="batchProgress"><i></i></div>
             <p class="hint" id="batchStatus"></p>
             <div class="result-list" id="batchList"></div>
@@ -662,18 +687,18 @@
       <section class="panel">
         <h2>쇼츠 한 편 만드는 순서</h2>
         <div class="guide-steps" id="guideSteps">
-          <div class="gstep"><span class="n">01</span><b>스타일 고르기</b><p>잘 나가는 쇼츠 형식 20가지 중 하나를 누릅니다. 미리보기가 바로 그 형식으로 바뀝니다.</p><img src="assets/guide/step-01.jpg" alt="스타일 갤러리 화면" loading="lazy"></div>
+          <div class="gstep"><span class="n">01</span><b>스타일 고르기</b><p>잘 나가는 쇼츠 형식 <span data-style-count>30</span>가지 중 하나를 누릅니다. 미리보기가 바로 그 형식으로 바뀝니다.</p><img src="assets/guide/step-01.jpg" alt="스타일 갤러리 화면" loading="lazy"></div>
           <div class="gstep"><span class="n">02</span><b>사진 넣기</b><p>매물·현장·강의 자료 사진을 순서대로 넣습니다. 사진이 없어도 글자 장면으로 만들 수 있습니다.</p><img src="assets/guide/step-02.jpg" alt="사진 추가 영역" loading="lazy"></div>
           <div class="gstep"><span class="n">03</span><b>대본 넣기</b><p>한 줄에 한 장면씩 씁니다. 강조할 단어는 <code>*별표*</code>로 감쌉니다. AI 대본이 켜져 있으면 주제만 넣어도 됩니다.</p><img src="assets/guide/step-03.jpg" alt="대본 입력 칸" loading="lazy"></div>
           <div class="gstep"><span class="n">04</span><b>소리 넣기</b><p>배경음악·내레이션 녹음을 넣고, 필요하면 “장면 길이를 내레이션에 맞추기”를 누릅니다.</p><img src="assets/guide/step-04.jpg" alt="소리 패널" loading="lazy"></div>
-          <div class="gstep"><span class="n">05</span><b>영상 만들기</b><p>이 스타일로 한 편, 또는 20가지 전부를 ZIP으로 만듭니다. 영상 길이만큼 시간이 걸립니다.</p><img src="assets/guide/step-05.jpg" alt="영상 만들기 패널" loading="lazy"></div>
+          <div class="gstep"><span class="n">05</span><b>영상 만들기</b><p>이 스타일로 한 편, 또는 <span data-style-count>30</span>가지 전부를 ZIP으로 만듭니다. 영상 길이만큼 시간이 걸립니다.</p><img src="assets/guide/step-05.jpg" alt="영상 만들기 패널" loading="lazy"></div>
           <div class="gstep"><span class="n">06</span><b>바로 올리기</b><p>“바로 올리기”에서 유튜브·인스타·틱톡·페이스북·쓰레드 업로드 화면을 열고, 복사한 제목·해시태그를 붙여 넣습니다.</p><img src="assets/guide/step-06.jpg" alt="바로 올리기 패널" loading="lazy"></div>
         </div>
       </section>
       <section class="panel">
         <h2>알아 두면 좋은 점</h2>
         <ul>
-          <li>영상은 실제 길이만큼 녹화하듯 만들어집니다. 30초 영상이면 약 30초, 20가지 전부면 그 20배가 걸립니다.</li>
+          <li>영상은 실제 길이만큼 녹화하듯 만들어집니다. 30초 영상이면 약 30초, <span data-style-count>30</span>가지 전부면 그 <span data-style-count>30</span>배가 걸립니다.</li>
           <li>크롬·엣지 최신 버전에서는 MP4로, 그 밖의 브라우저에서는 WEBM으로 저장됩니다. 유튜브·인스타·틱톡 모두 MP4를 받습니다.</li>
           <li>사진·소리 파일은 서버로 올라가지 않고 이 브라우저 안에서만 처리됩니다.</li>
           <li>“프로젝트 저장”은 사진과 글을 한 파일(.json)로 묶습니다. 소리 파일은 들어가지 않으니 다시 넣어 주세요.</li>

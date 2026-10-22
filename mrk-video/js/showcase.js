@@ -203,7 +203,7 @@ export async function initShowcase() {
   wirePause();
   popIn(document.querySelectorAll('#heroChips .chip'), { delay: 500 });
   const cnt = $('#caseStyleCount');
-  if (cnt) countUp(cnt, Number(cnt.textContent) || 20);
+  if (cnt) countUp(cnt, Number(cnt.textContent) || styles.length);
   // 첫 프레임은 바로 그려 둔다(정지 상태에서도 보이게)
   for (const id of ['heroCanvas', 'caseShortsCanvas']) {
     const c = document.getElementById(id);

@@ -163,6 +163,16 @@ export function layout(p, W, H) {
 
 const easeInOut = (x) => 0.5 - Math.cos(Math.PI * clamp(x, 0, 1)) / 2;
 const easeOut = (x) => { x = clamp(x, 0, 1); return 1 - (1 - x) * (1 - x) * (1 - x); };
+/** 바닥에서 한 번 튀는 easeOutBounce 근사(0→1, 중간에 0.75·0.94 까지 되튀어 오름) */
+const easeOutBounce = (x) => {
+  x = clamp(x, 0, 1);
+  const n1 = 7.5625;
+  const d1 = 2.75;
+  if (x < 1 / d1) return n1 * x * x;
+  if (x < 2 / d1) return n1 * (x -= 1.5 / d1) * x + 0.75;
+  if (x < 2.5 / d1) return n1 * (x -= 2.25 / d1) * x + 0.9375;
+  return n1 * (x -= 2.625 / d1) * x + 0.984375;
+};
 
 function motionFor(p, index, prog) {
   let mode = p.motion;
@@ -273,6 +283,19 @@ function tapePattern(ctx, u) {
   });
 }
 
+// ── 자막 어휘 ─────────────────────────────────────────
+/** 자막 모양(captionStyle) 전체. 모르는 값은 outline 으로 봅니다. 뜻은 docs/STYLE-SPEC.md 1절. */
+export const CAPTION_STYLES = ['outline', 'box', 'plain', 'pill', 'neon', 'shadow3d', 'marker', 'glass', 'tag', 'underline', 'gradient', 'bubble'];
+/** 자막 등장(captionAnim) 전체. 모르는 값은 none 으로 봅니다. */
+export const CAPTION_ANIMS = ['none', 'words', 'karaoke', 'type', 'pop', 'bounce', 'scale', 'slide', 'wave', 'flash'];
+const CAPTION_STYLE_SET = new Set(CAPTION_STYLES);
+/** 줄 간격 배율(모양별). 칩·알약처럼 줄 뒤에 배경이 붙는 모양은 줄 사이가 붙지 않게 넓힙니다. */
+const LINE_HEIGHT = { pill: 1.42, tag: 1.5, marker: 1.36, glass: 1.3, bubble: 1.3 };
+/** 띄어쓰기 폭 배율(모양별). 단어 칩(tag)은 칩 사이에 틈이 보이게 공백을 넓힙니다. */
+const WS_MUL = { tag: 2.3 };
+/** 글자 블록 바깥에 패널·칩이 붙는 모양은 글자 영역을 그만큼(글자 크기 배) 안쪽으로 들여 상자 밖으로 나가지 않게 합니다. */
+const BLOCK_INSET = { glass: { x: 0.32, y: 0.2 }, bubble: { x: 0.42, y: 0.28, tail: 0.45 }, tag: { x: 0.2, y: 0.1 } };
+
 // ── 글자 ──────────────────────────────────────────────
 /** "*강조*" 표시를 읽어 [{text, hl}] 조각으로 나눕니다. */
 export function parseRuns(line) {
@@ -305,8 +328,9 @@ function markedWords(text) {
 /**
  * 폭에 맞춰 줄을 나눕니다. 띄어쓰기 단위로 자르고, 한 단어가 너무 길면 글자 단위로 자릅니다.
  * 조각마다 wi(단어 번호)·ci(글자 위치)·ws(공백 여부)를 붙여 자막 애니메이션이 씁니다.
+ * wsMul: 띄어쓰기 폭 배율(단어 칩 모양에서 칩 사이 틈)
  */
-function wrapRich(ctx, text, maxW) {
+function wrapRich(ctx, text, maxW, wsMul = 1) {
   const lines = [];
   let wi = -1;
   let ci = 0;
@@ -329,7 +353,7 @@ function wrapRich(ctx, text, maxW) {
         ci += tok.length;
         if (!ws) wi++;
         if (!line.length && ws) continue;
-        const w = ctx.measureText(tok).width;
+        const w = ctx.measureText(tok).width * (ws ? wsMul : 1);
         if (lineW + w <= maxW || !line.length) {
           if (w > maxW && !ws) {
             let k = 0;
@@ -359,11 +383,12 @@ function wrapRich(ctx, text, maxW) {
 
 // 글자 줄나눔은 프레임마다 똑같으므로 캐시합니다(글·크기·폭이 같으면 재사용).
 const textLayoutCache = new Map();
-function layoutText(ctx, text, box, o) {
+function layoutText(ctx, text, box, o, style = o.style) {
   const weight = o.weight ?? o.family;
-  const lhMul = o.lineHeight || (o.style === 'pill' ? 1.42 : 1.28);
+  const lhMul = o.lineHeight || LINE_HEIGHT[style] || 1.28;
+  const wsMul = WS_MUL[style] || 1;
   const maxLines = o.maxLines || 99;
-  const key = `${text}\u0001${o.size.toFixed(1)}\u0001${weight}\u0001${Math.round(box.w)}\u0001${Math.round(box.h)}\u0001${maxLines}\u0001${lhMul}`;
+  const key = `${text}\u0001${o.size.toFixed(1)}\u0001${weight}\u0001${Math.round(box.w)}\u0001${Math.round(box.h)}\u0001${maxLines}\u0001${lhMul}\u0001${wsMul}`;
   let v = textLayoutCache.get(key);
   if (v) return v;
   let size = o.size;
@@ -371,7 +396,7 @@ function layoutText(ctx, text, box, o) {
   let wrapped;
   for (;;) {
     ctx.font = fontCss(weight, size);
-    wrapped = wrapRich(ctx, text, box.w);
+    wrapped = wrapRich(ctx, text, box.w, wsMul);
     const h = wrapped.lines.length * size * lhMul;
     if ((wrapped.lines.length <= maxLines && h <= box.h) || size <= minSize) break;
     size *= 0.93;
@@ -387,13 +412,57 @@ const HIDE = { alpha: 0, dy: 0, kind: 'hide' };
 const CUR = { alpha: 1, dy: 0, kind: 'cur' };
 const DIM = { alpha: 0.55, dy: 0, kind: 'dim' }; // 가라오케에서 아직 안 읽은 글자(밝은 배경에서도 보이게 0.55)
 
-/** 자막 애니메이션별 조각 상태 함수. anim = { mode, t(장면 시작 후 초), dur(장면 길이) } */
-function makeState(anim, TL, size) {
+/**
+ * 자막 애니메이션별 조각 상태 함수. anim = { mode, t(장면 시작 후 초), dur(장면 길이) }
+ * 돌려주는 함수 state(pc, li, ln) → { alpha, dy, dx?, cut?, kind }  (li=줄 번호, ln=줄)
+ *   kind: read(평소) · hide · cur(가라오케 읽는 단어: 강조색+살짝 확대+밑줄) · dim(아직 안 읽음) · flash(깜빡 강조: 강조색만)
+ * slide 처럼 줄 단위로 움직이는 모드는 state.lineDx(li, ln) 도 붙여서 줄 배경(띠·칩·밑줄)이 글자와 함께 움직이게 합니다.
+ * env = { lineX(ln)(줄의 시작 x), u }
+ */
+function makeState(anim, TL, size, env) {
   if (!anim) return null;
   const { mode } = anim;
   const t = Math.max(0, anim.t);
   const dur = Math.max(0.5, anim.dur || 3);
   const N = Math.max(1, TL.words);
+  if (mode === 'bounce') {
+    // 단어가 위에서 떨어져 바닥에서 한 번 튀며 자리 잡음(장면 앞 55% 안에 단어 분배, 단어마다 0.5초)
+    const win = Math.max(0.3, dur * 0.55);
+    return (pc) => {
+      if (pc.ws) return VIS;
+      const x = (t - (pc.wi / N) * win) / 0.5;
+      if (x <= 0) return HIDE;
+      if (x >= 1) return VIS;
+      return { alpha: Math.min(1, x * 5), dy: -(1 - easeOutBounce(x)) * size * 1.1, kind: 'read' };
+    };
+  }
+  if (mode === 'slide') {
+    // 줄 단위로 왼쪽 화면 밖에서 미끄러져 들어옴(줄마다 0.12초 지연, 0.42초 easeOut)
+    const lineDx = (li, ln) => {
+      const e = easeOut((t - li * 0.12) / 0.42);
+      if (e >= 1) return 0;
+      return -(1 - e) * (env.lineX(ln) + ln.w + 60 * env.u);
+    };
+    const fn = (pc, li, ln) => {
+      const dx = lineDx(li, ln);
+      return dx === 0 ? VIS : { alpha: 1, dy: 0, dx, kind: 'read' };
+    };
+    fn.lineDx = lineDx;
+    return fn;
+  }
+  if (mode === 'wave') {
+    // 단어가 순서대로 살짝 위아래로 물결(진폭 글자 크기의 0.06, 주기 1.6초). 등장은 0.4초 페이드
+    const alpha = easeOut(t / 0.4);
+    const phase = (t / 1.6) * Math.PI * 2;
+    return (pc) => (pc.ws ? VIS : { alpha, dy: Math.sin(phase - pc.wi * 0.55) * size * 0.06, kind: 'read' });
+  }
+  if (mode === 'flash') {
+    // 읽는 단어(가라오케와 같은 시간 분배)가 강조색으로 0.1초 간격 깜빡임(알파 1↔0.55). 나머지는 평소대로
+    const win = Math.max(0.4, dur * 0.85);
+    const cur = t >= win ? N : Math.floor(t / (win / N));
+    const flash = { alpha: Math.floor(t / 0.1) % 2 === 0 ? 1 : 0.55, dy: 0, kind: 'flash' };
+    return (pc) => (pc.ws || pc.wi !== cur ? VIS : flash);
+  }
   if (mode === 'words') {
     const win = Math.max(0.3, dur * 0.6);
     return (pc) => {
@@ -442,42 +511,94 @@ function popGroup(text, anim) {
   return { text: groups[g], scale: 1.35 - 0.35 * easeOut(lt / 0.18) };
 }
 
+/** 한 줄의 조각을 띄어쓰기 기준 "단어 묶음"으로 나눕니다(단어 칩용). 줄 객체에 캐시(글자 구조만 쓰므로 모양과 무관). */
+function wordGroups(ln) {
+  if (ln.groups) return ln.groups;
+  const groups = [];
+  let x = 0;
+  let cur = null;
+  for (const r of ln.runs) {
+    if (r.ws) { cur = null; x += r.w; continue; }
+    if (!cur) groups.push((cur = { x, w: 0, hl: false, runs: [] }));
+    cur.w += r.w;
+    cur.hl = cur.hl || r.hl;
+    cur.runs.push(r);
+    r.group = cur;
+    x += r.w;
+  }
+  ln.groups = groups;
+  return groups;
+}
+
 /**
  * 상자 안에 강조 글씨를 그립니다. 넘치면 글자를 줄여 맞춥니다.
- * o = { size, weight(또는 family), color, hl, style: outline|box|plain|pill, valign: top|center|bottom, align: center|left,
- *       maxLines, alpha, u, shadow, strokeColor, boxColor, pillColor, anim: {mode, t, dur}, lineHeight }
+ * o = { size, weight(또는 family), color, hl, style: CAPTION_STYLES 중 하나(모르면 outline), valign: top|center|bottom, align: center|left,
+ *       maxLines, alpha, u, shadow, strokeColor, boxColor, pillColor, anim: {mode, t, dur}, lineHeight,
+ *       accent(강조색 원본 — 빛무리·형광펜 띠·밑줄·칩에 씀, 없으면 hl), ink(밝은 면 위 글자색), brightBg(밝은 배경 위인지), chipColor(단어 칩 본문 색) }
+ * 그리는 순서: 1) 줄·블록 배경(띠·알약·형광펜·밑줄·칩·유리 패널·말풍선) 2) 글자 레이어(빛무리·그림자·테두리 → 글자) — 레이어마다 모든 글자를 한 번씩 돌아,
+ * 테두리나 그림자가 옆 글자를 덮지 않게 합니다. shadowBlur·filter 는 느려서 쓰지 않습니다.
  */
 export function drawRichText(ctx, text, box, o) {
   if (!plainText(text).trim()) return;
   let anim = o.anim && o.anim.mode && o.anim.mode !== 'none' ? o.anim : null;
   const u = o.u || 1;
-  let popScale = 1;
+  const style = CAPTION_STYLE_SET.has(o.style) ? o.style : 'outline';
+  // 블록 전체가 커지거나(pop·scale) 흐려지는 애니메이션
+  let blockScale = 1;
+  let blockAlpha = 1;
   if (anim?.mode === 'pop') {
     const g = popGroup(text, anim);
     if (!g) return;
     text = g.text;
-    popScale = g.scale;
+    blockScale = g.scale;
     o = { ...o, size: o.size * 1.25, valign: 'center', maxLines: 3 };
     anim = null;
+  } else if (anim?.mode === 'scale') {
+    // 자막 전체가 0.6→1.0 으로 커지며 알파 0→1 (0.35초), 이후 정지
+    const e = easeOut(Math.max(0, anim.t) / 0.35);
+    if (e <= 0) return;
+    blockScale = 0.6 + 0.4 * e;
+    blockAlpha = e;
+    anim = null;
   }
-  const TL = layoutText(ctx, text, box, o);
+  // 패널·칩이 붙는 모양은 글자 영역을 안쪽으로 들여 상자 밖으로 나가지 않게(자동 축소·maxLines 는 들인 상자 기준으로 그대로 동작)
+  const inset = BLOCK_INSET[style];
+  const lbox = inset
+    ? { x: box.x + o.size * inset.x, y: box.y + o.size * inset.y, w: Math.max(10, box.w - o.size * inset.x * 2), h: Math.max(10, box.h - o.size * (inset.y * 2 + (inset.tail || 0))) }
+    : box;
+  const TL = layoutText(ctx, text, lbox, o, style);
   const { size, lh, lines } = TL;
   const blockH = lines.length * lh;
-  let y0 = box.y;
-  if (o.valign === 'center') y0 = box.y + (box.h - blockH) / 2;
-  else if (o.valign === 'bottom') y0 = box.y + box.h - blockH;
+  let y0 = lbox.y;
+  if (o.valign === 'center') y0 = lbox.y + (lbox.h - blockH) / 2;
+  else if (o.valign === 'bottom') y0 = lbox.y + lbox.h - blockH;
   const left = o.align === 'left';
-  const lineX = (ln) => (left ? box.x : box.x + (box.w - ln.w) / 2);
-  const state = makeState(anim, TL, size);
+  const lineX = (ln) => (left ? lbox.x : lbox.x + (lbox.w - ln.w) / 2);
+  const lineY = (i) => y0 + i * lh + lh / 2;
+  const state = makeState(anim, TL, size, { lineX, u });
+  const lineDx = state?.lineDx || null;
+  const shift = (i, ln) => (lineDx ? lineDx(i, ln) : 0);
+  const stateOf = (r, i, ln) => (state ? state(r, i, ln) : VIS);
+  /** 줄에서 가장 진한 글자 조각의 알파(줄 배경이 첫 글자와 함께 나타나게. 공백 조각은 항상 보이는 상태라 뺍니다) */
+  const lineAlpha = (ln, i) => {
+    if (!state) return 1;
+    let a = 0;
+    for (const r of ln.runs) { if (r.ws) continue; a = Math.max(a, stateOf(r, i, ln).alpha); if (a >= 1) break; }
+    return a;
+  };
+  const accent = o.accent || o.hl;
+  const ink = o.ink || '#111111';
+  const onAccent = isBright(accent) ? ink : '#ffffff'; // 강조색 면 위 글자색
+  const brightGlyph = isBright(o.color);
 
   ctx.save();
-  const baseAlpha = ctx.globalAlpha * (o.alpha ?? 1);
+  const baseAlpha = ctx.globalAlpha * (o.alpha ?? 1) * blockAlpha;
   ctx.globalAlpha = baseAlpha;
-  if (popScale !== 1) {
+  if (blockScale !== 1) {
     const cx = box.x + box.w / 2;
     const cy = box.y + box.h / 2;
     ctx.translate(cx, cy);
-    ctx.scale(popScale, popScale);
+    ctx.scale(blockScale, blockScale);
     ctx.translate(-cx, -cy);
   }
   ctx.textBaseline = 'middle';
@@ -485,86 +606,217 @@ export function drawRichText(ctx, text, box, o) {
   ctx.lineJoin = 'round';
   ctx.font = fontCss(TL.weight, size);
 
-  // 줄 배경(검은 띠·알약)
-  if (o.style === 'box' || o.style === 'pill') {
-    const pill = o.style === 'pill';
+  // ── 1) 배경 ──
+  if (style === 'box' || style === 'pill') {
+    // 줄마다 검은 띠·강조색 알약
+    const pill = style === 'pill';
     ctx.fillStyle = pill ? (o.pillColor || o.hl) : (o.boxColor || 'rgba(0,0,0,0.72)');
     lines.forEach((ln, i) => {
       if (!ln.runs.length) return;
-      let a = 1;
-      if (state) { a = 0; for (const r of ln.runs) a = Math.max(a, state(r).alpha); if (a <= 0) return; }
+      const a = lineAlpha(ln, i);
+      if (a <= 0) return;
       ctx.globalAlpha = baseAlpha * a;
-      const x = lineX(ln);
+      const x = lineX(ln) + shift(i, ln);
       const py = size * (pill ? 0.16 : 0.2);
       const px = size * (pill ? 0.42 : 0.32);
       roundRectPath(ctx, x - px, y0 + i * lh + (lh - size) / 2 - py, ln.w + px * 2, size + py * 2, pill ? size : 10 * u);
       ctx.fill();
     });
     ctx.globalAlpha = baseAlpha;
-  }
-
-  // 밝은 글자엔 검은 테두리, 어두운 글자엔 흰 테두리
-  const strokeColor = o.strokeColor || (isBright(o.color) ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.9)');
-  const doStroke = o.style === 'outline';
-  // 흐림 그림자(shadowBlur)는 비싸서, 살짝 어긋난 어두운 글씨로 대신합니다(1080p 30fps 를 지키기 위함).
-  const fakeShadow = o.style === 'plain' && o.shadow !== false && isBright(o.color);
-
-  const drawPiece = (r, st, x, y, pass) => {
-    const txt = st.cut != null ? r.text.slice(0, st.cut) : r.text;
-    if (!txt) return;
-    let color = r.hl ? o.hl : o.color;
-    if (st.kind === 'cur') color = o.hl;
-    if (st.kind === 'dim') color = o.color; // 아직 안 읽은 강조 단어는 본문색으로 흐리게 깔고, 읽는 순간부터 강조색
-    const yy = y + st.dy;
-    if (st.kind === 'cur') {
-      ctx.save();
-      const cx = x + r.w / 2;
-      ctx.translate(cx, yy);
-      ctx.scale(1.06, 1.06);
-      ctx.translate(-cx, -yy);
-      if (pass === 0) { if (doStroke) ctx.strokeText(txt, x, yy); }
-      else {
-        ctx.fillStyle = color;
-        ctx.fillText(txt, x, yy);
-        ctx.fillRect(x, yy + size * 0.5, r.w, Math.max(2, size * 0.08));
-      }
-      ctx.restore();
-      return;
-    }
-    if (pass === 0) {
-      if (doStroke) ctx.strokeText(txt, x, yy);
-      else if (fakeShadow) {
-        ctx.fillStyle = 'rgba(0,0,0,0.38)';
-        ctx.fillText(txt, x + size * 0.035, yy + size * 0.05);
-      }
-    } else {
-      ctx.fillStyle = color;
-      ctx.fillText(txt, x, yy);
-    }
-  };
-
-  // 1차: 테두리/그림자, 2차: 글자 (테두리가 옆 글자를 덮지 않게 두 번에 나눠 그립니다)
-  for (let pass = 0; pass < 2; pass++) {
-    if (pass === 0) {
-      if (!doStroke && !fakeShadow) continue;
-      if (doStroke) {
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = Math.max(2, size * 0.17);
-      }
-    }
+  } else if (style === 'marker') {
+    // 줄 뒤에 형광펜처럼 살짝 기울어진 강조색 띠(줄 높이의 0.7, 줄마다 기울기 번갈아)
+    ctx.fillStyle = accent;
+    const bh = lh * 0.7;
+    const bx = size * 0.18;
     lines.forEach((ln, i) => {
-      let x = lineX(ln);
-      const y = y0 + i * lh + lh / 2;
+      if (!ln.runs.length) return;
+      const a = lineAlpha(ln, i);
+      if (a <= 0) return;
+      ctx.globalAlpha = baseAlpha * a * 0.92;
+      const cx = lineX(ln) + shift(i, ln) + ln.w / 2;
+      ctx.save();
+      ctx.translate(cx, lineY(i) + size * 0.06);
+      ctx.rotate((i % 2 ? 1 : -1) * 0.012);
+      ctx.fillRect(-ln.w / 2 - bx, -bh / 2, ln.w + bx * 2, bh);
+      ctx.restore();
+    });
+    ctx.globalAlpha = baseAlpha;
+  } else if (style === 'underline') {
+    // 줄 아래 강조색 굵은 밑줄, 강조 단어 구간은 더 두껍게
+    ctx.fillStyle = accent;
+    lines.forEach((ln, i) => {
+      if (!ln.runs.length) return;
+      const a = lineAlpha(ln, i);
+      if (a <= 0) return;
+      ctx.globalAlpha = baseAlpha * a;
+      const x0 = lineX(ln) + shift(i, ln);
+      const uy = lineY(i) + size * 0.5;
+      ctx.fillRect(x0, uy, ln.w, Math.max(2, size * 0.09));
+      let x = x0;
       for (const r of ln.runs) {
-        const st = state ? state(r) : VIS;
-        if (st.alpha > 0 && !r.ws) {
-          if (st.alpha !== 1) ctx.globalAlpha = baseAlpha * st.alpha;
-          drawPiece(r, st, x, y, pass);
-          if (st.alpha !== 1) ctx.globalAlpha = baseAlpha;
-        }
+        if (r.hl && !r.ws) ctx.fillRect(x, uy - size * 0.05, r.w, Math.max(3, size * 0.17));
         x += r.w;
       }
     });
+    ctx.globalAlpha = baseAlpha;
+  } else if (style === 'tag') {
+    // 단어마다 작은 둥근 칩(본문은 어두운 반투명, 강조 단어는 강조색). 칩은 단어와 같은 알파·높이로 움직입니다
+    const px = size * 0.2;
+    const ch = size * 1.14;
+    lines.forEach((ln, i) => {
+      if (!ln.runs.length) return;
+      const x0 = lineX(ln) + shift(i, ln);
+      const y = lineY(i);
+      for (const g of wordGroups(ln)) {
+        const st = stateOf(g.runs[0], i, ln);
+        if (st.alpha <= 0) continue;
+        ctx.globalAlpha = baseAlpha * st.alpha;
+        ctx.fillStyle = g.hl ? accent : (o.chipColor || 'rgba(0,0,0,0.62)');
+        roundRectPath(ctx, x0 + g.x - px, y + st.dy - ch / 2 + size * 0.03, g.w + px * 2, ch, size * 0.3);
+        ctx.fill();
+      }
+    });
+    ctx.globalAlpha = baseAlpha;
+  } else if (style === 'glass' || style === 'bubble') {
+    // 줄 블록 전체 뒤에 패널 하나: glass=반투명 둥근 패널+가는 테두리, bubble=흰 말풍선(왼쪽 아래 꼬리)+그림자
+    const bubble = style === 'bubble';
+    const padX = size * (bubble ? 0.42 : 0.32);
+    const padY = size * (bubble ? 0.28 : 0.2);
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let a = 0;
+    lines.forEach((ln, i) => {
+      if (!ln.runs.length) return;
+      const x = lineX(ln);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x + ln.w);
+      a = Math.max(a, lineAlpha(ln, i));
+    });
+    if (minX < maxX && a > 0) {
+      const rect = { x: minX - padX, y: y0 - padY, w: maxX - minX + padX * 2, h: blockH + padY * 2 };
+      const rad = bubble ? size * 0.5 : 20 * u;
+      ctx.globalAlpha = baseAlpha * a;
+      if (bubble) {
+        const bottom = rect.y + rect.h;
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        roundRectPath(ctx, rect.x + 3 * u, rect.y + 8 * u, rect.w, rect.h, rad);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); // 꼬리
+        ctx.moveTo(rect.x + size * 0.55, bottom - 2 * u);
+        ctx.lineTo(rect.x + size * 1.2, bottom - 2 * u);
+        ctx.lineTo(rect.x + size * 0.3, bottom + size * 0.42);
+        ctx.closePath();
+        ctx.fill();
+        roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, rad);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = o.brightBg ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.22)';
+        roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, rad);
+        ctx.fill();
+        ctx.strokeStyle = o.brightBg ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = Math.max(1, 1.5 * u);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = baseAlpha;
+      // 줄이 옆에서 밀려오는 애니메이션이면 패널 안에서 나타나게 패널로 잘라 냅니다
+      if (lineDx) { roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, rad); ctx.clip(); }
+    }
+  }
+
+  // ── 2) 글자 레이어 ──
+  // 밝은 글자엔 검은 테두리, 어두운 글자엔 흰 테두리
+  const strokeColor = o.strokeColor || (brightGlyph ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.9)');
+  // 흐림 그림자(shadowBlur)는 비싸서, 살짝 어긋난 어두운 글씨로 대신합니다(1080p 30fps 를 지키기 위함).
+  const layers = [];
+  if (style === 'outline') layers.push({ kind: 'stroke', color: strokeColor, width: Math.max(2, size * 0.17) });
+  else if (style === 'plain' || style === 'underline') { if (o.shadow !== false && brightGlyph) layers.push({ kind: 'shadow', color: 'rgba(0,0,0,0.38)', dx: size * 0.035, dy: size * 0.05 }); }
+  else if (style === 'neon') {
+    // 넓은 반투명 강조색 스트로크 2겹이 빛무리. 강조 단어(강조색 글자)는 빛무리를 반대색(흰/잉크)으로 뒤집어 강조색 속에 묻히지 않게.
+    // 사진 위(shadow)에서는 가는 검은 테두리를 한 겹 더
+    const hlGlow = brightGlyph ? '#ffffff' : (isBright(ink) ? '#111111' : ink);
+    layers.push({ kind: 'stroke', color: rgba(accent, 0.3), hlColor: rgba(hlGlow, 0.3), width: size * 0.44 });
+    layers.push({ kind: 'stroke', color: rgba(accent, 0.55), hlColor: rgba(hlGlow, 0.55), width: size * 0.22 });
+    if (o.shadow && brightGlyph) layers.push({ kind: 'stroke', color: 'rgba(0,0,0,0.5)', width: Math.max(1.5, size * 0.07) });
+  } else if (style === 'shadow3d') {
+    // 오른쪽 아래로 4단 쌓인 단색 그림자(총 글자 크기의 0.1). 밝은 글자엔 검정(inkColor), 어두운 글자엔 강조색. 강조색 글자의 그림자는 늘 검정(inkColor)
+    const dark = isBright(ink) ? '#111111' : ink;
+    const sc = brightGlyph ? dark : accent;
+    for (let k = 4; k >= 1; k--) layers.push({ kind: 'shadow', color: sc, hlColor: dark, dx: size * 0.025 * k, dy: size * 0.025 * k });
+  } else if (style === 'glass') { if (brightGlyph) layers.push({ kind: 'shadow', color: 'rgba(0,0,0,0.45)', dx: size * 0.03, dy: size * 0.04 }); }
+  else if (style === 'gradient') layers.push({ kind: 'stroke', color: 'rgba(0,0,0,0.8)', width: Math.max(1.5, size * 0.07) });
+  layers.push({ kind: 'fill' });
+
+  /** 줄마다 1회 만드는 세로 그라데이션(위 35% 는 본문색 그대로, 아래로 갈수록 강조색) */
+  const lineGrad = (y) => {
+    const g = ctx.createLinearGradient(0, y - size * 0.5, 0, y + size * 0.5);
+    g.addColorStop(0, o.color);
+    g.addColorStop(0.35, o.color);
+    g.addColorStop(1, accent);
+    return g;
+  };
+  const colorOf = (r, st, lineFill) => {
+    if (style === 'tag') {
+      if (r.group?.hl) return onAccent; // 강조색 칩 안 글자
+      if (st.kind === 'cur' || st.kind === 'flash') return accent;
+      return st.kind !== 'dim' && r.hl ? o.hl : o.color;
+    }
+    if (st.kind === 'cur' || st.kind === 'flash') return o.hl;
+    if (st.kind === 'dim') return o.color; // 아직 안 읽은 강조 단어는 본문색으로 흐리게 깔고, 읽는 순간부터 강조색
+    if (r.hl) return o.hl;
+    return lineFill || o.color;
+  };
+
+  const drawPiece = (r, st, x, y, layer, lineFill) => {
+    const txt = st.cut != null ? r.text.slice(0, st.cut) : r.text;
+    if (!txt) return;
+    const xx = x + (st.dx || 0);
+    const yy = y + st.dy;
+    const cur = st.kind === 'cur';
+    if (cur) {
+      ctx.save();
+      const cx = xx + r.w / 2;
+      ctx.translate(cx, yy);
+      ctx.scale(1.06, 1.06);
+      ctx.translate(-cx, -yy);
+    }
+    if (layer.kind === 'stroke') {
+      if (layer.hlColor) ctx.strokeStyle = r.hl ? layer.hlColor : layer.color; // 강조 단어만 다른 빛무리 색
+      ctx.strokeText(txt, xx, yy);
+    } else if (layer.kind === 'shadow') {
+      ctx.fillStyle = layer.hlColor && r.hl ? layer.hlColor : layer.color;
+      ctx.fillText(txt, xx + layer.dx, yy + layer.dy);
+    } else {
+      ctx.fillStyle = colorOf(r, st, lineFill);
+      ctx.fillText(txt, xx, yy);
+      if (cur) ctx.fillRect(xx, yy + size * 0.5, r.w, Math.max(2, size * 0.08));
+    }
+    if (cur) ctx.restore();
+  };
+
+  for (const layer of layers) {
+    if (layer.kind === 'stroke') {
+      ctx.strokeStyle = layer.color;
+      ctx.lineWidth = layer.width;
+    }
+    for (let i = 0; i < lines.length; i++) {
+      const ln = lines[i];
+      if (!ln.runs.length) continue;
+      const y = lineY(i);
+      let x = lineX(ln);
+      const lineFill = layer.kind === 'fill' && style === 'gradient' ? lineGrad(y) : null;
+      for (const r of ln.runs) {
+        if (!r.ws) {
+          const st = stateOf(r, i, ln);
+          if (st.alpha > 0) {
+            if (st.alpha !== 1) ctx.globalAlpha = baseAlpha * st.alpha;
+            drawPiece(r, st, x, y, layer, lineFill);
+            if (st.alpha !== 1) ctx.globalAlpha = baseAlpha;
+          }
+        }
+        x += r.w;
+      }
+    }
   }
   ctx.restore();
 }
@@ -787,15 +1039,31 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
   ctx.restore();
 }
 
-/** 자막 모양 옵션(색·스타일)을 배경에 맞게 정리합니다. */
+/**
+ * 자막 모양 옵션(색·스타일)을 배경에 맞게 정리합니다. bg=자막이 놓이는 면의 색, overPhoto=사진 위인지.
+ * 모르는 captionStyle 은 outline. bubble 은 댓글 장식(overlay=comment)과 겹치지 않게 plain 으로 내립니다.
+ */
 function captionLook(p, bg, overPhoto) {
+  let style = CAPTION_STYLE_SET.has(p.captionStyle) ? p.captionStyle : 'outline';
+  if (style === 'bubble' && p.overlay === 'comment') style = 'plain';
+  const brightBg = !overPhoto && isBright(bg);
   let color = overPhoto ? p.textColor : onColor(bg, p);
   let hl = p.highlightColor;
-  let style = p.captionStyle || 'outline';
-  if (style === 'box') color = isBright(p.textColor) ? p.textColor : '#ffffff';
-  if (style === 'pill') { color = isBright(p.highlightColor) ? p.inkColor : (isBright(p.textColor) ? p.textColor : '#ffffff'); hl = color; }
-  return { color, hl, style, shadow: !isBright(color), pillColor: p.highlightColor };
+  const brightText = isBright(p.textColor) ? p.textColor : '#ffffff'; // 어두운 면 위에 쓸 밝은 글자색
+  const onAccent = isBright(p.highlightColor) ? p.inkColor : brightText; // 강조색 면 위 글자색
+  let shadow = !isBright(color);
+  let chipColor;
+  if (style === 'box') color = brightText;
+  else if (style === 'pill' || style === 'marker') { color = onAccent; hl = color; } // 강조색 면 위라 강조 단어도 같은 색
+  else if (style === 'neon') { color = brightBg ? p.inkColor : '#ffffff'; shadow = overPhoto; } // 빛무리는 highlightColor, 사진 위에선 가는 검은 테두리
+  else if (style === 'glass') { color = brightBg ? p.inkColor : '#ffffff'; if (brightBg && isBright(hl)) hl = p.inkColor; }
+  else if (style === 'tag') { color = '#ffffff'; chipColor = overPhoto ? 'rgba(0,0,0,0.62)' : brightBg ? 'rgba(0,0,0,0.72)' : 'rgba(255,255,255,0.16)'; }
+  else if (style === 'bubble') { color = p.inkColor; if (isBright(hl)) hl = p.inkColor; } // 흰 말풍선 위
+  // shadow3d · underline · gradient 는 글자색을 plain 처럼 배경 밝기로 고르고, 그림자·밑줄·그라데이션 끝은 accent 를 씁니다
+  return { color, hl, style, shadow, pillColor: p.highlightColor, accent: p.highlightColor, ink: p.inkColor, brightBg, chipColor };
 }
+/** 훅 배경·사진 없는 장면처럼 큰 글자를 가운데 놓는 자리에서도 유지하는 자막 모양(outline·box 는 plain 으로 단순화) */
+const KEEP_STYLES = new Set(['pill', 'neon', 'shadow3d', 'marker', 'glass', 'tag', 'underline', 'gradient', 'bubble']);
 
 function drawCaption(ctx, p, L, seg, alpha, t, adj) {
   if (seg.kind !== 'scene') return;
@@ -819,16 +1087,17 @@ function drawCaption(ctx, p, L, seg, alpha, t, adj) {
     // 훅 배경(틴트 사진) 위: 자막 자리는 bandColor 이므로 그 밝기로 글자색을 고릅니다
     const look = captionLook(p, p.bandColor, false);
     box = L.hook;
-    o = { ...look, size: p.captionSize * 1.4 * u, valign: 'center', maxLines: 5, style: look.style === 'pill' ? 'pill' : 'plain', shadow: isBright(look.color) };
+    o = { ...look, size: p.captionSize * 1.4 * u, valign: 'center', maxLines: 5, style: KEEP_STYLES.has(look.style) ? look.style : 'plain', shadow: isBright(look.color) };
   } else if (!scene.img && tpl !== 'dark') {
     // 사진 없는 장면: split 은 패널색 위(글자색은 패널 기준), 그 밖은 남색 도면 패널 위 흰 글자. 가운데 크게
     box = noImgBox(p, L);
     const bg = tpl === 'split' ? p.panelColor : null;
     o = {
       size: p.captionSize * (tpl === 'card' ? 1.1 : 1.25) * u, color: bg ? onColor(bg, p) : '#ffffff', hl: p.highlightColor,
-      style: p.captionStyle === 'pill' ? 'pill' : 'plain', valign: 'center', maxLines: 5, align: tpl === 'split' ? 'left' : 'center',
+      style: 'plain', valign: 'center', maxLines: 5, align: tpl === 'split' ? 'left' : 'center',
     };
-    if (o.style === 'pill') Object.assign(o, captionLook(p, bg || '#000', false));
+    const look = captionLook(p, bg || '#000', false);
+    if (KEEP_STYLES.has(look.style)) Object.assign(o, look);
   } else if (tpl === 'split') {
     box = L.cap;
     o = { ...captionLook(p, p.panelColor, false), size: p.captionSize * 1.12 * u, align: 'left', valign: 'top', maxLines: 4 };
