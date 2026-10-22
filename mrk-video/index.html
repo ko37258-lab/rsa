@@ -397,9 +397,9 @@
                     <input type="password" id="ttsKey" autocomplete="off" spellcheck="false" placeholder="각 서비스에서 발급한 키">
                   </label>
                   <label class="field check span2"><input type="checkbox" id="ttsRemember"><span>API 키를 이 브라우저에 기억</span></label>
-                  <div class="field" id="ttsVoiceField"><span id="l-ttsVoice">목소리</span>
+                  <label class="field" id="ttsVoiceField" for="ttsVoice"><span id="l-ttsVoice">목소리</span>
                     <select id="ttsVoice" aria-labelledby="l-ttsVoice"></select>
-                  </div>
+                  </label>
                   <label class="field" id="ttsModelField" hidden><span>엔진</span>
                     <select id="ttsModel"></select>
                   </label>
@@ -409,6 +409,7 @@
                   </label>
                   <label class="field span2"><span>대본 (한 줄씩 이어 읽음)</span>
                     <textarea id="ttsText" rows="4" maxlength="3000" placeholder="장면 자막이 자동으로 들어옵니다. 고쳐도 됩니다."></textarea>
+                    <small class="hint" id="ttsDiffHint" hidden>장면 자막과 다릅니다. "대본 다시 가져오기"를 누르면 자막대로 맞춰집니다.</small>
                   </label>
                 </div>
                 <div class="row wrap">
@@ -717,7 +718,7 @@
     <section class="view prose" id="view-guide" data-view="guide" hidden>
       <header class="view-head"><div><p class="kicker">Guide</p><h1 data-kinetic>사용 *안내*</h1><p class="lede">이 화면에서 지금 쓸 수 있는 기능과 각 기능을 쓰는 순서입니다.</p></div></header>
       <section class="panel guide-video" id="guideVideo" hidden>
-        <div class="panel-head"><h2>사용법 영상</h2><span class="hint">1분 30초 · 소리를 켜고 보세요</span></div>
+        <div class="panel-head"><h2>사용법 영상</h2><span class="hint">약 1분 · 소리를 켜고 보세요</span></div>
         <video id="guideVideoEl" controls playsinline preload="metadata"></video>
       </section>
       <section class="panel">

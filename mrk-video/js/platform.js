@@ -149,11 +149,16 @@ export async function generateScript(params) {
  * body = { provider:'fish', key, voice, model, text, speed }. 서버는 키를 저장하지 않습니다.
  */
 export async function ttsRelay(body) {
-  const res = await fetch(API + 'tts', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-access-code': accessCode() },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(API + 'tts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-code': accessCode() },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error('음성 서버에 연결하지 못했습니다. 인터넷 연결을 확인하세요.');
+  }
   if (!res.ok) {
     const j = await res.json().catch(() => ({}));
     throw new Error(j.error || `음성 서버 오류 (${res.status})`);

@@ -78,6 +78,7 @@ const tts = { provider: 'gemini', voice: {}, model: 'drama-3', speed: 1, ...stor
 if (!tts.voice || typeof tts.voice !== 'object') tts.voice = {};
 let ttsResult = null; // 마지막으로 만든 음성 { blob, ext } — "파일로 저장" 용
 let ttsTextEdited = false; // 사용자가 대본 칸을 직접 고쳤으면 장면이 바뀌어도 덮어쓰지 않는다
+let ttsBusy = false; // '음성 만들기' 진행 중 — 그동안 영상 만들기·전부 만들기를 막는다(내레이션이 반만 들어가지 않게)
 
 function pickSettings(obj) {
   const out = {};
@@ -134,6 +135,7 @@ function applyLines(lines, hints = []) {
     }
   });
   if (project.scenes[0] && project.scenes[0].kind === 'normal') project.scenes[0].kind = 'hook';
+  ttsTextEdited = false; // 새 대본을 넣었으니 내레이션 대본 칸도 새 자막으로
   changed(true);
   toast(`대본 ${lines.length}줄을 장면 자막에 넣었습니다.`);
 }
@@ -293,7 +295,7 @@ function changed(structural) {
   draw();
   scheduleStripRender();
   $('#fitToNarr').disabled = !audio.narr || !project.scenes.length;
-  if (structural) syncTtsText(); // 장면이 바뀌면 내레이션 대본 칸도(사용자가 손대지 않았을 때만)
+  syncTtsText(); // 자막을 한 글자만 고쳐도 내레이션 대본 칸이 따라온다(사용자가 손댔으면 덮어쓰지 않고 '자막과 다름' 힌트만)
 }
 
 const refreshFonts = debounce(async () => { await ensureFonts(project); draw(); }, 250);
@@ -647,6 +649,7 @@ function applyStyle(st) {
     loadStyleSample(st).then((scenes) => {
       if (job !== styleJob) return;
       project.scenes = scenes;
+      ttsTextEdited = false; // 예시 장면으로 바뀌면 대본 칸도 새로
       if (st.sample.title) { project.title = st.sample.title; $('#title').value = project.title; }
       finish();
     });
@@ -745,6 +748,7 @@ async function useViral(v) {
 async function exportVideo() {
   if (exporting) { exporting.abort.abort(); return; }
   if (batch) return toast(`${batchLabel()}가 진행 중입니다. 먼저 멈춰 주세요.`);
+  if (ttsBusy) return toast('내레이션을 만드는 중입니다. 끝난 뒤 영상을 만들어 주세요.');
   if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
   stopPlayback();
   stopMusicPreview();
@@ -816,6 +820,7 @@ function videoFileName(ext = resultExt, suffix = '') {
 async function exportAllStyles() {
   if (batch) { batch.abort.abort(); return; }
   if (exporting) return toast('한 편 만들기가 진행 중입니다. 먼저 멈춰 주세요.');
+  if (ttsBusy) return toast('내레이션을 만드는 중입니다. 끝난 뒤 영상을 만들어 주세요.');
   if (!STYLES.length) return toast('스타일 데이터가 없습니다.');
   if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
   stopPlayback();
@@ -1037,6 +1042,7 @@ async function openProject(file) {
       },
     )));
     uploadInfo = data.uploadInfo || null;
+    ttsTextEdited = false; // 다른 프로젝트를 열었으니 대본 칸도 그 자막으로
     syncControls();
     renderUploadInfo();
     sizePreview();
@@ -1094,21 +1100,42 @@ async function runAI() {
 const ttsProvider = () => providerOf(tts.provider);
 const saveTts = () => store.set('tts', tts);
 
-/** 장면 자막을 별표 없는 글로 한 줄씩 대본 칸에 넣습니다. 사용자가 손댄 뒤에는 force 일 때만 덮어씁니다. */
-function syncTtsText(force = false) {
-  const ta = $('#ttsText');
-  if (!ta || (ttsTextEdited && !force)) return;
-  ta.value = project.scenes
+/** 장면 자막을 별표 없는 글로 한 줄씩 이어 붙인 것 — 대본 칸의 기본값. */
+function scenesScript() {
+  return project.scenes
     .map((s) => plainText(s.caption).replace(/\s*\n\s*/g, ' ').trim())
     .filter(Boolean)
     .join('\n');
+}
+
+/** 대본 칸이 지금 장면 자막과 다르면 '장면 자막과 다릅니다' 힌트를 보여 줍니다(손댄 대본으로 음성을 만들기 전에 알 수 있게). */
+function renderTtsDiff() {
+  const hint = $('#ttsDiffHint');
+  const ta = $('#ttsText');
+  if (!hint || !ta) return;
+  hint.hidden = ta.value.trim() === scenesScript().trim();
+}
+
+/** 장면 자막을 별표 없는 글로 한 줄씩 대본 칸에 넣습니다. 사용자가 손댄 뒤에는 force 일 때만 덮어쓰고, 아니면 힌트만 갱신합니다. */
+function syncTtsText(force = false) {
+  const ta = $('#ttsText');
+  if (!ta) return;
+  if (ttsTextEdited && !force) { renderTtsDiff(); return; }
+  const next = scenesScript();
+  if (ta.value !== next) ta.value = next;
   ttsTextEdited = false;
+  renderTtsDiff();
 }
 
 /** 상태 칸의 기본 안내 — 아티팩트(Claude 미리보기)·서버 없는 Fish Audio 는 미리 알려 줍니다. */
 function ttsNote() {
   const st = $('#ttsStatus');
-  if (inArtifact) { st.textContent = 'Claude 미리보기에서는 음성 생성이 안 됩니다. ko372.com 에서 써 주세요.'; return; }
+  if (inArtifact) {
+    st.textContent = 'Claude 미리보기에서는 음성 생성이 안 됩니다. ko372.com 에서 써 주세요.';
+    $('#ttsRun').disabled = true; // 쓸 수 없는 키를 넣게 이끌지 않도록 버튼과 키 칸을 잠근다
+    $('#ttsKey').disabled = true;
+    return;
+  }
   st.textContent = '';
   if (ttsProvider().id !== 'fish') return;
   serverInfo().then((info) => {
@@ -1175,6 +1202,7 @@ async function runTts() {
   const st = $('#ttsStatus');
   const btn = $('#ttsRun');
   if (btn.disabled) return;
+  if (inArtifact) { st.textContent = 'Claude 미리보기에서는 음성 생성이 안 됩니다. ko372.com 에서 써 주세요.'; return; } // 키 검사보다 먼저(키를 넣으라고 이끌지 않게)
   if (exporting || batch) return toast('영상을 만드는 중에는 내레이션을 만들 수 없습니다. 먼저 멈춰 주세요.');
   const key = $('#ttsKey').value.trim();
   const voice = $('#ttsVoice').value.trim();
@@ -1184,10 +1212,12 @@ async function runTts() {
   if (!text) { st.textContent = '대본이 비어 있습니다. "대본 다시 가져오기"를 누르거나 직접 적어 주세요.'; $('#ttsText').focus(); return; }
   if (text.length > MAX_TEXT) { st.textContent = `대본이 너무 깁니다 (${text.length.toLocaleString()}자). ${MAX_TEXT.toLocaleString()}자 이하로 줄여 주세요.`; return; }
   btn.disabled = true;
+  ttsBusy = true;
   $('#ttsSave').hidden = true;
   st.textContent = '만드는 중… (10~40초)';
   try {
-    const { blob, mime } = await synthesize({ provider: p.id, key, voice, model: tts.model, text, speed: tts.speed });
+    // 엔진(model)은 Fish Audio 에만 있습니다. 제미나이·일레븐랩스는 tts.js 의 고정 모델을 씁니다.
+    const { blob, mime } = await synthesize({ provider: p.id, key, voice, model: p.models ? tts.model : undefined, text, speed: tts.speed });
     const buffer = await loadAudioFile(blob);
     audio.narr = { name: `내레이션 (${p.short})`, buffer, made: true };
     $('#narrFile').value = '';
@@ -1199,6 +1229,7 @@ async function runTts() {
   } catch (e) {
     st.textContent = e?.message || '음성을 만들지 못했습니다. 다시 시도하세요.';
   } finally {
+    ttsBusy = false;
     btn.disabled = false;
   }
 }
@@ -1214,7 +1245,7 @@ function wireTts() {
   speed.addEventListener('input', () => { tts.speed = Number(speed.value); showSpeed(); saveTts(); });
   $('#ttsKey').addEventListener('input', rememberTtsKey);
   $('#ttsRemember').addEventListener('change', rememberTtsKey);
-  $('#ttsText').addEventListener('input', () => { ttsTextEdited = true; });
+  $('#ttsText').addEventListener('input', () => { ttsTextEdited = true; renderTtsDiff(); });
   $('#ttsFromScenes').addEventListener('click', () => { syncTtsText(true); toast('장면 자막을 대본 칸에 다시 넣었습니다.'); });
   $('#ttsRun').addEventListener('click', runTts);
   $('#ttsSave').addEventListener('click', async () => {
@@ -1310,6 +1341,7 @@ export async function initShorts() {
   $('#clearScenes').addEventListener('click', () => {
     if (!project.scenes.length) return;
     project.scenes = [];
+    ttsTextEdited = false; // 대본 칸도 비운다
     changed(true);
     toast('장면을 모두 지웠습니다.');
   });
@@ -1329,7 +1361,9 @@ export async function initShorts() {
     const f = input.files?.[0];
     if (!f) return;
     try {
-      audio[slot] = { name: f.name, buffer: await loadAudioFile(f) };
+      const buffer = await loadAudioFile(f);
+      if (slot === 'narr' && audio.narr?.made) $('#ttsStatus').textContent = '올린 파일을 내레이션으로 씁니다. 만든 음성은 "파일로 저장"으로 남길 수 있습니다.';
+      audio[slot] = { name: f.name, buffer };
       renderAudioInfo();
     } catch {
       toast(`${f.name}: 소리 파일을 읽지 못했습니다. mp3·m4a·wav를 써 주세요.`);
@@ -1338,6 +1372,7 @@ export async function initShorts() {
   onAudio('bgm', $('#bgmFile'));
   onAudio('narr', $('#narrFile'));
   $('#clearAudio').addEventListener('click', () => {
+    if (audio.narr?.made) $('#ttsStatus').textContent = '내레이션을 뺐습니다. 만든 음성은 "파일로 저장"으로 남길 수 있습니다.';
     audio.bgm = null;
     audio.narr = null;
     $('#bgmFile').value = '';

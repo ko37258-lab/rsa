@@ -69,6 +69,8 @@ export async function synthesize({ provider, key, voice, model, text, speed = 1 
   voice = String(voice || '').trim();
   text = String(text || '').trim();
   if (!key) throw new Error(`${p.name} API 키를 넣어 주세요. (${p.keyHint})`);
+  // 복사하다 붙은 줄바꿈·전각·보이지 않는 글자는 fetch 가 '잘못된 헤더' 로 던져 연결 실패처럼 보이므로 먼저 걸러 준다
+  if (!/^[\x21-\x7E]+$/.test(key)) throw new Error('API 키에 허용되지 않는 글자(공백·한글·줄바꿈 등)가 있습니다. 키를 다시 복사해 넣으세요.');
   if (!voice) throw new Error(p.voiceLabel ? `${p.voiceLabel}를 넣어 주세요.` : '목소리를 골라 주세요.');
   if (!text) throw new Error('대본이 비어 있습니다. 장면 자막을 가져오거나 직접 적어 주세요.');
   if (text.length > MAX_TEXT) throw new Error(`대본이 너무 깁니다 (${text.length.toLocaleString()}자). ${MAX_TEXT.toLocaleString()}자 이하로 줄여 주세요.`);
@@ -76,19 +78,21 @@ export async function synthesize({ provider, key, voice, model, text, speed = 1 
   if (!Number.isFinite(speed)) speed = 1;
   speed = Math.min(SPEED_MAX, Math.max(SPEED_MIN, speed));
 
-  if (p.id === 'gemini') return gemini(p, { key, voice, model: model || p.model, text });
-  if (p.id === 'elevenlabs') return elevenlabs(p, { key, voice, model: model || p.model, text });
+  // 제미나이·일레븐랩스는 고정 모델을 씁니다(화면의 "엔진" 칸은 Fish Audio 전용이라 넘어온 model 은 무시).
+  if (p.id === 'gemini') return gemini(p, { key, voice, model: p.model, text });
+  if (p.id === 'elevenlabs') return elevenlabs(p, { key, voice, model: p.model, text });
   return fish(p, { key, voice, model, text, speed });
 }
 
 // ── 제미나이 ─────────────────────────────────────────
 async function gemini(p, { key, voice, model, text }) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  // 키는 URL(?key=)이 아니라 헤더로 보낸다 — 실패한 요청의 URL 은 콘솔·네트워크 탭·프록시 로그에 그대로 남기 때문
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   let res;
   try {
     res = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
         contents: [{ parts: [{ text }] }],
         generationConfig: {
@@ -148,7 +152,9 @@ async function elevenlabs(p, { key, voice, model, text }) {
     const st = String(detail?.status || '');
     if (res.status === 401) {
       if (/quota|limit/i.test(st)) throw new Error(`일레븐랩스 글자 수 한도가 부족합니다. ${msg}`.trim());
-      throw new Error('일레븐랩스 API 키가 맞지 않습니다. Profile → API Keys 에서 다시 확인하세요.');
+      if (st === 'detected_unusual_activity') throw new Error(`일레븐랩스가 무료 요금제 사용을 막았습니다(비정상 사용 감지). 유료 요금제가 필요합니다. ${msg}`.trim());
+      if (!st || st === 'invalid_api_key') throw new Error('일레븐랩스 API 키가 맞지 않습니다. Profile → API Keys 에서 다시 확인하세요.');
+      throw new Error(`일레븐랩스가 요청을 거절했습니다 (${st}). ${msg}`.trim());
     }
     if (res.status === 402) throw new Error(`일레븐랩스 크레딧이 부족합니다. ${msg}`.trim());
     if (res.status === 404 || res.status === 422) throw new Error(`Voice ID 또는 대본을 확인하세요. ${msg}`.trim());

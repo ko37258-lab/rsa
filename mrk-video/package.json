@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "python3 -m http.server 5173",
-    "check": "node --check api/ai.js && node --check api/proxy.js && node --check api/health.js && node --check api/youtube.js && node --check js/script-prompt.js",
+    "check": "node --check api/ai.js && node --check api/proxy.js && node --check api/health.js && node --check api/youtube.js && node --check api/tts.js && node --check js/script-prompt.js",
     "artifact": "node scripts/artifact-page.mjs"
   }
 }

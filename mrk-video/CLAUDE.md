@@ -10,6 +10,7 @@
 - 쇼츠 스타일 30가지는 `js/styles-data.js` 데이터다. 스타일을 추가하면 갤러리·"전부 만들기" 버튼·사례 화면에 자동으로 들어가고, 화면 문구의 숫자(`index.html`의 `<span data-style-count>` 자리표시 — `main.js`의 `fillStyleCount()`가 `STYLES.length`로 채움)도 따라 바뀐다. 숫자를 HTML·JS 에 직접 적지 말고 자리표시를 쓴다. README·CLAUDE.md·docs 같은 정적 문서의 숫자는 직접 고친다. 추가 후 `node tests/style-sheet.cjs`로 시트를 만들어 눈으로 확인한다.
 - 내보내기는 `js/export.js`(exportProject / exportStyles). 화면 움직임은 `js/motion.js`.
 - AI 대본 프롬프트·JSON 스키마는 `js/script-prompt.js` 한 곳. 브라우저(아티팩트)와 `api/ai.js`가 함께 import한다.
+- 내레이션 만들기(제미나이·일레븐랩스·Fish Audio)는 `js/tts.js`(PROVIDERS·synthesize). 제미나이·일레븐랩스는 브라우저가 직접 부르고, Fish Audio 만 `api/tts.js`가 중계한다(CORS). 사용자 API 키는 서버에 저장·기록하지 않고, 브라우저에는 "기억" 체크가 켜졌을 때만 `store 'ttsKeys'`에 남긴다. 설정은 `store 'tts'`(프로젝트 .json 에는 넣지 않음).
 - 환경 차이(Claude 아티팩트 vs 일반 웹)는 `js/platform.js`에서만 처리한다. 아티팩트에서는 `<a download>`와 외부 fetch가 막혀 있으므로 저장은 `saveBlob()`/`openSink()`만 쓴다.
 - 설정값은 `store`(localStorage, try/catch 처리)에 저장. 사진·소리는 저장하지 않는다(프로젝트 .json으로만).
 
