@@ -3,6 +3,7 @@ import { getSample } from "./ai/engine";
 import { DictateView, ENGINE_LABEL } from "./components/DictateView";
 import { DictionaryView } from "./components/DictionaryView";
 import { EditView } from "./components/EditView";
+import { GuideDialog } from "./components/GuideDialog";
 import { HandNote } from "./components/HandNote";
 import { HistoryView } from "./components/HistoryView";
 import { Segmented } from "./components/Segmented";
@@ -11,8 +12,8 @@ import { usePersistentState } from "./hooks/usePersistentState";
 import { DEFAULT_DICTIONARY, type Dictionary } from "./lib/dictionary";
 import { addToHistory, type HistoryItem } from "./lib/history";
 import { DOWNLOAD_PAGE_URL } from "./lib/desktop";
-import { DEFAULT_SETTINGS, resolveEngine, type Settings } from "./lib/settings";
-import { load } from "./lib/storage";
+import { DEFAULT_SETTINGS, resolveEngine, type EngineId, type Settings } from "./lib/settings";
+import { load, save } from "./lib/storage";
 
 type Tab = "dictate" | "edit" | "dictionary" | "history" | "settings";
 
@@ -24,6 +25,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "settings", label: "설정" },
 ];
 
+const ENGINE_SHORT: Record<EngineId, string> = { account: "Claude 계정", apikey: "Claude", gemini: "Gemini", local: "AI 없이" };
+
 export function App() {
   const [settings, setSettings] = usePersistentState<Settings>("settings", (s) => ({ ...DEFAULT_SETTINGS, ...s }));
   const [dictionary, setDictionary] = usePersistentState<Dictionary>("dictionary", (s) => s ?? DEFAULT_DICTIONARY);
@@ -33,6 +36,26 @@ export function App() {
   const [editSource, setEditSource] = useState("");
   const [accountAvailable, setAccountAvailable] = useState(false);
   const [checking, setChecking] = useState(() => typeof window !== "undefined" && !!window.claude);
+  // 사용법: 주소 끝에 #guide를 붙이면 바로 열립니다 (학생에게 보낼 때).
+  const [guideOpen, setGuideOpen] = useState(() => typeof window !== "undefined" && window.location.hash === "#guide");
+  const [guideSeen, setGuideSeen] = useState(() => load<boolean>("guideSeen") === true);
+  const openGuide = useCallback(() => {
+    setGuideOpen(true);
+    setGuideSeen(true);
+    save("guideSeen", true);
+    if (!__ARTIFACT__) window.history.replaceState(null, "", "#guide");
+  }, []);
+  useEffect(() => {
+    const onHash = () => {
+      if (window.location.hash === "#guide") setGuideOpen(true);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const closeGuide = useCallback(() => {
+    setGuideOpen(false);
+    if (!__ARTIFACT__ && window.location.hash === "#guide") window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -74,6 +97,13 @@ export function App() {
           </span>
         </div>
         <div className="nav__actions">
+          <button type="button" className={`guide-btn${guideSeen ? "" : " is-new"}`} onClick={openGuide} aria-haspopup="dialog">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="10" cy="10" r="7.5" />
+              <path d="M7.9 7.6a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.4M10 14.2v.1" />
+            </svg>
+            사용법
+          </button>
           <a
             className="pc-link"
             href={DOWNLOAD_PAGE_URL}
@@ -89,7 +119,10 @@ export function App() {
           </a>
           <button type="button" className={`engine-pill is-${engine}`} onClick={() => setTab("settings")}>
             <span className="engine-pill__dot" aria-hidden="true" />
-            {checking ? "연결 확인 중" : ENGINE_LABEL[engine]}
+            <span className="engine-pill__full">{checking ? "연결 확인 중" : ENGINE_LABEL[engine]}</span>
+            <span className="engine-pill__short" aria-hidden="true">
+              {checking ? "확인 중" : ENGINE_SHORT[engine]}
+            </span>
           </button>
         </div>
       </header>
@@ -99,6 +132,9 @@ export function App() {
           말하면, <span className="hero__accent">정리된 글</span>이 됩니다
         </h1>
         <p className="hero__sub">"음, 어"는 걷어내고, 말을 바꾼 곳은 마지막 뜻만 남겨 바로 붙여넣을 글로 만들어 드립니다.</p>
+        <button type="button" className="hero__guide" onClick={openGuide}>
+          무엇을 누르면 녹음되고, AI가 어떻게 정리하는지 보기 →
+        </button>
         <HandNote text="부동산공법 용어도 알아들어요" className="hero__note" />
       </section>
 
@@ -157,6 +193,8 @@ export function App() {
           <SettingsView settings={settings} onSettings={patchSettings} engine={engine} accountAvailable={accountAvailable} />
         </div>
       </main>
+
+      <GuideDialog open={guideOpen} onClose={closeGuide} />
 
       <footer className="foot">
         <span>Typeless를 분석해 만든 MR.K 전용 받아쓰기</span>

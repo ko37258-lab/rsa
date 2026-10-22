@@ -2248,6 +2248,636 @@ textarea:focus {
   }
 }
 
+/* ---------- 사용법 ---------- */
+
+.guide-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.guide-btn:hover {
+  background: var(--primary-soft);
+  color: var(--primary-text);
+}
+
+.guide-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+/* 아직 사용법을 안 열어 봤으면 작은 점이 숨 쉬듯 깜박입니다 */
+.guide-btn.is-new::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rec);
+  box-shadow: 0 0 0 2px var(--canvas);
+  animation: cmp-blink 1.4s ease-in-out infinite;
+}
+
+.engine-pill__short {
+  display: none;
+}
+
+.hero__guide {
+  margin-top: 14px;
+  border: 0;
+  background: none;
+  padding: 4px 2px;
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--primary-text);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--primary-line);
+  text-underline-offset: 4px;
+  transition: text-decoration-color 0.2s;
+}
+
+.hero__guide:hover {
+  text-decoration-color: currentColor;
+}
+
+.guide {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(86vh, 900px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 60px -12px rgba(13, 19, 27, 0.35);
+  overflow: hidden;
+}
+
+.guide[open] {
+  display: flex;
+  animation: guide-in 0.42s var(--spring);
+}
+
+.guide::backdrop {
+  background: rgba(13, 19, 27, 0.42);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.25s ease-out;
+}
+
+.guide__panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+.guide__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 22px 12px;
+}
+
+.guide__eyebrow {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--primary-text);
+  transform: rotate(-2deg);
+  transform-origin: left;
+}
+
+.guide__title {
+  margin: 4px 0 0;
+  font-size: var(--step-2);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.guide__toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 22px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.guide__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 22px 26px;
+  display: grid;
+  gap: 8px;
+}
+
+.gsec {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  scroll-margin-top: 8px;
+}
+
+.gsec + .gsec {
+  border-top: 1px dashed var(--line-strong);
+  margin-top: 10px;
+  padding-top: 22px;
+}
+
+.gsec__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--step-1);
+  font-weight: 800;
+}
+
+.gsec__num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  font-size: var(--step--1);
+  color: #fff;
+  background: linear-gradient(180deg, var(--primary), var(--primary-deep));
+  box-shadow: var(--shadow-primary);
+}
+
+.gsec__lead,
+.gsec__note {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.gsec__note {
+  font-size: var(--step--1);
+}
+
+.gsec__subtitle {
+  margin: 4px 0 0;
+  font-weight: 700;
+}
+
+.gcards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gcard {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+
+.gcard__title {
+  margin: 4px 0 0;
+  font-weight: 800;
+}
+
+.gcard__desc {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--step--1);
+  line-height: 1.7;
+}
+
+.gmic {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, var(--primary), var(--primary-deep));
+  box-shadow: var(--shadow-primary);
+}
+
+.gmic svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.gmic rect {
+  fill: #fff;
+  stroke: none;
+}
+
+.gmic.is-live {
+  background: linear-gradient(180deg, #ff6b6b, var(--rec-deep));
+}
+
+.gmic.is-live::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid var(--rec);
+  animation: ring 1.4s ease-out infinite;
+}
+
+.gstates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: var(--step--1);
+  color: var(--text);
+}
+
+.gstates li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.gstates b {
+  color: var(--ink);
+  margin-right: 4px;
+}
+
+.gdot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--primary);
+  transform: translateY(-1px);
+}
+
+.gdot--rec {
+  background: var(--rec);
+  animation: cmp-blink 0.9s ease-in-out infinite;
+}
+
+.gdot--work {
+  background: #f0b443;
+}
+
+.gbox {
+  border-radius: var(--r-lg);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px var(--primary-soft-2);
+  padding: 12px 16px;
+  font-size: var(--step--1);
+}
+
+.gbox__title {
+  margin: 0 0 6px;
+  font-weight: 800;
+  color: var(--primary-text);
+}
+
+.gbox ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+
+.gflow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.gflow__step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
+/* 단계 사이를 잇는 선이 위에서 아래로 그려집니다 */
+.gflow__step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 30px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--primary-line);
+  transform-origin: top;
+  animation: grow-down 0.5s var(--ease-out) both;
+  animation-delay: calc(var(--n, 0) * 120ms + 200ms);
+}
+
+.gflow__step:nth-child(2) {
+  --n: 1;
+}
+
+.gflow__step:nth-child(3) {
+  --n: 2;
+}
+
+.gflow__num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1.5px solid var(--primary);
+  color: var(--primary-text);
+  font-weight: 800;
+}
+
+.gflow__step--ai .gflow__num {
+  background: var(--primary);
+  color: #fff;
+}
+
+.gflow__title {
+  margin: 4px 0 2px;
+  font-weight: 800;
+}
+
+.gflow__desc {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--step--1);
+  line-height: 1.65;
+}
+
+.gflow__list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+  color: var(--text);
+  font-size: var(--step--1);
+  line-height: 1.6;
+}
+
+.gexample {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.gexample > div {
+  display: grid;
+  gap: 6px;
+}
+
+.gexample__label {
+  font-family: var(--font-hand);
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--primary-text);
+}
+
+.gexample__arrow {
+  font-size: 1.4rem;
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.gexample__result {
+  margin: 0;
+  white-space: pre-wrap;
+  border: 1px solid var(--primary-line);
+  border-radius: var(--r);
+  background: var(--surface);
+  padding: 12px 14px;
+  line-height: 1.85;
+  animation: rise 0.6s 1.9s var(--ease-out) both;
+}
+
+.gmodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  font-size: var(--step--1);
+}
+
+.gmodes li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.gmodes b {
+  flex: none;
+  white-space: nowrap;
+}
+
+.gmodes span {
+  color: var(--text);
+}
+
+.gbtns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: var(--step--1);
+  color: var(--text);
+}
+
+.gbtns li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gbtn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gbtn--primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--primary), var(--primary-deep));
+  color: #fff;
+}
+
+.gtabs {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.gtabs div {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 10px;
+  font-size: var(--step--1);
+}
+
+.gtabs dt {
+  font-weight: 800;
+}
+
+.gtabs dd {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.gkeys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: var(--step--1);
+  color: var(--text);
+}
+
+.gkeys li {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.gpc {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--primary-line);
+  background: var(--primary-soft);
+  color: var(--ink-2);
+  font-size: var(--step--1);
+  line-height: 1.6;
+  text-decoration: none;
+  transition: transform 0.4s var(--spring);
+}
+
+.gpc:hover {
+  transform: translateY(-2px);
+}
+
+.gpc__go {
+  flex: none;
+  font-weight: 800;
+  color: var(--primary-text);
+}
+
+@keyframes guide-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+}
+
+@keyframes grow-down {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@media (max-width: 760px) {
+  .gcards,
+  .gmodes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gexample {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gexample__arrow {
+    transform: rotate(90deg);
+    justify-self: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .guide {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 92vh;
+    margin: auto 0 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+  }
+
+  .guide__head,
+  .guide__toc,
+  .guide__body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .guide-btn {
+    padding: 0 8px;
+  }
+
+  .engine-pill__full {
+    display: none;
+  }
+
+  .engine-pill__short {
+    display: inline;
+  }
+
+  .gkeys li,
+  .gtabs div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

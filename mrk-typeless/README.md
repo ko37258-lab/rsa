@@ -8,6 +8,7 @@ AI 받아쓰기 앱 [Typeless](https://www.typeless.com/)의 기능을 분석해
 ---
 
 > **어느 창에서든 바로 입력되는 Windows 프로그램**은 [`desktop/`](../desktop/)에 있습니다. Win+H를 누르고 말하면 정리된 글이 쓰던 창에 바로 들어갑니다.
+> 웹앱 사용법(녹음 켜고 끄기, AI 정리 순서, 버튼·메뉴·단축키)은 화면 위쪽 **사용법** 버튼으로 열고, 주소 끝에 `#guide`를 붙이면 바로 열립니다 ([mrk-typeless.vercel.app/#guide](https://mrk-typeless.vercel.app/#guide)).
 > 학생에게는 내려받기·설치 안내 페이지 **[mrk-typeless.vercel.app/download](https://mrk-typeless.vercel.app/download)** 를 보내면 됩니다 (`download.html`, `src/components/DownloadPage.tsx`).
 
 ---
