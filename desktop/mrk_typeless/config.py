@@ -149,26 +149,10 @@ def load_dictionary() -> tuple[dict, str | None]:
 
 
 def same_hotkey(a: str, b: str) -> bool:
-    """'win+h'와 'windows+h'처럼 적는 법만 다른 단축키를 같은 것으로 봅니다."""
-    try:
-        import keyboard
+    """'win+h'와 'windows+h', 'h+windows'처럼 적는 법만 다른 단축키를 같은 것으로 봅니다."""
+    from .hotkeys import same_combo
 
-        # parse_hotkey는 적은 순서대로 돌려주므로, 한 단계 안의 키는 정렬해서 견줍니다 ('h+windows' == 'windows+h').
-        def canon(combo: str):
-            steps = []
-            for step in keyboard.parse_hotkey(combo):
-                keys = [tuple(sorted(k)) if isinstance(k, (list, tuple)) else (k,) for k in step]
-                steps.append(tuple(sorted(keys)))
-            return tuple(steps)
-
-        return canon(a) == canon(b)
-    except Exception:  # noqa: BLE001 - keyboard를 쓸 수 없는 환경(테스트)에서는 글자로 비교
-
-        def norm(combo: str) -> str:
-            keys = (k.strip().lower() for k in combo.split("+"))
-            return "+".join(sorted("windows" if k in ("win", "windows", "super", "cmd") else k for k in keys))
-
-        return norm(a) == norm(b)
+    return same_combo(a, b)
 
 
 def append_history(entry: dict, cfg: dict | None = None) -> None:

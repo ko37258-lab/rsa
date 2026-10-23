@@ -345,7 +345,7 @@ class SettingsWindow:
         win.focus_force()
 
     def _save(self) -> None:
-        import keyboard
+        from .hotkeys import HotkeyError, parse_combo
 
         hotkeys = {
             "hotkey_dictate": self.hk_dictate.get().strip().lower(),
@@ -354,12 +354,17 @@ class SettingsWindow:
         }
         for combo in hotkeys.values():
             try:
-                keyboard.parse_hotkey(combo)
-            except ValueError:
-                messagebox.showerror("단축키 확인", f"'{combo}'는 쓸 수 없는 단축키입니다. 예: ctrl+shift+space", parent=self.win)
+                parse_combo(combo)
+            except HotkeyError as e:
+                messagebox.showerror("단축키 확인", f"'{combo}'는 쓸 수 없는 단축키입니다. {e}", parent=self.win)
                 return
-        if len(set(hotkeys.values())) < 3:
+        parsed = [parse_combo(c) for c in hotkeys.values()]
+        if len(set(parsed)) < 3:
             messagebox.showerror("단축키 확인", "세 단축키는 서로 달라야 합니다.", parent=self.win)
+            return
+        mode_keys = {parse_combo(f"ctrl+alt+{i}") for i in range(1, 8)}
+        if any(c in mode_keys for c in parsed):
+            messagebox.showerror("단축키 확인", "Ctrl+Alt+1~7은 글 형식 바꾸기에 쓰입니다. 다른 단축키를 적어 주세요.", parent=self.win)
             return
         if bool(self.win_h.get()) and any(same_hotkey(c, "windows+h") for c in hotkeys.values()):
             messagebox.showerror("단축키 확인", "Win+H는 이미 '말해서 입력'에 쓰이고 있습니다. 다른 단축키를 적거나 Win+H 옵션을 꺼 주세요.", parent=self.win)

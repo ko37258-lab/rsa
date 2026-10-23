@@ -184,7 +184,7 @@ def test_user_hotkey_equal_to_win_h_is_registered_once(app, monkeypatch):
     monkeypatch.setitem(sys.modules, "keyboard", kb)
     app.cfg.update({"win_h": True, "hotkey_dictate": "win+h"})
     app.register_hotkeys()
-    assert [c for c, _, _ in kb.hotkeys].count("windows+h") + [c for c, _, _ in kb.hotkeys].count("win+h") == 1
+    assert [str(b.combo) for b in app.hotkeys.bindings].count("windows+h") == 1
 
 
 def test_missing_stt_key_opens_settings(app):
@@ -272,22 +272,31 @@ def test_edit_needs_an_ai_key(app):
 class FakeKeyboard(types.ModuleType):
     def __init__(self):
         super().__init__("keyboard")
-        self.hotkeys, self.releases = [], []
+        self.hooks, self.press_keys, self.legacy_hotkeys = [], [], []
 
     def unhook_all(self):
-        self.hotkeys.clear()
+        self.hooks.clear()
 
-    def add_hotkey(self, combo, callback, args=(), suppress=False):
-        self.hotkeys.append((combo, args, suppress))
-
-    def on_release_key(self, key, callback):
-        self.releases.append(key)
+    def hook(self, callback, suppress=False):
+        self.hooks.append((callback, suppress))
 
     def on_press_key(self, key, callback):
-        pass
+        self.press_keys.append(key)
 
-    def parse_hotkey(self, combo):
-        return tuple(sorted(k.strip().lower().replace("windows", "win") for k in combo.split("+")))
+    def key_to_scan_codes(self, key):
+        return (sum(map(ord, key)),)
+
+    # 예전 방식(보조키를 삼켰다가 다시 보냄)은 한/영 키를 망가뜨리므로 쓰면 안 됩니다.
+    def add_hotkey(self, *a, **k):
+        self.legacy_hotkeys.append(a)
+
+    def on_release_key(self, *a, **k):
+        self.legacy_hotkeys.append(a)
+
+
+def registered(app):
+    """register_hotkeys가 건 단축키: {'ctrl+shift+space': Binding, ...}"""
+    return {str(b.combo): b for b in app.hotkeys.bindings}
 
 
 @pytest.mark.parametrize("win_h", [True, False])
@@ -296,11 +305,12 @@ def test_win_h_hotkey_follows_setting(app, monkeypatch, win_h):
     monkeypatch.setitem(sys.modules, "keyboard", kb)
     app.cfg["win_h"] = win_h
     app.register_hotkeys()
-    combos = {combo: (args, suppress) for combo, args, suppress in kb.hotkeys}
+    combos = registered(app)
     assert ("windows+h" in combos) is win_h
-    if win_h:
-        assert combos["windows+h"] == (("dictate", "winh"), True) and "h" in kb.releases
-    assert combos["ctrl+shift+space"] == (("dictate", "dictate"), True)
+    assert "ctrl+shift+space" in combos and combos["ctrl+shift+space"].on_release is not None
+    # 한 개의 훅이 모든 키를 먼저 보고 막을지 정하며, 보조키를 삼키는 add_hotkey는 쓰지 않습니다
+    assert len(kb.hooks) == 1 and kb.hooks[0][1] is True and kb.legacy_hotkeys == []
+    assert "esc" in kb.press_keys
 
 
 def test_polish_failure_keeps_transcript_in_clipboard(app, monkeypatch):
@@ -323,7 +333,8 @@ def test_mode_hotkeys_registered(app, monkeypatch):
     kb = FakeKeyboard()
     monkeypatch.setitem(sys.modules, "keyboard", kb)
     app.register_hotkeys()
-    assert [c for c, _, _ in kb.hotkeys if c.startswith("ctrl+alt+")] [:7] == [f"ctrl+alt+{i}" for i in range(1, 8)] or sum(c.startswith("ctrl+alt+") and c[-1].isdigit() for c, _, _ in kb.hotkeys) == 7
+    combos = registered(app)
+    assert all(f"ctrl+alt+{i}" in combos for i in range(1, 8))
 
 
 def _run_dictation(app):
@@ -390,3 +401,36 @@ def test_stt_busy_does_not_switch(app, monkeypatch):
     _run_dictation(app)
     assert calls == ["elevenlabs"]
     assert "_switch_stt_to_gemini" not in app.posted
+
+
+def test_hotkeys_drive_recording_without_touching_hangul_key(app, monkeypatch):
+    """실제 훅 경로: Ctrl+Shift+Space를 누르고 떼면 녹음이 시작·끝나고, 한/영 키(오른쪽 Alt 스캔 코드)는 그대로 지나갑니다."""
+    from mrk_typeless import hotkeys
+
+    kb = FakeKeyboard()
+    monkeypatch.setitem(sys.modules, "keyboard", kb)
+    held = {"mods": frozenset()}
+    masks = []
+    monkeypatch.setattr(hotkeys, "held_modifiers", lambda: held["mods"])
+    monkeypatch.setattr(hotkeys, "send_mask_key", lambda: masks.append(1))
+    app.register_hotkeys()
+    handle = kb.hooks[0][0]
+    space = kb.key_to_scan_codes("space")[0]
+
+    class Ev:
+        def __init__(self, t, code):
+            self.event_type, self.scan_code = t, code
+
+    # 한/영 키: 오른쪽 Alt와 같은 스캔 코드 0x38. 누르든 떼든 막지 않습니다
+    assert handle(Ev("down", 0x38)) is True and handle(Ev("up", 0x38)) is True
+    # 그냥 Space는 글자 입력이므로 그대로
+    assert handle(Ev("down", space)) is True and handle(Ev("up", space)) is True
+    assert app.state == "idle" and masks == []
+    # Ctrl+Shift+Space를 누른 채 말하기
+    held["mods"] = frozenset({"ctrl", "shift"})
+    assert handle(Ev("down", space)) is False
+    assert app.state == "recording" and masks == [1]
+    app._pressed_at -= 1.0
+    assert handle(Ev("up", space)) is False
+    wait_idle(app)
+    assert app.pasted

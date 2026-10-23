@@ -53,6 +53,7 @@ class Tray:
             pystray.MenuItem("사전 고치기 (메모장)", self._action(app.open_dictionary)),
             pystray.MenuItem("기록 폴더 열기", self._action(app.open_folder)),
             pystray.MenuItem("기록 지우기…", self._action(app.clear_history)),
+            pystray.MenuItem("한/영 키가 안 될 때 (키보드 상태 풀기)", self._action(app.reset_keyboard)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 lambda _item: f"새 버전 {app.newer_version} 받기…",
