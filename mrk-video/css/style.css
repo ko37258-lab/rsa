@@ -591,18 +591,20 @@ input[type="file"]::file-selector-button:hover { border-color: var(--accent); }
   .nav a[aria-current="page"] { background: var(--accent-soft); }
   .nav-k { display: none; }
   .side-foot { display: none; }
-  /* 회원 표시는 브랜드 오른쪽에 두 줄로 작게(배지 위·라벨 아래, 나가기는 옆) — 메뉴 줄 높이를 늘리지 않게 */
+  /* 회원 표시는 브랜드 오른쪽에 두 줄로 작게(배지 위·라벨 아래, 나가기는 옆) — 메뉴 줄 높이를 늘리지 않게.
+     브랜드 옆 남은 폭을 채우고(flex-grow), 기수 라벨 길이는 줄바꿈 판단에서 뺀다(contain) → 배지·나가기만 들어가면 브랜드 옆에 두고 긴 라벨은 말줄임 */
   .member-bar {
-    margin: 0 0 0 auto; flex: 0 1 auto;
-    display: grid; grid-template-columns: minmax(0, auto) auto; grid-template-areas: "badge out" "label out";
+    margin: 0; flex: 1 1 auto; min-width: 0;
+    display: grid; grid-template-columns: minmax(auto, 1fr) auto; grid-template-areas: "badge out" "label out";
     align-items: center; justify-items: end; column-gap: 8px; row-gap: 2px;
   }
   .member-badge { grid-area: badge; padding: 2px 7px 2px 6px; font-size: 10.5px; }
-  .member-label { grid-area: label; max-width: 100%; font-size: 12px; }
+  .member-label { grid-area: label; justify-self: stretch; text-align: right; font-size: 12px; contain: inline-size; }
   .member-bar:has(.member-label[hidden]) .member-badge { grid-row: 1 / span 2; } /* 라벨이 없으면 배지를 가운데로 */
   .member-bar .btn.member-out { grid-area: out; margin: 0; min-height: 36px; padding: 0 10px; }
-  /* 위에 붙은 메뉴(약 105px) 아래로 사례 카드 제목이 들어가지 않게 */
-  .case { scroll-margin-top: calc(118px + env(safe-area-inset-top, 0px)); }
+  .member-bar:has(.member-out[hidden]) { column-gap: 0; } /* 관리자(Google 로그인)는 나가기 없음 */
+  /* 위에 붙은 메뉴 줄 아래로 사례 카드 제목이 들어가지 않게 — 메뉴 줄 실제 높이(--side-h)는 main.js trackSideHeight() 가 잼(못 재면 105px) */
+  .case { scroll-margin-top: calc(var(--side-h, 105px) + 13px + env(safe-area-inset-top, 0px)); }
   /* 손가락으로 누르는 크기 */
   .btn.small, .plat .btn { min-height: 36px; padding-block: 9px; }
   .scene-tools .btn { width: 36px; height: 34px; }
@@ -627,6 +629,14 @@ input[type="file"]::file-selector-button:hover { border-color: var(--accent); }
   .grid2, .grid3 { grid-template-columns: minmax(0, 1fr); }
   .span2 { grid-column: auto; }
   .io-pair { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 360px) {
+  /* 아주 좁은 폰(320~360px)에서도 회원 표시가 브랜드 옆 한 줄에 들어가게 브랜드·나가기를 조금 줄임(나가기 높이 36px 는 그대로) */
+  .brand { gap: 8px; }
+  .brand-mark { width: 32px; height: 32px; border-radius: 9px; font-size: 19px; }
+  .brand-text { font-size: 16px; }
+  .member-bar { column-gap: 6px; }
+  .member-bar .btn.member-out { padding: 0 8px; font-size: 11.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .progress i { transition: none; }

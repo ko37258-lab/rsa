@@ -10,5 +10,6 @@ export default function handler(req, res) {
     tts: true, // Fish Audio 내레이션 중계(api/tts) — 서버가 있으면 전달 가능(키는 사용자가 넣음)
     gate: false, // 회원 입장 게이트 없음(단독 배포). ko372.com 은 lib/mrk-video/app.mjs 게이트가 있어 true
     member: null, // 들어온 회원 기수 라벨 — 게이트가 없으니 항상 없음
+    owner: false, // 최고관리자(Google 관리자 로그인)로 들어왔는지 — ko372.com 에만 있음
   });
 }

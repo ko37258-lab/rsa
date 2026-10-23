@@ -19,8 +19,9 @@ function useCap(name) {
 /**
  * 서버 함수(api/health)가 있는지 한 번만 확인합니다. tts 는 Fish Audio 내레이션 중계(api/tts) 가능 여부(기본 false).
  * gate 는 회원 입장 게이트가 있는 서버(ko372.com)인지, member 는 들어온 회원의 기수 라벨('2기' 등, 관리자는 '관리자', 없으면 null).
+ * owner 는 최고관리자(Google 관리자 로그인)로 들어왔는지 — 이때는 "나가기"로 입장 쿠키를 지워도 다시 들어오므로 버튼을 숨깁니다.
  */
-const NO_SERVER = { ai: false, proxy: false, needsCode: false, youtube: false, tts: false, gate: false, member: null };
+const NO_SERVER = { ai: false, proxy: false, needsCode: false, youtube: false, tts: false, gate: false, member: null, owner: false };
 let serverP;
 export function serverInfo() {
   if (inArtifact) return Promise.resolve({ ...NO_SERVER });
@@ -30,6 +31,7 @@ export function serverInfo() {
       ai: !!j?.ai, proxy: !!j?.proxy, needsCode: !!j?.needsCode, youtube: !!j?.youtube, tts: !!j?.tts,
       gate: !!j?.gate,
       member: typeof j?.member === 'string' && j.member.trim() ? j.member.trim() : null,
+      owner: j?.owner === true,
     }))
     .catch(() => ({ ...NO_SERVER }));
   return serverP;
@@ -217,7 +219,8 @@ export async function fetchImageBlob(url, signal) {
 export async function findViralShorts(topic, { max = 12 } = {}) {
   const info = await serverInfo();
   if (!info.youtube) return null;
-  const yt = API === 'api/' ? 'api/youtube' : '/api/youtube';
+  // 다른 서버 기능과 같은 자리(API)로 부릅니다 — ko372.com 에서는 회원 입장을 확인하는 /api/mrk-video/youtube
+  const yt = API + 'youtube';
   const after = new Date(Date.now() - 365 * 864e5).toISOString();
   const q = new URLSearchParams({ ep: 'search', part: 'snippet', type: 'video', videoDuration: 'short', order: 'viewCount', maxResults: String(max), regionCode: 'KR', relevanceLanguage: 'ko', publishedAfter: after, q: `${topic} #shorts` });
   const sr = await fetch(`${yt}?${q}`, { headers: { 'x-access-code': accessCode() } });

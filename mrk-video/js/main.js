@@ -70,10 +70,13 @@ function currentView() {
   return h || 'showcase';
 }
 
-/** 회원 라벨: 관리자는 "관리자", 기수는 "자동화 2기 회원" 처럼. 라벨이 없으면 빈 글자. */
+/** 회원 라벨: 관리자는 "관리자", 기수는 "자동화 2기 회원" 처럼. 라벨이 없으면 빈 글자.
+ *  라벨에 이미 "자동화"·"회원"이 들어 있으면("자동화 3기 심화반") 겹쳐 붙이지 않습니다. */
 function memberText(member) {
   if (!member) return '';
-  return member === '관리자' ? '관리자' : `자동화 ${member} 회원`;
+  if (member === '관리자') return '관리자';
+  const base = /^자동화/.test(member) ? member : `자동화 ${member}`;
+  return /회원$/.test(base) ? base : `${base} 회원`;
 }
 
 /** 맨 위 "회원 전용" 표시: 회원 게이트가 있는 서버(ko372.com, health 의 gate)에서만 보입니다. */
@@ -85,9 +88,11 @@ function renderMember(info) {
   const label = $('#memberLabel');
   const text = memberText(info.member);
   label.textContent = text;
-  label.title = text;
   label.hidden = !text;
   const out = $('#memberLogout');
+  // 최고관리자(Google 관리자 로그인)는 입장 쿠키를 지워도 Google 로그인으로 바로 다시 들어오므로 "나가기"를 숨기고 안내만 남깁니다
+  out.hidden = !!info.owner;
+  label.title = info.owner ? `${text} — Google 관리자 로그인으로 들어왔습니다. 로그아웃은 관리자 화면(admin-social.html)에서 합니다.` : text;
   if (out.dataset.wired) return;
   out.dataset.wired = '1';
   out.addEventListener('click', () => {
@@ -173,9 +178,21 @@ async function wireGuideVideo() {
   } catch { /* 영상 없음 */ }
 }
 
+/** 모바일에서 위에 붙는 메뉴 줄(.side)의 실제 높이를 CSS 변수 --side-h 로 알려 줍니다.
+ *  회원 표시·기수 라벨 길이에 따라 높이가 달라져도 사례 카드로 건너뛸 때 제목이 메뉴 밑에 숨지 않게(style.css .case scroll-margin-top). */
+function trackSideHeight() {
+  const side = document.querySelector('.side');
+  if (!side) return;
+  const set = () => document.documentElement.style.setProperty('--side-h', `${Math.ceil(side.getBoundingClientRect().height)}px`);
+  set();
+  if (typeof ResizeObserver === 'function') new ResizeObserver(set).observe(side);
+  else window.addEventListener('resize', set);
+}
+
 async function boot() {
   wirePressFeedback();
   wireGuideVideo();
+  trackSideHeight();
   // 회원 표시는 다른 화면 준비를 기다리지 않고 먼저 띄웁니다(serverInfo 는 한 번만 묻고 결과를 같이 씀)
   serverInfo().then(renderMember).catch((e) => console.error('member', e));
   window.addEventListener('hashchange', () => {
