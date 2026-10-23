@@ -79,7 +79,7 @@ function memberText(member) {
   return /회원$/.test(base) ? base : `${base} 회원`;
 }
 
-/** 맨 위 "회원 전용" 표시: 회원 게이트가 있는 서버(ko372.com, health 의 gate)에서만 보입니다. */
+/** 맨 위 "회원만 가능" 표시: 회원 게이트가 있는 서버(ko372.com, health 의 gate)에서만 보입니다. */
 function renderMember(info) {
   const bar = $('#memberBar');
   if (!bar) return;
