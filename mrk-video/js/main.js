@@ -1,7 +1,7 @@
 // 시작점 — 메뉴 전환(움직임 포함)과 각 화면 초기화
 
 import { $, $$ } from './util.js';
-import { inArtifact, canPickFolder, serverInfo, aiAvailable, accessCode, setAccessCode } from './platform.js';
+import { inArtifact, canPickFolder, serverInfo, aiAvailable, accessCode, setAccessCode, memberLogout } from './platform.js';
 import { kinetic, rise, swapViews, topline, wirePressFeedback } from './motion.js';
 import { initShorts, pauseShorts } from './shorts.js';
 import { initCompose } from './compose.js';
@@ -70,8 +70,36 @@ function currentView() {
   return h || 'showcase';
 }
 
+/** 회원 라벨: 관리자는 "관리자", 기수는 "자동화 2기 회원" 처럼. 라벨이 없으면 빈 글자. */
+function memberText(member) {
+  if (!member) return '';
+  return member === '관리자' ? '관리자' : `자동화 ${member} 회원`;
+}
+
+/** 맨 위 "회원 전용" 표시: 회원 게이트가 있는 서버(ko372.com, health 의 gate)에서만 보입니다. */
+function renderMember(info) {
+  const bar = $('#memberBar');
+  if (!bar) return;
+  bar.hidden = !info.gate;
+  if (!info.gate) return;
+  const label = $('#memberLabel');
+  const text = memberText(info.member);
+  label.textContent = text;
+  label.title = text;
+  label.hidden = !text;
+  const out = $('#memberLogout');
+  if (out.dataset.wired) return;
+  out.dataset.wired = '1';
+  out.addEventListener('click', () => {
+    out.disabled = true;
+    out.setAttribute('aria-busy', 'true');
+    memberLogout();
+  });
+}
+
 async function renderEnv() {
   const info = await serverInfo();
+  renderMember(info);
   const ai = await aiAvailable();
   const rec = typeof MediaRecorder !== 'undefined' && !!HTMLCanvasElement.prototype.captureStream;
   const mp4 = rec && ['video/mp4;codecs=avc1', 'video/mp4'].some((m) => MediaRecorder.isTypeSupported(m));
@@ -148,6 +176,8 @@ async function wireGuideVideo() {
 async function boot() {
   wirePressFeedback();
   wireGuideVideo();
+  // 회원 표시는 다른 화면 준비를 기다리지 않고 먼저 띄웁니다(serverInfo 는 한 번만 묻고 결과를 같이 씀)
+  serverInfo().then(renderMember).catch((e) => console.error('member', e));
   window.addEventListener('hashchange', () => {
     const v = currentView();
     show(v);

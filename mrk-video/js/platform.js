@@ -16,20 +16,34 @@ function useCap(name) {
   return capCache.get(name);
 }
 
-/** 서버 함수(api/health)가 있는지 한 번만 확인합니다. tts 는 Fish Audio 내레이션 중계(api/tts) 가능 여부(기본 false). */
-const NO_SERVER = { ai: false, proxy: false, needsCode: false, youtube: false, tts: false };
+/**
+ * 서버 함수(api/health)가 있는지 한 번만 확인합니다. tts 는 Fish Audio 내레이션 중계(api/tts) 가능 여부(기본 false).
+ * gate 는 회원 입장 게이트가 있는 서버(ko372.com)인지, member 는 들어온 회원의 기수 라벨('2기' 등, 관리자는 '관리자', 없으면 null).
+ */
+const NO_SERVER = { ai: false, proxy: false, needsCode: false, youtube: false, tts: false, gate: false, member: null };
 let serverP;
 export function serverInfo() {
   if (inArtifact) return Promise.resolve({ ...NO_SERVER });
   serverP ??= fetch(API + 'health', { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
-    .then((j) => ({ ai: !!j?.ai, proxy: !!j?.proxy, needsCode: !!j?.needsCode, youtube: !!j?.youtube, tts: !!j?.tts }))
+    .then((j) => ({
+      ai: !!j?.ai, proxy: !!j?.proxy, needsCode: !!j?.needsCode, youtube: !!j?.youtube, tts: !!j?.tts,
+      gate: !!j?.gate,
+      member: typeof j?.member === 'string' && j.member.trim() ? j.member.trim() : null,
+    }))
     .catch(() => ({ ...NO_SERVER }));
   return serverP;
 }
 
 export function accessCode() { return store.get('accessCode', ''); }
 export function setAccessCode(v) { store.set('accessCode', v || ''); }
+
+/** 회원 나가기(ko372.com 게이트): 서버가 입장 쿠키를 지우게 한 뒤 새로고침해 잠금 화면으로 돌아갑니다. */
+export async function memberLogout() {
+  // 응답 본문까지 받아 둔 뒤 새로고침(본문을 남긴 채 떠나면 요청이 중단된 것으로 남음). 실패해도 새로고침은 합니다.
+  await fetch(API + 'app?route=logout', { method: 'POST', credentials: 'same-origin' }).then((r) => r.text()).catch(() => null);
+  location.reload();
+}
 
 export const canPickFolder = !inArtifact && typeof window.showDirectoryPicker === 'function';
 

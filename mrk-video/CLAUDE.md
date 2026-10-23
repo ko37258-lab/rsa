@@ -11,6 +11,7 @@
 - 내보내기는 `js/export.js`(exportProject / exportStyles). 화면 움직임은 `js/motion.js`.
 - AI 대본 프롬프트·JSON 스키마는 `js/script-prompt.js` 한 곳. 브라우저(아티팩트)와 `api/ai.js`가 함께 import한다.
 - 내레이션 만들기(제미나이·일레븐랩스·Fish Audio)는 `js/tts.js`(PROVIDERS·synthesize). 제미나이·일레븐랩스는 브라우저가 직접 부르고, Fish Audio 만 `api/tts.js`가 중계한다(CORS). 사용자 API 키는 서버에 저장·기록하지 않고, 브라우저에는 "기억" 체크가 켜졌을 때만 `store 'ttsKeys'`에 남긴다. 설정은 `store 'tts'`(프로젝트 .json 에는 넣지 않음).
+- 맨 위 "회원 전용" 표시(`index.html` `#memberBar`, `main.js` `renderMember`)는 `serverInfo().gate` 가 true 일 때만 켜진다(단독 배포 `api/health.js` 는 `gate:false`). 회원 코드·입장 쿠키 게이트는 ko372.com 저장소 `lib/mrk-video/app.mjs` 에 있다.
 - 환경 차이(Claude 아티팩트 vs 일반 웹)는 `js/platform.js`에서만 처리한다. 아티팩트에서는 `<a download>`와 외부 fetch가 막혀 있으므로 저장은 `saveBlob()`/`openSink()`만 쓴다.
 - 설정값은 `store`(localStorage, try/catch 처리)에 저장. 사진·소리는 저장하지 않는다(프로젝트 .json으로만).
 
