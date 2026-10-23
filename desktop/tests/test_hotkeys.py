@@ -70,8 +70,29 @@ def test_same_key_different_modifiers():
     state["mods"] = frozenset({"ctrl", "alt", "shift"})  # 정확히 맞지 않으면 아무것도 안 함
     assert r.handle(Ev("down", 57)) is True and r.handle(Ev("up", 57)) is True
     state["mods"] = frozenset({"ctrl", "alt"})
-    assert r.handle(Ev("down", 79)) is False  # 숫자 패드 1도 같은 '1'
+    assert r.handle(Ev("down", 2)) is False and r.handle(Ev("up", 2)) is False
     assert state["log"] == ["polish", "mode1"]
+
+
+@pytest.mark.parametrize("code", [0x4F, 0x50, 0x51, 0x4B, 0x4D, 0x47])  # End·↓·PgDn·←·→·Home (숫자 패드와 같은 번호)
+def test_ctrl_alt_navigation_keys_are_not_mode_hotkeys(code):
+    """VS Code의 Ctrl+Alt+↓, 원격 데스크톱의 Ctrl+Alt+End를 막거나 글 형식을 바꾸면 안 됩니다."""
+    r, state = make_router()
+    state["mods"] = frozenset({"ctrl", "alt"})
+    assert r.handle(Ev("down", code)) is True and r.handle(Ev("up", code)) is True
+    assert state["log"] == []
+
+
+def test_key_passed_through_stays_passed_through_until_released():
+    """Space를 먼저 누르고 Shift를 늦게 눌러도, 그대로 보낸 Space의 반복·뗌은 막지 않습니다 (Windows가 Space를 눌린 채로 알지 않게)."""
+    r, state = make_router()
+    state["mods"] = frozenset({"ctrl"})
+    assert r.handle(Ev("down", 57)) is True  # Ctrl+Space — 단축키 아님, 그대로 보냄
+    state["mods"] = frozenset({"ctrl", "shift"})
+    assert r.handle(Ev("down", 57)) is True  # 반복 신호: 단축키로 바꾸지 않음
+    assert r.handle(Ev("up", 57)) is True  # 뗌도 그대로
+    assert state["log"] == []
+    assert r.handle(Ev("down", 57)) is False and state["log"] == ["dictate"]  # 다시 누르면 단축키
 
 
 def test_win_h_masks_start_menu():
@@ -109,6 +130,30 @@ def test_parse_combo():
     for bad in ("", "ctrl+shift", "ctrl+a+b", "ctrl+k, ctrl+s", "ctrl+hangul", "right alt+space", "ctrl+한/영", "alt gr+e", "ctrl+ctrl+a", "ctrl++a"):
         with pytest.raises(HotkeyError):
             parse_combo(bad)
+    # 한/영·한자 전환에 쓰일 수 있는 조합과, 글자를 못 치게 만드는 단독 키
+    for bad in ("space", "shift+space", "ctrl+space", "e", "1", "enter"):
+        with pytest.raises(HotkeyError):
+            parse_combo(bad)
+    assert parse_combo("ctrl+shift+space").key == "space" and parse_combo("alt+space").mods == frozenset({"alt"})
+
+
+def test_hangul_jamo_typed_in_settings_means_the_same_key():
+    """설정 칸이 한글 입력 상태여도 'ctrl+alt+ㄱ'은 Ctrl+Alt+R로 읽습니다."""
+    assert parse_combo("ctrl+alt+ㄱ") == parse_combo("ctrl+alt+r")
+    assert parse_combo("ctrl+alt+ㄷ") == parse_combo("ctrl+alt+e")
+    assert parse_combo("win+ㅗ") == parse_combo("windows+h")
+    assert parse_combo("ctrl+shift+스페이스") == parse_combo("ctrl+shift+space")
+
+
+def test_unknown_key_name_is_a_hotkey_error():
+    def codes_of(key):
+        if key == "spcae":
+            raise ValueError("Key 'spcae' is not mapped to any known key.")
+        return CODES[key]
+
+    r = HotkeyRouter(held=frozenset, mask=lambda: None, codes_of=codes_of)
+    with pytest.raises(HotkeyError):
+        r.add("ctrl+shift+spcae", lambda: None)
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="keyboard 라이브러리의 Windows 키 표가 필요합니다 (CI windows-latest에서 돎)")

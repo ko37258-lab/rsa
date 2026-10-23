@@ -434,3 +434,24 @@ def test_hotkeys_drive_recording_without_touching_hangul_key(app, monkeypatch):
     assert handle(Ev("up", space)) is False
     wait_idle(app)
     assert app.pasted
+
+
+def test_bad_hotkey_falls_back_and_keeps_win_h_and_esc(app, monkeypatch):
+    """설정에 잘못된 단축키(오타·예전 버전의 오른쪽 Ctrl 등)가 있어도 나머지 단축키·Win+H·Esc는 살아 있어야 합니다."""
+    kb = FakeKeyboard()
+
+    def key_to_scan_codes(key):
+        if key == "spcae":
+            raise ValueError("not mapped")
+        return (sum(map(ord, key)),)
+
+    kb.key_to_scan_codes = key_to_scan_codes
+    monkeypatch.setitem(sys.modules, "keyboard", kb)
+    app.cfg.update({"win_h": True, "hotkey_dictate": "ctrl+shift+spcae", "hotkey_edit": "right ctrl+e"})
+    app.register_hotkeys()
+    combos = registered(app)
+    assert "ctrl+shift+space" in combos  # 기본값으로 대신 걸림
+    assert "ctrl+alt+e" in combos
+    assert "windows+h" in combos and "ctrl+alt+space" in combos
+    assert len(kb.hooks) == 1 and "esc" in kb.press_keys
+    assert any(name == "show_error" and "기본값" in args[0] for name, args in app.overlay.calls)

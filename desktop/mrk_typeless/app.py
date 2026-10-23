@@ -13,6 +13,7 @@ from . import __version__, autostart, update
 from .audio import AudioError, Recorder
 from .cleanup import local_cleanup, sanitize_dictation
 from .config import (
+    DEFAULTS,
     APP_DIR,
     DICTIONARY_PATH,
     LOG_PATH,
@@ -104,28 +105,47 @@ class App:
         자세한 까닭은 hotkeys.py 머리말에 있습니다."""
         import keyboard
 
-        from .hotkeys import HotkeyRouter
+        from .hotkeys import HotkeyError, HotkeyRouter
 
-        keyboard.unhook_all()
         router = HotkeyRouter()
-        triggers = [("dictate", "dictate", self.cfg["hotkey_dictate"]), ("edit", "edit", self.cfg["hotkey_edit"])]
+        problems = []
+
+        def add(combo: str, default: str, on_press, on_release=None) -> None:
+            """단축키 하나가 잘못돼도(오타·예전 버전 설정) 나머지 단축키·Win+H·Esc는 살아 있게, 기본값으로 대신 겁니다."""
+            try:
+                router.add(combo, on_press, on_release)
+            except HotkeyError as e:
+                log.warning("단축키 '%s'를 걸 수 없어 기본값 '%s'로 겁니다: %s", combo, default, e)
+                problems.append(f"'{combo}' → {default}")
+                if combo != default:
+                    router.add(default, on_press, on_release)
+
+        triggers = [
+            ("dictate", "dictate", self.cfg["hotkey_dictate"], DEFAULTS["hotkey_dictate"]),
+            ("edit", "edit", self.cfg["hotkey_edit"], DEFAULTS["hotkey_edit"]),
+        ]
         # Win+H: Windows 음성 입력 대신 MR.K 받아쓰기를 엽니다. Win 키 자체는 막지 않으므로 시작 메뉴·Win+E 같은
         # 단축키는 그대로 됩니다. 사용자가 단축키를 Win+H로 직접 정했으면 같은 키를 두 번 걸지 않습니다.
-        if self.cfg.get("win_h", True) and not any(same_hotkey(c, "windows+h") for _, _, c in triggers):
-            triggers.append(("dictate", "winh", "windows+h"))
-        for purpose, trigger, combo in triggers:
-            router.add(
+        if self.cfg.get("win_h", True) and not any(same_hotkey(c, "windows+h") for _, _, c, _ in triggers):
+            triggers.append(("dictate", "winh", "windows+h", "windows+h"))
+        for purpose, trigger, combo, default in triggers:
+            add(
                 combo,
+                default,
                 lambda p=purpose, t=trigger: self._on_record_hotkey(p, t),
                 lambda p=purpose, t=trigger: self._on_record_key_up(p, t),
             )
-        router.add(self.cfg["hotkey_polish"], self._on_polish_hotkey)
+        add(self.cfg["hotkey_polish"], DEFAULTS["hotkey_polish"], self._on_polish_hotkey)
         # Ctrl+Alt+1~7: 글 형식 바로 바꾸기 (자동 정리·메시지·이메일·보고서·강의 원고·상담 노트·번역)
         for i, mode in enumerate(MODES[:7], start=1):
-            router.add(f"ctrl+alt+{i}", lambda m=mode["id"]: self.post(self.set_mode, m))
+            add(f"ctrl+alt+{i}", f"ctrl+alt+{i}", lambda m=mode["id"]: self.post(self.set_mode, m))
+        # 새 단축키를 다 만든 뒤에야 예전 것을 풉니다 — 중간에 실패해도 단축키가 하나도 없는 때가 없게
+        keyboard.unhook_all()
         keyboard.hook(router.handle, suppress=True)
         keyboard.on_press_key("esc", lambda _e: self._on_escape())
         self.hotkeys = router
+        if problems:
+            self.post(self.overlay.show_error, "쓸 수 없는 단축키를 기본값으로 바꿔 걸었습니다: " + ", ".join(problems))
         log.info(
             "단축키 등록: %s / %s / %s / Win+H %s",
             self.cfg["hotkey_dictate"],

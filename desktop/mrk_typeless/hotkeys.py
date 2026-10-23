@@ -45,7 +45,18 @@ _ALIASES = {
     "spacebar": "space",
     "escape": "esc",
     "return": "enter",
+    "스페이스": "space",
+    "스페이스바": "space",
+    "엔터": "enter",
 }
+
+# 설정 칸이 한글 입력 상태라 'ctrl+alt+ㄱ'처럼 들어온 글자를 같은 자리의 영문 키로 바꿉니다 (두벌식).
+_JAMO_TO_KEY = dict(zip("ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔㅁㄴㅇㄹㅎㅗㅓㅏㅣㅋㅌㅊㅍㅠㅜㅡㅃㅉㄸㄲㅆㅒㅖ", "qwertyuiopasdfghjklzxcvbnmqwertop", strict=True))
+
+# 보조키 없이 쓰면 그 키로 글을 칠 수 없게 되는 키
+_TYPING_KEYS = {"space", "enter", "tab", "backspace", "delete", "esc"}
+# 한글 입력기가 한/영·한자 전환에 쓰는 조합 (Microsoft 입력기 설정·101키 종류 3)
+_IME_COMBOS = {frozenset(): "space", frozenset({"shift"}): "space", frozenset({"ctrl"}): "space"}
 
 # 한글 입력기가 쓰는 키 — 단축키로 쓰면 한/영 전환이 망가집니다.
 _IME_WORDS = ("hangul", "hanguel", "hanja", "kana", "kanji", "ime", "한/영", "한영", "한자", "right alt", "alt gr", "altgr", "right ctrl", "right control")
@@ -83,12 +94,17 @@ def parse_combo(text: str) -> Combo:
         if any(w in n for w in _IME_WORDS):
             raise HotkeyError("한/영·한자 키와 오른쪽 Alt·Ctrl은 한글 입력에 쓰이므로 단축키로 쓸 수 없습니다.")
     mods = [n for n in names if n in MODIFIERS]
-    keys = [n for n in names if n not in MODIFIERS]
+    keys = [_JAMO_TO_KEY.get(n, n) for n in names if n not in MODIFIERS]
     if len(keys) != 1:
         raise HotkeyError(f"'{text}'에는 보조키(Ctrl·Shift·Alt·Win) 말고 키가 하나 있어야 합니다. 예: ctrl+shift+space")
     if len(set(mods)) != len(mods):
         raise HotkeyError(f"'{text}'에 같은 보조키가 두 번 들어 있습니다.")
-    return Combo(frozenset(mods), keys[0])
+    combo = Combo(frozenset(mods), keys[0])
+    if _IME_COMBOS.get(combo.mods) == combo.key:
+        raise HotkeyError("Space·Shift+Space·Ctrl+Space는 한/영·한자 전환에 쓰일 수 있어 단축키로 쓸 수 없습니다.")
+    if not combo.mods and (len(combo.key) == 1 or combo.key in _TYPING_KEYS):
+        raise HotkeyError(f"'{combo.key}' 키만 쓰면 그 글자를 칠 수 없게 됩니다. Ctrl·Shift·Alt·Win 중 하나와 함께 정하거나 F9 같은 키를 쓰세요.")
+    return combo
 
 
 def same_combo(a: str, b: str) -> bool:
@@ -99,7 +115,8 @@ def same_combo(a: str, b: str) -> bool:
 
 
 # ---------- Windows에 묻고 보내기 (테스트에서는 바꿔 끼웁니다) ----------
-_VK = {"ctrl": (0x11,), "shift": (0x10,), "alt": (0x12,), "windows": (0x5B, 0x5C)}
+# Alt는 왼쪽(VK_LMENU)만 셉니다. 오른쪽 Alt는 한/영 키(입력기 설정에 따라 VK_RMENU로 옴)이거나 AltGr(가짜 Ctrl+오른쪽 Alt)입니다.
+_VK = {"ctrl": (0x11,), "shift": (0x10,), "alt": (0xA4,), "windows": (0x5B, 0x5C)}
 _MASK_VK = 0xE8  # 아무 일도 하지 않는 키 (Windows에 배정되지 않음)
 
 
@@ -170,6 +187,10 @@ class Binding:
     last_seen: float = 0.0
 
 
+# 숫자 패드 스캔 코드. keyboard는 확장 키 표시를 버려서 End·↓·PgDn·←·→·Home도 같은 번호로 옵니다.
+_KEYPAD_CODES = frozenset(range(0x47, 0x54))
+
+
 @dataclass
 class HotkeyRouter:
     """keyboard.hook(router.handle, suppress=True)로 겁니다. 모든 키마다 불리므로 가볍게 끝나야 합니다."""
@@ -179,37 +200,65 @@ class HotkeyRouter:
     mask: Callable[[], None] | None = None
     codes_of: Callable[[str], tuple[int, ...]] | None = None
     clock: Callable[[], float] = time.monotonic
+    # 단축키가 아니라서 그대로 보낸 '누름' — 그 키의 반복 신호와 뗌도 그대로 보내야 Windows가 키를 눌린 채로 알지 않습니다.
+    _passed: dict[int, float] = field(default_factory=dict)
+    _codes: set[int] = field(default_factory=set)
 
     def add(self, combo_text: str, on_press: Callable[[], None], on_release: Callable[[], None] | None = None) -> Combo:
         combo = parse_combo(combo_text)
-        codes = tuple((self.codes_of or scan_codes_of)(combo.key))
+        try:
+            codes = tuple((self.codes_of or scan_codes_of)(combo.key))
+        except ValueError as e:  # keyboard가 모르는 키 이름
+            raise HotkeyError(f"'{combo.key}' 키를 찾지 못했습니다. 예: ctrl+shift+space, f9") from e
+        if combo.key.isdigit():
+            # 숫자 단축키(Ctrl+Alt+1~7)는 윗줄 숫자만 — 숫자 패드 번호를 같이 쓰는 End·방향키를 잡지 않게 합니다.
+            codes = tuple(c for c in codes if c not in _KEYPAD_CODES)
         if not codes:
             raise HotkeyError(f"'{combo.key}' 키를 찾지 못했습니다.")
         self.bindings.append(Binding(combo, on_press, on_release, codes))
+        self._codes.update(codes)
         return combo
 
     def handle(self, event) -> bool:
         """True면 키를 그대로 보내고, False면 막습니다. 보조키·한/영·한자 키는 언제나 True입니다."""
         code = event.scan_code
+        if code not in self._codes:
+            return True
         down = event.event_type == "down"
         now = self.clock()
+
+        # 1) 지금 눌려 있는 단축키: 반복 신호와 뗌을 막습니다
         for b in self.bindings:
-            if code not in b.scan_codes:
-                continue
-            if b.active:
+            if b.active and code in b.scan_codes:
                 if down and now - b.last_seen > STALE_SECONDS:
                     b.active = False  # 놓친 '뗌'이 있었음 — 새로 누른 것으로 봅니다
-                else:
-                    b.last_seen = now
-                    if not down:
-                        b.active = False
-                        if b.on_release:
-                            b.on_release()
-                    return False  # 누르고 있는 동안의 반복 신호와 뗌도 막습니다
-            if down and (self.held or held_modifiers)() == b.combo.mods:
+                    break
+                b.last_seen = now
+                if not down:
+                    b.active = False
+                    if b.on_release:
+                        b.on_release()
+                return False
+
+        if not down:
+            self._passed.pop(code, None)
+            return True
+
+        # 2) 이미 그대로 보낸 키의 반복 신호: 단축키로 바꾸지 않고 계속 보냅니다
+        last = self._passed.get(code)
+        if last is not None and now - last <= STALE_SECONDS:
+            self._passed[code] = now
+            return True
+
+        # 3) 새로 누름: 보조키가 정확히 맞는 단축키가 있으면 막고 실행합니다
+        held = (self.held or held_modifiers)()
+        for b in self.bindings:
+            if code in b.scan_codes and held == b.combo.mods:
+                self._passed.pop(code, None)
                 b.active, b.last_seen = True, now
                 if b.combo.mods:
                     (self.mask or send_mask_key)()
                 b.on_press()
                 return False
+        self._passed[code] = now
         return True

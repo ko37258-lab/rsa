@@ -345,7 +345,7 @@ class SettingsWindow:
         win.focus_force()
 
     def _save(self) -> None:
-        from .hotkeys import HotkeyError, parse_combo
+        from .hotkeys import HotkeyError, HotkeyRouter, parse_combo
 
         hotkeys = {
             "hotkey_dictate": self.hk_dictate.get().strip().lower(),
@@ -354,7 +354,8 @@ class SettingsWindow:
         }
         for combo in hotkeys.values():
             try:
-                parse_combo(combo)
+                # 프로그램이 실제로 걸 때와 똑같이 확인합니다 (모르는 키 이름·오타까지)
+                HotkeyRouter(held=frozenset, mask=lambda: None).add(combo, lambda: None)
             except HotkeyError as e:
                 messagebox.showerror("단축키 확인", f"'{combo}'는 쓸 수 없는 단축키입니다. {e}", parent=self.win)
                 return
