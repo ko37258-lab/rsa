@@ -2,7 +2,7 @@
 // GitHub 릴리스의 '최신' 주소라 새 버전을 올려도 바뀌지 않습니다.
 const RELEASES = "https://github.com/ko37258-lab/rsa/releases";
 
-export const DESKTOP_VERSION = "1.1.4";
+export const DESKTOP_VERSION = "1.1.5";
 export const SETUP_URL = `${RELEASES}/latest/download/MRK-Typeless-Setup.exe`;
 export const PORTABLE_URL = `${RELEASES}/latest/download/MRK-Typeless.exe`;
 export const GEMINI_KEY_URL = "https://aistudio.google.com/apikey";
