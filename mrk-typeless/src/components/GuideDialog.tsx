@@ -298,6 +298,7 @@ export function GuideDialog({ open, onClose }: Props) {
             <a className="gpc" href={DOWNLOAD_PAGE_URL} target="_blank" rel="noopener noreferrer">
               <span>
                 <b>Windows PC 프로그램</b>을 설치하면 메일·메신저·한글 어디서든 <kbd>Win</kbd>+<kbd>H</kbd>로 말해 바로 입력됩니다.
+                1.1.5부터는 <b>한/영·한자 키를 건드리지 않습니다</b>. 예전 버전을 쓰셨다면 새로 받아 설치하세요.
               </span>
               <span className="gpc__go">내려받기 ↗</span>
             </a>

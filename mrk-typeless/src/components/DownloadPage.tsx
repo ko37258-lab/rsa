@@ -281,6 +281,11 @@ export function DownloadPage() {
             </div>
           </li>
         </ol>
+        <p className="dl-lead">
+          <b>한/영·한자 키는 그대로 쓰시면 됩니다.</b> 1.1.5부터 MR.K는 한/영·한자 키와 Ctrl·Alt·Shift·Win 키를 전혀 막지
+          않고, 단축키의 마지막 키(Space·E·H)만 가로챕니다. 예전 버전(1.1.4 이하)을 쓰셨다면 이 페이지에서 새로 받아
+          설치하세요.
+        </p>
       </section>
 
       <section className="dl-section" aria-labelledby="keys-title">
