@@ -54,7 +54,9 @@ export function rise(elements, { delay = 0, stagger = 70, duration = 560, y = 22
   if (reduce()) return Promise.resolve();
   return Promise.all(list.map((el, i) => el.animate(
     [{ opacity: 0, transform: `translateY(${y}px)`, filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }],
-    { duration, delay: delay + i * stagger, easing: EASE_OUT, fill: 'both' },
+    // fill:'backwards' — 기다리는 동안만 시작 모습을 두고, 끝나면 효과를 지웁니다(끝난 뒤에도 filter·transform 이 남으면
+    // 그 상자가 position:fixed 의 기준이 되어 '크게 보기' 같은 화면 가득 칸이 상자 안에 갇힙니다)
+    { duration, delay: delay + i * stagger, easing: EASE_OUT, fill: 'backwards' },
   ).finished.catch(() => {})));
 }
 
@@ -64,7 +66,7 @@ export function popIn(elements, { delay = 0, stagger = 110, duration = 520 } = {
   if (reduce()) return Promise.resolve();
   return Promise.all(list.map((el, i) => el.animate(
     [{ opacity: 0, transform: 'translateY(14px) scale(.92)' }, { opacity: 1, transform: 'none' }],
-    { duration, delay: delay + i * stagger, easing: EASE_SPRING, fill: 'both' },
+    { duration, delay: delay + i * stagger, easing: EASE_SPRING, fill: 'backwards' }, // 끝나면 transform 을 남기지 않음(rise 와 같은 까닭)
   ).finished.catch(() => {})));
 }
 
@@ -92,7 +94,7 @@ export async function swapViews(outEl, inEl, dir = 1) {
   inEl.hidden = false;
   inEl.animate(
     [{ opacity: 0, transform: `translateX(${34 * dir}px)`, filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }],
-    { duration: 420, easing: EASE_OUT, fill: 'both' },
+    { duration: 420, easing: EASE_OUT, fill: 'backwards' }, // 끝나면 .view 에 filter·transform 을 남기지 않음(rise 와 같은 까닭)
   );
 }
 

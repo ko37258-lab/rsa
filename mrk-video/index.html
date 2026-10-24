@@ -179,8 +179,234 @@
         </div>
       </header>
 
+      <!-- 맨 위 AI 키 칸(js/keys.js · listing.js initKeyBar). 대본 AI(제미나이·클로드·GPT)와 목소리(제미나이·일레븐랩스·Fish Audio)가 모두 여기 키를 씁니다.
+           칸(줄)은 listing.js 가 keys.js 의 KEY_PROVIDERS 로 채웁니다. 키는 프로젝트 .json·로그에 넣지 않습니다. -->
+      <section class="panel keybar" id="aiKeys" aria-labelledby="h-keys">
+        <div class="keybar-head">
+          <h2 id="h-keys">AI 키</h2>
+          <div class="key-chips" id="keyChips" role="status" aria-live="polite"></div>
+          <button type="button" class="btn small accent" id="keyToggle" aria-expanded="false" aria-controls="keyBody">키 넣기</button>
+        </div>
+        <div class="keybar-body" id="keyBody" hidden>
+          <div class="key-primary">
+            <p class="kp-title">무료로 시작 — 제미나이 키만 있으면 됩니다</p>
+            <p class="hint">사진을 보고 매물 설명 대본 쓰기와 목소리 만들기를 제미나이 키 하나로 할 수 있습니다(무료 한도 안에서). <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio 에서 무료 키 받기 ↗</a></p>
+            <div class="key-rows" id="keyRowsMain"></div>
+          </div>
+          <div class="key-group">
+            <h3>대본 AI <small class="hint">선택 — 제미나이 대신 쓸 때</small></h3>
+            <div class="key-rows" id="keyRowsText"></div>
+          </div>
+          <div class="key-group">
+            <h3>목소리 <small class="hint">선택 — 일레븐랩스·Fish Audio 목소리를 쓸 때</small></h3>
+            <div class="key-rows" id="keyRowsVoice"></div>
+          </div>
+          <div class="row wrap keybar-foot">
+            <label class="check"><input type="checkbox" id="keyRemember"><span>이 브라우저에 기억</span></label>
+            <button type="button" class="btn small ghost danger" id="keyClearAll">키 모두 지우기</button>
+          </div>
+          <p class="hint">키는 이 브라우저에서 각 AI 회사로 바로 보냅니다(Fish Audio 만 브라우저 제한 때문에 ko372.com 서버가 한 번 전달하며, 키를 저장·기록하지 않습니다). “이 브라우저에 기억”을 끄면 이 탭을 닫을 때 키도 지워집니다. 같이 쓰는 PC 에서는 끝나고 “키 모두 지우기”를 눌러 주세요.</p>
+        </div>
+      </section>
+
       <div class="studio">
         <div class="studio-controls">
+          <!-- 매물 사진으로 쇼츠 만들기(js/listing.js): 단계 1~6. 아래 스타일·장면·소리·미리보기와 같은 project 를 씁니다. -->
+          <section class="panel listing" id="listingBox" aria-labelledby="h-listing">
+            <div class="panel-head">
+              <h2 id="h-listing">매물 사진으로 쇼츠 만들기</h2>
+              <span class="hint">사진만 넣으면 AI 가 매물 설명 대본을 씁니다</span>
+            </div>
+            <ol class="ls-progress" id="lsProgress" aria-label="진행 단계">
+              <li data-step="1"><i aria-hidden="true">1</i><span>사진</span></li>
+              <li data-step="2"><i aria-hidden="true">2</i><span>정보</span></li>
+              <li data-step="3"><i aria-hidden="true">3</i><span>대본</span></li>
+              <li data-step="4"><i aria-hidden="true">4</i><span>목소리</span></li>
+              <li data-step="5"><i aria-hidden="true">5</i><span>영상</span></li>
+              <li data-step="6"><i aria-hidden="true">6</i><span>보내기</span></li>
+            </ol>
+            <p class="sr" id="lsProgressText" aria-live="polite"></p>
+
+            <!-- ① 사진 -->
+            <section class="ls-step" data-step="1" aria-labelledby="h-ls1">
+              <span class="ls-n" aria-hidden="true">1</span>
+              <div class="ls-body">
+                <h3 id="h-ls1">매물 사진 넣기</h3>
+                <label class="drop" id="lsDrop">
+                  <input type="file" id="lsFiles" accept="image/*" multiple>
+                  <span><b>매물 사진 넣기</b> — 끌어다 놓거나 눌러서 고르세요. 사진마다 한 장면이 됩니다(AI 에는 앞의 10장까지).</span>
+                </label>
+                <ol class="ls-thumbs" id="lsThumbs" aria-label="넣은 매물 사진(장면 순서)"></ol>
+                <p class="hint" id="lsPhotoHint">외관 → 거실 → 주방 → 방 → 욕실 → 주변처럼 보기 좋은 순서로 놓으면 AI 도 그 흐름을 참고합니다. 순서는 AI 가 다시 짤 수 있습니다.</p>
+              </div>
+            </section>
+
+            <!-- ② 정보 -->
+            <section class="ls-step" data-step="2" aria-labelledby="h-ls2">
+              <span class="ls-n" aria-hidden="true">2</span>
+              <div class="ls-body">
+                <h3 id="h-ls2">매물 정보 <small class="hint">선택 — 적은 것만 대본·설명에 씁니다</small></h3>
+                <details class="ls-more" id="lsInfo">
+                  <summary>매물·중개사무소 정보 넣기</summary>
+                  <div class="ls-more-body">
+                    <div class="grid3">
+                      <label class="field"><span>종류</span>
+                        <select id="lsType">
+                          <option value="">고르기</option>
+                          <option>아파트</option><option>오피스텔</option><option>상가</option><option>토지</option>
+                          <option>단독주택</option><option>빌라</option><option>사무실</option><option>기타</option>
+                        </select>
+                      </label>
+                      <label class="field"><span>거래</span>
+                        <select id="lsDeal">
+                          <option value="">고르기</option>
+                          <option>매매</option><option>전세</option><option>월세</option>
+                        </select>
+                      </label>
+                      <label class="field"><span>가격</span><input type="text" id="lsPrice" maxlength="60" autocomplete="off" placeholder="예: 매매 5억 2천 / 보증금 1천·월 80"></label>
+                      <label class="field"><span>면적</span><input type="text" id="lsArea" maxlength="60" autocomplete="off" placeholder="예: 전용 84㎡(25평)"></label>
+                      <label class="field"><span>위치 (동까지만)</span><input type="text" id="lsLoc" maxlength="60" autocomplete="off" placeholder="예: 수원시 영통구 이의동"></label>
+                      <label class="field"><span>층</span><input type="text" id="lsFloor" maxlength="40" autocomplete="off" placeholder="예: 12층 / 20층"></label>
+                      <label class="field ls-wide"><span>특징 한 줄</span><input type="text" id="lsMemo" maxlength="200" autocomplete="off" placeholder="예: 남향, 올수리, 초등학교 도보 5분"></label>
+                    </div>
+                    <!-- 건축물(토지가 아닌 매물) 표시·광고 항목 — 시행령 제17조의2 ② 6호. 종류가 토지면 listing.js 가 숨김 -->
+                    <details class="ls-sub" id="lsBld" open>
+                      <summary>건축물 필수 항목 <small class="hint">아파트·빌라·오피스텔·상가 등</small></summary>
+                      <p class="hint" id="lsBldNote"></p>
+                      <div class="grid3">
+                        <label class="field"><span>사용승인일</span><input type="text" id="lsApproval" maxlength="40" autocomplete="off" placeholder="예: 2005.03.15"></label>
+                        <label class="field"><span>방향</span><input type="text" id="lsDir" maxlength="40" autocomplete="off" placeholder="예: 남향(거실 기준)"></label>
+                        <label class="field"><span>방·욕실 수</span><input type="text" id="lsRooms" maxlength="40" autocomplete="off" placeholder="예: 방 3 / 욕실 2"></label>
+                        <label class="field"><span>입주 가능일</span><input type="text" id="lsMoveIn" maxlength="40" autocomplete="off" placeholder="예: 즉시 / 2026.12 협의"></label>
+                        <label class="field"><span>주차 대수</span><input type="text" id="lsParking" maxlength="40" autocomplete="off" placeholder="예: 세대당 1.2대"></label>
+                        <label class="field"><span>관리비</span><input type="text" id="lsMaint" maxlength="60" autocomplete="off" placeholder="예: 월 25만 원(난방 별도)"></label>
+                      </div>
+                    </details>
+                    <h4>중개사무소 <small class="hint">이 브라우저에 기억 · 설명 끝에 적은 표시 항목</small></h4>
+                    <div class="grid3">
+                      <label class="field"><span>상호</span><input type="text" id="lsOfName" maxlength="60" autocomplete="organization" placeholder="예: 미스터홈즈공인중개사사무소"></label>
+                      <label class="field"><span>대표(개업공인중개사)</span><input type="text" id="lsOfAgent" maxlength="30" autocomplete="name"></label>
+                      <label class="field"><span>등록번호</span><input type="text" id="lsOfReg" maxlength="40" autocomplete="off" placeholder="예: 41117-2026-00000"></label>
+                      <label class="field"><span>소재지</span><input type="text" id="lsOfAddr" maxlength="120" autocomplete="street-address"></label>
+                      <label class="field"><span>연락처</span><input type="text" id="lsOfPhone" maxlength="40" autocomplete="tel" inputmode="tel" placeholder="예: 031-000-0000"></label>
+                    </div>
+                    <p class="hint">공인중개사가 인터넷에 매물을 올릴 때는 중개사무소 명칭·소재지·연락처·등록번호·개업공인중개사 성명과 매물의 소재지·면적·가격·종류·거래 형태(건축물이면 층수·사용승인일·방향·방/욕실 수·입주 가능일·주차 대수·관리비도)를 밝혀야 합니다. 적은 항목만 업로드 설명 끝에 자동으로 붙고, 빠진 항목은 ⑥에서 알려 드립니다.</p>
+                  </div>
+                </details>
+                <div class="grid2">
+                  <label class="field"><span>화면 비율</span>
+                    <select id="lsAspect">
+                      <option value="9:16">9:16 쇼츠·릴스 (세로)</option>
+                      <option value="16:9">16:9 유튜브 (가로)</option>
+                      <option value="1:1">1:1 정사각형</option>
+                    </select>
+                  </label>
+                  <label class="field"><span>쓸 AI</span>
+                    <select id="lsAi">
+                      <option value="auto">자동 (제미나이 먼저)</option>
+                      <option value="gemini">제미나이</option>
+                      <option value="claude">클로드</option>
+                      <option value="openai">GPT</option>
+                    </select>
+                  </label>
+                </div>
+                <p class="ls-warn" id="lsAspectWarn" hidden>16:9 가로 영상은 유튜브 일반 영상용입니다. 인스타 릴스·틱톡은 세로(9:16)를 권장합니다.</p>
+              </div>
+            </section>
+
+            <!-- ③ 대본 -->
+            <section class="ls-step" data-step="3" aria-labelledby="h-ls3">
+              <span class="ls-n" aria-hidden="true">3</span>
+              <div class="ls-body">
+                <h3 id="h-ls3">AI 로 매물 설명 대본 만들기</h3>
+                <div class="row wrap">
+                  <button type="button" class="btn accent" id="lsGen">AI로 매물 설명 대본 만들기</button>
+                  <button type="button" class="btn small ghost" id="lsGenCancel" hidden>멈춤</button>
+                </div>
+                <p class="hint ls-status" id="lsGenStatus" role="status" aria-live="polite">사진(1024px 로 줄여서)과 적은 정보만 고른 AI 로 바로 보냅니다. 가격·면적은 지어내지 않게 했지만, 올리기 전에 꼭 확인하세요.</p>
+                <ol class="ls-script" id="lsScript" aria-label="장면별 자막과 읽을 문장" hidden></ol>
+              </div>
+            </section>
+
+            <!-- ④ 목소리 -->
+            <section class="ls-step" data-step="4" aria-labelledby="h-ls4">
+              <span class="ls-n" aria-hidden="true">4</span>
+              <div class="ls-body">
+                <h3 id="h-ls4">목소리 넣기</h3>
+                <div class="ls-tabs" role="tablist" aria-label="목소리 고르기">
+                  <button type="button" role="tab" id="lsTab-gemini" aria-controls="lsPane-gemini" aria-selected="true">제미나이 <small>기본 · 무료 한도</small></button>
+                  <button type="button" role="tab" id="lsTab-record" aria-controls="lsPane-record" aria-selected="false" tabindex="-1">내 목소리 녹음</button>
+                  <button type="button" role="tab" id="lsTab-elevenlabs" aria-controls="lsPane-elevenlabs" aria-selected="false" tabindex="-1">일레븐랩스</button>
+                  <button type="button" role="tab" id="lsTab-fish" aria-controls="lsPane-fish" aria-selected="false" tabindex="-1">Fish Audio</button>
+                </div>
+                <div class="ls-pane" role="tabpanel" id="lsPane-gemini" aria-labelledby="lsTab-gemini">
+                  <label class="field"><span>목소리</span><select id="lsGemVoice"></select></label>
+                  <p class="hint" id="lsGemNote"></p>
+                  <div class="row wrap"><button type="button" class="btn small accent" id="lsGemRun" data-run="gemini">제미나이로 목소리 만들기</button></div>
+                </div>
+                <div class="ls-pane ls-rec" role="tabpanel" id="lsPane-record" aria-labelledby="lsTab-record" hidden>
+                  <div class="ls-reader" id="lsReader" tabindex="0" aria-label="읽을 대본"></div>
+                  <div class="ls-meter" aria-hidden="true"><i id="lsRecMeter"></i></div>
+                  <div class="row wrap ls-rec-tools">
+                    <button type="button" class="btn small accent" id="lsRecStart" aria-pressed="false">● 녹음</button>
+                    <button type="button" class="btn small" id="lsRecStop" disabled>■ 멈춤</button>
+                    <button type="button" class="btn small ghost" id="lsRecRedo" disabled>↺ 다시</button>
+                    <button type="button" class="btn small ghost" id="lsRecPlay" disabled aria-pressed="false">▶ 듣기</button>
+                    <button type="button" class="btn small ghost" id="lsRecFull" aria-pressed="false">크게 보기</button>
+                    <span class="tc" id="lsRecTime">00:00.0</span>
+                  </div>
+                  <p class="hint">마이크를 허용하고, 위 대본을 또박또박 읽은 뒤 멈춤을 누르세요. 앞뒤 조용한 부분은 저절로 잘라 냅니다. 녹음은 이 브라우저 안에서만 다룹니다.</p>
+                </div>
+                <div class="ls-pane" role="tabpanel" id="lsPane-elevenlabs" aria-labelledby="lsTab-elevenlabs" hidden>
+                  <label class="field"><span>Voice ID</span><input type="text" id="lsElVoice" autocomplete="off" spellcheck="false" placeholder="일레븐랩스 Voice ID"></label>
+                  <div class="row wrap"><button type="button" class="btn small accent" id="lsElRun" data-run="elevenlabs">일레븐랩스로 목소리 만들기</button></div>
+                </div>
+                <div class="ls-pane" role="tabpanel" id="lsPane-fish" aria-labelledby="lsTab-fish" hidden>
+                  <div class="grid2">
+                    <label class="field"><span>음성 모델 ID <small class="hint">기본값 「밝은 고상철」</small></span><input type="text" id="lsFishVoice" autocomplete="off" spellcheck="false"></label>
+                    <label class="field"><span>엔진</span><select id="lsFishModel"></select></label>
+                  </div>
+                  <p class="hint" id="lsFishNote"></p>
+                  <div class="row wrap"><button type="button" class="btn small accent" id="lsFishRun" data-run="fish">Fish Audio 로 목소리 만들기</button></div>
+                </div>
+                <div class="row wrap">
+                  <button type="button" class="btn small ghost" id="lsVoiceCancel" hidden>멈춤</button>
+                  <p class="hint ls-status" id="lsVoiceStatus" role="status" aria-live="polite">만든 목소리는 내레이션 자리에 들어가고, 장면 길이를 장면마다 읽을 문장 길이에 맞춰 나눕니다.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- ⑤ 영상 -->
+            <section class="ls-step" data-step="5" aria-labelledby="h-ls5">
+              <span class="ls-n" aria-hidden="true">5</span>
+              <div class="ls-body">
+                <h3 id="h-ls5">영상 만들기</h3>
+                <label class="field"><span>영상 제목 <small class="hint">영상 위·파일 이름·업로드 제목 · 줄바꿈 가능 · *강조*</small></span><textarea id="lsTitle" rows="2" maxlength="120"></textarea></label>
+                <p class="hint" id="lsExportInfo"></p>
+                <div class="row wrap"><button type="button" class="btn accent" id="lsExport">영상 만들기</button></div>
+                <div class="progress" id="lsExportProgress" hidden><i></i></div>
+                <p class="hint ls-status" id="lsExportStatus" role="status" aria-live="polite">영상 길이만큼 시간이 걸립니다. 만드는 동안 이 탭을 띄워 두세요.</p>
+              </div>
+            </section>
+
+            <!-- ⑥ 저장·보내기 -->
+            <section class="ls-step" data-step="6" aria-labelledby="h-ls6">
+              <span class="ls-n" aria-hidden="true">6</span>
+              <div class="ls-body">
+                <h3 id="h-ls6">저장하고 보내기</h3>
+                <div class="row wrap">
+                  <button type="button" class="btn small" id="lsSave" disabled>영상 저장</button>
+                  <button type="button" class="btn small" id="lsCopy">업로드 글 복사</button>
+                </div>
+                <p class="ls-warn" id="lsSendWarn" role="note" hidden>지금 영상은 16:9 가로입니다. 인스타 릴스·틱톡은 세로(9:16)를 권장합니다 — 그대로 보내면 위아래가 비거나 잘려 보일 수 있습니다.</p>
+                <div class="row wrap">
+                  <button type="button" class="btn accent ls-send" id="lsSend" disabled>업무 대시보드로 보내기 (인스타·틱톡·페이스북·쓰레드·유튜브)</button>
+                </div>
+                <p class="hint ls-status" id="lsSendStatus" role="status" aria-live="polite"></p>
+              </div>
+            </section>
+          </section>
+
           <!-- 스타일 -->
           <section class="panel style-panel" aria-labelledby="h-styles">
             <div class="panel-head">
@@ -386,23 +612,21 @@
               <label class="field"><span>내레이션 녹음</span><input type="file" id="narrFile" accept="audio/*"></label>
               <label class="field" for="narrVolume"><span>내레이션 크기 <output id="narrVolOut"></output></span><input type="range" id="narrVolume" min="0" max="1.5" step="0.05"></label>
             </div>
-            <!-- 내레이션 만들기: 제미나이·일레븐랩스·Fish Audio API 키로 대본을 목소리로 만들어 내레이션 자리에 넣습니다(js/tts.js · js/shorts.js).
+            <!-- 내레이션 만들기: 제미나이·일레븐랩스·Fish Audio 로 대본을 목소리로 만들어 내레이션 자리에 넣습니다(js/tts.js · js/shorts.js).
+                 키는 이 상자에 넣지 않고 맨 위 'AI 키' 칸(#aiKeys, js/keys.js)에서 꺼내 씁니다.
                  목소리 칸(#ttsVoice)은 서비스에 따라 shorts.js 가 select(제미나이)/글자 칸(나머지)으로 바꿉니다. 엔진 칸은 Fish Audio 일 때만 보입니다. -->
             <details class="tts" id="ttsBox">
-              <summary>내레이션 만들기 (API 키로 음성 생성)</summary>
+              <summary>내레이션 만들기 (AI 목소리)</summary>
               <div class="tts-body">
+                <p class="hint tts-keynote"><span class="kchip off" id="ttsKeyState"></span> 키는 맨 위 <a href="#aiKeys" data-open-keys="gemini">AI 키 칸</a>에서 넣습니다. <span id="ttsKeyHint"></span></p>
                 <div class="grid2">
                   <label class="field"><span>서비스</span>
                     <select id="ttsProvider">
-                      <option value="gemini">제미나이 (Google)</option>
+                      <option value="gemini">제미나이 (Google · 무료 한도)</option>
                       <option value="elevenlabs">일레븐랩스</option>
                       <option value="fish">Fish Audio</option>
                     </select>
                   </label>
-                  <label class="field"><span>API 키 <small class="hint" id="ttsKeyHint"></small></span>
-                    <input type="password" id="ttsKey" autocomplete="off" spellcheck="false" placeholder="각 서비스에서 발급한 키">
-                  </label>
-                  <label class="field check span2"><input type="checkbox" id="ttsRemember"><span>API 키를 이 브라우저에 기억</span></label>
                   <label class="field" id="ttsVoiceField" for="ttsVoice"><span id="l-ttsVoice">목소리</span>
                     <select id="ttsVoice" aria-labelledby="l-ttsVoice"></select>
                   </label>
@@ -424,7 +648,7 @@
                   <button type="button" class="btn small" id="ttsSave" hidden>파일로 저장</button>
                   <span class="hint" id="ttsStatus" aria-live="polite"></span>
                 </div>
-                <p class="hint">키는 이 브라우저에서 각 서비스로 바로 보내지고(Fish Audio 는 이 사이트 서버가 한 번 전달만), 서버에 저장되지 않습니다.</p>
+                <p class="hint">키는 이 브라우저에서 각 서비스로 바로 보내지고(Fish Audio 는 이 사이트 서버가 한 번 전달만), 서버에 저장되지 않습니다. 직접 읽어 넣으려면 위 “매물 사진으로 쇼츠 만들기” ④의 <b>내 목소리 녹음</b>을 쓰세요.</p>
               </div>
             </details>
             <!-- 스타일 음악: 배경음악 파일이 없을 때 스타일에 맞는 분위기를 코드로 만들어 깔아 줍니다(목록은 shorts.js 가 MOODS 로 채움) -->
@@ -729,6 +953,7 @@
       </section>
       <section class="panel">
         <h2>지금 이 환경</h2>
+        <p class="guide-keys">AI 대본·목소리를 쓰려면 숏폼 화면 맨 위 <a href="#shorts" data-open-keys="gemini">AI 키 칸에 키 넣기 →</a> 제미나이 키 하나면 무료 한도 안에서 시작할 수 있습니다.</p>
         <ul class="status-list" id="envList"></ul>
       </section>
       <section class="panel">
@@ -748,7 +973,9 @@
           <li>영상은 실제 길이만큼 녹화하듯 만들어집니다. 30초 영상이면 약 30초, <span data-style-count>30</span>가지 전부면 그 <span data-style-count>30</span>배가 걸립니다.</li>
           <li>크롬·엣지 최신 버전에서는 MP4로, 그 밖의 브라우저에서는 WEBM으로 저장됩니다. 유튜브·인스타·틱톡 모두 MP4를 받습니다.</li>
           <li>사진·소리 파일은 서버로 올라가지 않고 이 브라우저 안에서만 처리됩니다.</li>
-          <li>“프로젝트 저장”은 사진과 글을 한 파일(.json)로 묶습니다. 소리 파일은 들어가지 않으니 다시 넣어 주세요.</li>
+          <li>“프로젝트 저장”은 사진과 글(매물 정보·장면별 읽을 문장 포함)을 한 파일(.json)로 묶습니다. 소리 파일과 AI 키는 들어가지 않으니 소리는 다시 넣어 주세요.</li>
+          <li>AI 키는 이 브라우저에서 제미나이·클로드·GPT·일레븐랩스·Fish Audio 로 바로 갑니다. “이 브라우저에 기억”을 켜지 않으면 탭을 닫을 때 지워집니다.</li>
+          <li>매물 쇼츠: 사진에 보이는 것과 적은 사실만 말하도록 했지만, 가격·면적·층 같은 숫자와 표현은 올리기 전에 꼭 확인하세요. ②에 적은 중개사무소·매물 정보는 업로드 설명 끝에 표시 항목으로 붙고, 빠진 필수 항목은 ⑥에서 알려 드립니다.</li>
         </ul>
       </section>
     </section>

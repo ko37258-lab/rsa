@@ -3,6 +3,7 @@
 //  - 일반 웹 배포(Vercel 등): 브라우저 다운로드 + /api/* 서버 함수 사용
 
 import { store } from './util.js';
+import { firstWithKey } from './keys.js';
 
 export const inArtifact = typeof window.claude?.use === 'function';
 
@@ -122,18 +123,25 @@ export async function copyText(text) {
   }
 }
 
-/** AI 사용 가능 여부 */
+/**
+ * AI 사용 가능 여부.
+ * 아티팩트: 보는 사람의 Claude(sample). 일반 웹: 맨 위 AI 키 칸에 키가 있거나(제미나이·클로드·GPT) 서버 AI(api/ai)가 켜져 있으면 true.
+ * 키는 나중에 넣을 수도 있으니 화면은 keys.js onKeysChange 때 다시 물어보면 됩니다.
+ */
 export async function aiAvailable() {
   if (inArtifact) return !!(await useCap('sample'));
+  if (firstWithKey()) return true;
   return (await serverInfo()).ai;
 }
 
 /**
- * 쇼츠 대본 생성. params = { topic, style, scenes, channel }
- * 아티팩트에서는 보는 사람의 Claude로, 배포 버전에서는 서버(api/ai)로 요청합니다.
+ * 쇼츠 대본 생성. params = { topic, style, scenes, channel, styleName?, styleHint?, reference?, provider?, signal? }
+ * 아티팩트에서는 보는 사람의 Claude로 만듭니다(외부 fetch 가 막혀 있음).
+ * 배포 버전에서는 사용자 AI 키가 있으면 그 서비스로 브라우저에서 바로(provider 고른 것 → 제미나이 → 클로드 → GPT),
+ * 키가 없으면 서버(api/ai)로 요청합니다. 결과에 provider('gemini'|'claude'|'openai'|'server')를 붙여 돌려줍니다.
  */
 export async function generateScript(params) {
-  const { buildScriptPrompt, normalizeScriptParams, normalizeScriptResult } = await import('./script-prompt.js');
+  const { buildScriptPrompt, normalizeScriptParams, normalizeScriptResult, SCRIPT_SCHEMA } = await import('./script-prompt.js');
   const p = normalizeScriptParams(params);
   if (inArtifact) {
     const sample = await useCap('sample');
@@ -150,14 +158,30 @@ export async function generateScript(params) {
       throw new Error(msg || 'AI 대본을 만들지 못했습니다. 주제를 조금 바꿔 다시 시도해 보세요.');
     }
   }
-  const res = await fetch(API + 'ai', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-access-code': accessCode() },
-    body: JSON.stringify(p),
-  });
+  // 사용자 키(맨 위 AI 키 칸)가 있으면 그 서비스로 바로 — 이 사이트 서버를 거치지 않습니다.
+  const { pickProvider, generateJSON } = await import('./llm.js');
+  const provider = pickProvider(params?.provider);
+  if (provider) {
+    if (!p.topic) throw new Error('주제를 적어 주세요.');
+    const data = await generateJSON({ provider, prompt: buildScriptPrompt(p), schema: SCRIPT_SCHEMA, signal: params?.signal });
+    return { ...normalizeScriptResult(data), provider };
+  }
+  if (!(await serverInfo()).ai) throw new Error('AI 키가 없습니다. 맨 위 AI 키 칸에 제미나이(무료) 키를 넣어 주세요.');
+  let res;
+  try {
+    res = await fetch(API + 'ai', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-access-code': accessCode() },
+      body: JSON.stringify(p),
+      signal: params?.signal,
+    });
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e;
+    throw new Error('AI 서버에 연결하지 못했습니다. 인터넷 연결을 확인하세요.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `AI 서버 오류 (${res.status})`);
-  return normalizeScriptResult(data);
+  return { ...normalizeScriptResult(data), provider: 'server' };
 }
 
 /**

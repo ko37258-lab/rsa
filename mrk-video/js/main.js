@@ -4,6 +4,8 @@ import { $, $$ } from './util.js';
 import { inArtifact, canPickFolder, serverInfo, aiAvailable, accessCode, setAccessCode, memberLogout } from './platform.js';
 import { kinetic, rise, swapViews, topline, wirePressFeedback } from './motion.js';
 import { initShorts, pauseShorts } from './shorts.js';
+import { openKeyBar } from './listing.js';
+import { firstWithKey } from './keys.js';
 import { initCompose } from './compose.js';
 import { initDownloader } from './downloader.js';
 import { initShowcase, pauseShowcase, resumeShowcase } from './showcase.js';
@@ -63,6 +65,21 @@ function show(name) {
   return switching;
 }
 
+/**
+ * '맨 위 AI 키 칸' 바로 가기(data-open-keys="서비스 id"): 숏폼 화면으로 옮긴 뒤 키 칸을 펼치고 그 칸에 커서를 둡니다.
+ * 사용 안내 화면·내레이션 상자 등 어디에 있어도 같은 방식으로 동작합니다.
+ */
+function wireKeyLinks() {
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest?.('[data-open-keys]');
+    if (!a) return;
+    e.preventDefault();
+    const focus = a.dataset.openKeys || 'gemini';
+    if (location.hash !== '#shorts') history.pushState(null, '', '#shorts');
+    Promise.resolve(show('shorts')).then(() => openKeyBar({ focus }));
+  });
+}
+
 function currentView() {
   const h = location.hash.replace('#', '');
   // 사례 화면 안의 앵커(#case-shorts 등)는 사례 화면으로
@@ -113,7 +130,7 @@ async function renderEnv() {
   const items = [
     ['실행 위치', inArtifact ? 'Claude 아티팩트 화면' : info.proxy ? '인터넷 배포 버전 (서버 함수 사용 가능)' : '정적 웹 페이지 (서버 함수 없음)', true],
     ['영상 녹화', rec ? (mp4 ? '가능 · MP4로 저장' : '가능 · WEBM으로 저장') : '이 브라우저에서는 안 됨 (크롬·엣지 권장)', rec],
-    ['AI 대본', ai ? '사용 가능' : inArtifact ? '사용할 수 없음' : '서버에 ANTHROPIC_API_KEY·접속 코드를 넣으면 켜집니다', ai],
+    ['AI 대본', ai ? (!inArtifact && firstWithKey() ? '사용 가능 (내 AI 키)' : '사용 가능') : inArtifact ? '사용할 수 없음' : '숏폼 화면 맨 위 AI 키 칸에 제미나이(무료) 키를 넣으면 켜집니다', ai],
     ['빵터진 영상 찾기', info.youtube ? '사용 가능 (유튜브 검색)' : '유튜브 검색 링크로 대신합니다', !!info.youtube],
     ['주소로 이미지 받기', inArtifact ? '배포 버전에서만 동작' : info.proxy ? '사용 가능 (서버 프록시)' : '직접 받기만 가능 (일부 사이트는 막힘)', !inArtifact],
     ['PC 폴더에 바로 저장', canPickFolder ? '사용 가능' : 'ZIP 파일로 저장됩니다', canPickFolder],
@@ -192,6 +209,7 @@ function trackSideHeight() {
 async function boot() {
   wirePressFeedback();
   wireGuideVideo();
+  wireKeyLinks();
   trackSideHeight();
   // 회원 표시는 다른 화면 준비를 기다리지 않고 먼저 띄웁니다(serverInfo 는 한 번만 묻고 결과를 같이 씀)
   serverInfo().then(renderMember).catch((e) => console.error('member', e));

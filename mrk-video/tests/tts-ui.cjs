@@ -2,7 +2,8 @@
 //  (a) 서비스 전환 시 목소리 칸(select/글자 칸)·엔진 칸·키 힌트가 바뀌고 Fish 기본 음성 ID 가 채워짐
 //  (b) 대본 기본값 = 장면 자막(별표 없음)
 //  (c) 각 서비스로 "음성 만들기" → #audioInfo 에 "내레이션 (…)" 과 길이, #fitToNarr 활성, #ttsSave 보임
-//  (d) 기억 체크 끄면 localStorage 에 키 없음 · 켜면 있음 · 다시 끄면 없음
+//  (d) 키는 맨 위 'AI 키' 칸(#aiKeys, js/keys.js)에서 넣음 — 상자 안 키 칸은 없고 키 칸으로 가는 링크·키 상태 칩만 있음.
+//      키 없이 누르면 안내 + 키 칸이 펼쳐짐. "이 브라우저에 기억"(#keyRemember) 끄면 localStorage 에 키 없음 · 켜면 있음 · 다시 끄면 없음
 //  (e) 모바일 400px 에서 가로 넘침 없음(상자 연 상태)
 //  (f) 콘솔 오류 0 (정적 서버에 없는 예시 사진 404 는 예상된 것)
 // 결과: tests/out/tts/report.json + 스크린샷. 종료 코드 0/1. 정적 서버가 http://127.0.0.1:5173/ 에 떠 있어야 합니다.
@@ -54,6 +55,18 @@ function makePcmB64() {
   return buf.toString('base64');
 }
 
+/** PCM16(base64)에 WAV(RIFF) 머리를 붙여 base64 로 — 제미나이 3.8 TTS 는 한 번 요청에 audio/wav 를 기본으로 돌려줍니다(speech-generation 문서) */
+function wavB64(pcm64, rate = 24000) {
+  const pcm = Buffer.from(pcm64, 'base64');
+  const h = Buffer.alloc(44);
+  h.write('RIFF', 0); h.writeUInt32LE(36 + pcm.length, 4); h.write('WAVE', 8); h.write('fmt ', 12);
+  h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28);
+  h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write('data', 36); h.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([h, pcm]).toString('base64');
+}
+// 제미나이 목소리 모의 형식: 기본 'wav'(실제와 같음), 옛 모델 대비로 한 번만 'l16'(audio/L16 PCM)
+let geminiFormat = 'wav';
+
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, GET, OPTIONS' };
 
 (async () => {
@@ -83,7 +96,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
       report.calls.gemini.push({ url: rq.url(), headers: rq.headers(), body: rq.postDataJSON() });
       return route.fulfill({
         status: 200, contentType: 'application/json', headers: CORS,
-        body: JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcmB64 } }] } }] }),
+        body: JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: geminiFormat === 'l16' ? { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcmB64 } : { mimeType: 'audio/wav', data: wavB64(pcmB64) } }] } }] }),
       });
     });
     await page.route('https://api.elevenlabs.io/**', (route) => {
@@ -164,11 +177,45 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
     const refilled = await page.$eval('#ttsText', (el) => el.value);
     if (refilled !== script.expect) problem('"대본 다시 가져오기"가 장면 자막으로 되돌리지 않음');
 
-    // ── (c) 각 서비스로 음성 만들기 ──
+    // ── (d-1) 키 칸은 맨 위로 옮겨짐: 상자 안 키 칸 없음, 링크·상태 칩, 키 없이 누르면 안내 + 키 칸 펼침 ──
+    await pick('gemini');
+    const moved = await page.evaluate(() => ({
+      oldKey: !!document.querySelector('#ttsKey'), oldRemember: !!document.querySelector('#ttsRemember'),
+      link: document.querySelector('#ttsBox [data-open-keys]')?.textContent || '', state: document.querySelector('#ttsKeyState')?.textContent || '',
+    }));
+    report.keyMoved = moved;
+    if (moved.oldKey || moved.oldRemember) problem('내레이션 상자 안에 예전 키 칸(#ttsKey/#ttsRemember)이 남아 있음');
+    if (!/AI 키 칸/.test(moved.link)) problem(`내레이션 상자에 'AI 키 칸' 링크가 없음: "${moved.link}"`);
+    if (!/제미나이 키 없음/.test(moved.state)) problem(`키 없을 때 상태 칩: "${moved.state}"`);
+    await page.click('#ttsRun');
+    await page.waitForTimeout(400);
+    const noKey = await page.evaluate(() => ({
+      status: document.querySelector('#ttsStatus').textContent, expanded: document.querySelector('#keyToggle').getAttribute('aria-expanded'),
+      focus: document.activeElement?.id || '',
+    }));
+    report.noKey = noKey;
+    if (!/키가 없습니다/.test(noKey.status) || !/AI 키/.test(noKey.status)) problem(`키 없이 음성 만들기 → 안내가 다름: "${noKey.status}"`);
+    if (noKey.expanded !== 'true' || noKey.focus !== 'key-gemini') problem(`키 없이 음성 만들기 → 키 칸이 안 펼쳐지거나 제미나이 칸에 커서가 없음: ${JSON.stringify(noKey)}`);
+    if (report.calls.gemini.length) problem('키가 없는데 제미나이 요청이 나감');
+    // 상자 안 링크도 키 칸을 펼침
+    await page.click('#keyToggle'); // 접기
+    await page.click('#ttsBox [data-open-keys]');
+    await page.waitForTimeout(500);
+    if ((await page.$eval('#keyToggle', (el) => el.getAttribute('aria-expanded'))) !== 'true') problem("내레이션 상자의 'AI 키 칸' 링크가 키 칸을 펼치지 않음");
+    await page.$eval('#ttsBox', (el) => { el.open = true; });
+
+    // ── (c) 각 서비스로 음성 만들기 — 키는 맨 위 키 칸에 ──
     const PROVIDER_LABEL = { gemini: '제미나이', elevenlabs: '일레븐랩스', fish: 'Fish Audio' };
+    const KEY_STATE_LABEL = { gemini: '제미나이', elevenlabs: '일레븐랩스', fish: 'Fish Audio' };
     for (const id of ['gemini', 'elevenlabs', 'fish']) {
       await pick(id);
-      await page.fill('#ttsKey', KEYS[id]);
+      // 'AI 키 칸' 바로 가기 링크도 고른 서비스의 칸으로(일레븐랩스를 골랐는데 제미나이 칸으로 가지 않게)
+      const linkKey = await page.$eval('.tts-keynote [data-open-keys]', (a) => a.dataset.openKeys);
+      if (linkKey !== id) problem(`${id}: 내레이션 상자의 'AI 키 칸' 링크가 ${linkKey} 칸으로 감`);
+      await page.fill(`#key-${id}`, KEYS[id]);
+      await page.waitForTimeout(60);
+      const stt = await page.$eval('#ttsKeyState', (el) => el.textContent);
+      if (stt !== `${KEY_STATE_LABEL[id]} 키 ✓`) problem(`${id}: 키를 넣었는데 내레이션 상자 키 상태가 "${stt}"`);
       if (id === 'elevenlabs') await page.fill('#ttsVoice', 'testVoice0001');
       await page.click('#ttsRun');
       const t0 = Date.now();
@@ -193,11 +240,25 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
       if (!r.saveVisible) problem(`${id}: "파일로 저장" 버튼이 안 보임`);
       if (!r.runEnabled) problem(`${id}: 끝난 뒤 버튼이 풀리지 않음`);
     }
+    // 옛 모델 응답(audio/L16 PCM)도 한 번 — 기본 모의는 실제와 같은 audio/wav(RIFF)
+    {
+      geminiFormat = 'l16';
+      await pick('gemini');
+      await page.click('#ttsRun');
+      await page.waitForFunction(() => { const s = document.querySelector('#ttsStatus').textContent.trim(); return s && !/만드는 중/.test(s); }, null, { timeout: 30000 });
+      const st = await page.evaluate(() => ({ status: document.querySelector('#ttsStatus').textContent, audioInfo: document.querySelector('#audioInfo').textContent }));
+      report.runs['gemini-l16'] = st;
+      if (!/^완성/.test(st.status) || !/내레이션 \(제미나이\)/.test(st.audioInfo)) problem(`gemini(audio/L16 응답): 완성되지 않음 — ${JSON.stringify(st)}`);
+      geminiFormat = 'wav';
+    }
     // 보낸 요청 확인 — 키가 알맞은 자리에만 갔는지
     const gc = report.calls.gemini[0];
+    // 모델 이름은 tts.js PROVIDERS 한 곳에서 읽는다(바뀌어도 이 점검을 고치지 않게)
+    const ttsModel = await page.evaluate(async () => (await import('/js/tts.js')).providerOf('gemini').model);
+    report.geminiModel = ttsModel;
     if (!gc) problem('제미나이 요청이 안 나감');
     else {
-      if (!gc.url.includes('gemini-2.5-flash-preview-tts:generateContent') || gc.url.includes(KEYS.gemini)) problem(`제미나이 URL(키는 URL 에 실리면 안 됨): ${gc.url}`);
+      if (!ttsModel || !gc.url.includes(`/models/${ttsModel}:generateContent`) || gc.url.includes(KEYS.gemini)) problem(`제미나이 URL(모델 ${ttsModel}, 키는 URL 에 실리면 안 됨): ${gc.url}`);
       if (gc.headers['x-goog-api-key'] !== KEYS.gemini) problem('제미나이 x-goog-api-key 헤더가 다름');
       if (gc.body?.generationConfig?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName !== 'Kore') problem('제미나이 본문 voiceName 이 Kore 가 아님');
       if (!gc.body?.generationConfig?.responseModalities?.includes('AUDIO')) problem('제미나이 본문 responseModalities 에 AUDIO 없음');
@@ -221,38 +282,39 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
     if (report.calls.gemini.some((c) => JSON.stringify(c).includes(KEYS.elevenlabs) || JSON.stringify(c).includes(KEYS.fish))) problem('제미나이 요청에 다른 서비스 키가 섞임');
     if (report.calls.elevenlabs.some((c) => JSON.stringify(c).includes(KEYS.gemini) || JSON.stringify(c).includes(KEYS.fish))) problem('일레븐랩스 요청에 다른 서비스 키가 섞임');
 
-    // ── (d) 기억 체크 ──
+    // ── (d) 기억 체크(맨 위 키 칸 #keyRemember) ──
     const ls = () => page.evaluate(() => {
       const all = {};
       for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); all[k] = localStorage.getItem(k); }
-      return all;
+      const ss = {};
+      for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); ss[k] = sessionStorage.getItem(k); }
+      return { all, ss };
     });
     const hasKey = (all, key) => Object.values(all).some((v) => String(v).includes(key));
-    await pick('gemini');
-    await page.fill('#ttsKey', KEYS.gemini);
-    const remember0 = await page.$eval('#ttsRemember', (el) => el.checked);
-    let all = await ls();
-    report.remember.off = { checked: remember0, keyInStorage: hasKey(all, KEYS.gemini), ttsKeys: all['mrk:ttsKeys'] || null, hasTtsSettings: !!all['mrk:tts'] };
+    const remember0 = await page.$eval('#keyRemember', (el) => el.checked);
+    let { all, ss } = await ls();
+    report.remember.off = { checked: remember0, keyInStorage: hasKey(all, KEYS.gemini), keyInSession: hasKey(ss, KEYS.gemini), ttsKeys: all['mrk:ttsKeys'] || null, hasTtsSettings: !!all['mrk:tts'] };
     if (remember0) problem('기억 체크가 기본으로 켜져 있음');
     if (hasKey(all, KEYS.gemini)) problem('기억 체크가 꺼져 있는데 localStorage 에 키가 있음');
+    if (!hasKey(ss, KEYS.gemini)) problem('기억 끔: 이 탭(sessionStorage)에 키가 없음');
+    if (all['mrk:ttsKeys']) problem("예전 키 저장(store 'ttsKeys')이 다시 생김");
     if (!all['mrk:tts']) problem("설정(store 'tts')이 저장되지 않음");
-    if (all['mrk:tts'] && (all['mrk:tts'].includes(KEYS.gemini) || all['mrk:tts'].includes(KEYS.fish))) problem("설정(store 'tts')에 키가 섞임");
+    if (all['mrk:tts'] && Object.values(KEYS).some((k) => all['mrk:tts'].includes(k))) problem("설정(store 'tts')에 키가 섞임");
     if (all['mrk:shorts'] && /tts/i.test(all['mrk:shorts'])) problem("프로젝트 설정(store 'shorts')에 tts 항목이 들어감");
-    await page.check('#ttsRemember');
-    all = await ls();
-    report.remember.on = { keyInStorage: hasKey(all, KEYS.gemini), ttsKeys: all['mrk:ttsKeys'] || null };
-    if (!hasKey(all, KEYS.gemini)) problem('기억 체크를 켰는데 localStorage 에 키가 없음');
-    // 다른 서비스로 갔다가 돌아와도 키·체크가 남아 있다
+    await page.check('#keyRemember');
+    ({ all, ss } = await ls());
+    report.remember.on = { keyInStorage: hasKey(all, KEYS.gemini), keyInSession: hasKey(ss, KEYS.gemini) };
+    if (!String(all['mrkv.keys'] || '').includes(KEYS.gemini) || !String(all['mrkv.keys'] || '').includes(KEYS.fish)) problem('기억 체크를 켰는데 localStorage(mrkv.keys)에 키가 없음');
+    // 서비스를 바꿔도 각자 키 상태가 맞게 보인다
     await pick('fish');
-    const fishKeyAfter = await page.$eval('#ttsKey', (el) => el.value);
-    if (fishKeyAfter !== '') problem(`Fish 로 바꿨는데 제미나이 키가 칸에 남아 있음: "${fishKeyAfter}"`);
+    const fishState = await page.$eval('#ttsKeyState', (el) => el.textContent);
+    if (fishState !== 'Fish Audio 키 ✓') problem(`Fish 로 바꿨는데 키 상태: "${fishState}"`);
     await pick('gemini');
-    const back = await page.evaluate(() => ({ key: document.querySelector('#ttsKey').value, checked: document.querySelector('#ttsRemember').checked }));
-    if (back.key !== KEYS.gemini || !back.checked) problem(`제미나이로 돌아왔는데 기억한 키가 안 돌아옴: ${JSON.stringify(back)}`);
-    await page.uncheck('#ttsRemember');
-    all = await ls();
-    report.remember.offAgain = { keyInStorage: hasKey(all, KEYS.gemini), ttsKeys: all['mrk:ttsKeys'] || null };
+    await page.uncheck('#keyRemember');
+    ({ all, ss } = await ls());
+    report.remember.offAgain = { keyInStorage: hasKey(all, KEYS.gemini), keyInSession: hasKey(ss, KEYS.gemini) };
     if (hasKey(all, KEYS.gemini)) problem('기억 체크를 껐는데 localStorage 에 키가 남아 있음');
+    if (!hasKey(ss, KEYS.gemini)) problem('기억을 끈 뒤 이 탭에서 키가 사라짐(탭 안에는 남아야 함)');
 
     await page.screenshot({ path: path.join(OUT, 'desktop.png'), fullPage: false });
 
@@ -286,7 +348,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
   console.log(JSON.stringify({
     ok: report.ok, problems: report.problems, consoleErrors: report.consoleErrors, expected404: report.expected404.length,
     runs: Object.fromEntries(Object.entries(report.runs).map(([k, v]) => [k, { status: v.status, audioInfo: v.audioInfo, fit: v.fitEnabled, save: v.saveVisible, ms: v.ms }])),
-    remember: report.remember, mobile: report.mobile, calls: { gemini: report.calls.gemini.length, elevenlabs: report.calls.elevenlabs.length, fish: report.calls.fish.length, health: report.calls.health },
+    remember: report.remember, noKey: report.noKey, geminiModel: report.geminiModel, mobile: report.mobile, calls: { gemini: report.calls.gemini.length, elevenlabs: report.calls.elevenlabs.length, fish: report.calls.fish.length, health: report.calls.health },
   }, null, 2));
   process.exit(report.ok ? 0 : 1);
 })();
