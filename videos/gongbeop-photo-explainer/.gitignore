@@ -1,0 +1,10 @@
+node_modules/
+tts/
+stills/
+out.mp4
+*.log
+.fish_key
+public/voice.wav
+public/photo*.webp
+public/fonts/
+public/face.webm
