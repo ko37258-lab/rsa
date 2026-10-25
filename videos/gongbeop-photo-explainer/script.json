@@ -511,6 +511,21 @@
        "type": "panel",
        "kw": "국토계획법",
        "item": "law"
+      },
+      {
+       "type": "panel",
+       "kw": "주거",
+       "item": "z0"
+      },
+      {
+       "type": "panel",
+       "kw": "상업",
+       "item": "z1"
+      },
+      {
+       "type": "panel",
+       "kw": "공업",
+       "item": "z2"
       }
      ]
     }

@@ -240,7 +240,7 @@ const Panel: React.FC<{t: number; to: number}> = ({t, to}) => {
         </div>
         <div style={{marginTop: 18, display: 'flex', flexDirection: 'column', gap: 12}}>
           {ZONES.map((z, i) => {
-            const kb = appear(t, (it('law')?.at ?? 1e9) + 0.25 + i * 0.75, 0.7);
+            const kb = appear(t, it('z' + i)?.at ?? (it('law')?.at ?? 1e9) + 0.25 + i * 0.75, 0.6);
             return (
               <div key={z.n} style={{display: 'flex', alignItems: 'center', gap: 18, height: 44}}>
                 <div style={{width: 92, fontSize: 30, fontWeight: 900, color: INK, display: 'flex', alignItems: 'center', gap: 10}}><span style={{width: 18, height: 18, borderRadius: 5, background: z.c, display: 'inline-block'}} />{z.n}</div>

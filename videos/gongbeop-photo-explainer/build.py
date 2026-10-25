@@ -105,7 +105,14 @@ def frac_to_time(s, frac, edge='s'):
 
 
 def kw_time(s, kw):
-    say = norm(s['say']); k = norm(kw); j = say.find(k)
+    # 1) 음성인식 단어에서 키워드를 직접 찾는다 (숫자 읽기처럼 글자 수가 달라도 정확)
+    k = norm(kw); first = norm(kw.split()[0])
+    for w in s['words']:
+        nw = norm(w['w'])
+        if nw and (k in nw or (len(nw) >= 2 and k.startswith(nw)) or (' ' in kw and nw == first)):
+            return w['s']
+    # 2) 없으면 대본 글자 비율로 추정
+    say = norm(s['say']); j = say.find(k)
     if j < 0: print('  kw not found:', kw, 'in', s['say']); return s['s']
     return frac_to_time(s, j / max(1, len(say)))
 
