@@ -1,0 +1,1185 @@
+<title>K-쇼츠컷 전체 화면</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;500;700;800;900&family=IBM+Plex+Sans+KR:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap">
+<style>
+:root{
+  /* Layout: 쇼룸 한 장 — 브라우저 창 모양 프레임에 실제 크기 화면을 작업 순서대로 쌓고, '한눈에 보기'에서는 축소판 여러 열로 전부 펼친다 */
+  /* 색은 K-쇼츠컷 사이트 CSS의 클로드(기본)·다크 테마 값을 그대로 사용 */
+  --bg:#f0e9dc;--bg-grad-top:#f7f3ec;--bg-grad-bottom:#ece3d3;--panel:#fffdfa;--panel-2:#f3ede1;--border:#e6dccb;
+  --text:#2a2620;--muted:#6f6656;--gold:#c4633b;--gold-dim:#a44f2d;--danger:#c0392b;--ok:#4e9a6b;--btn-text:#fff;
+  --grad-a:#c4633b;--grad-b:#e0895f;--header-bg:#f7f3eccc;--canvas:#e7dece;
+  --card-shadow:0 1px 2px #46321e0a,0 6px 20px #7855320d;
+  --frame-shadow:0 1px 3px #46321e14,0 18px 50px #5a3c1e1c;
+  --menu-shadow:0 10px 24px #2a26201f;
+  --ui-font:"Pretendard Variable","Pretendard","Noto Sans KR","Malgun Gothic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a0a12;--bg-grad-top:#0a0a12;--bg-grad-bottom:#0a0a12;--panel:#12121f;--panel-2:#1a1a2c;--border:#26263c;
+  --text:#f2f2f7;--muted:#9a9ab0;--gold:#ffcf0d;--gold-dim:#b8960a;--danger:#ff5c7a;--ok:#3ddc97;--btn-text:#141000;
+  --grad-a:#ffcf0d;--grad-b:#ffe98a;--header-bg:#0a0a12d9;--canvas:#05050a;
+  --card-shadow:none;--frame-shadow:0 0 0 1px #26263c,0 24px 60px #000c;--menu-shadow:0 10px 24px #000a;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a0a12;--bg-grad-top:#0a0a12;--bg-grad-bottom:#0a0a12;--panel:#12121f;--panel-2:#1a1a2c;--border:#26263c;
+  --text:#f2f2f7;--muted:#9a9ab0;--gold:#ffcf0d;--gold-dim:#b8960a;--danger:#ff5c7a;--ok:#3ddc97;--btn-text:#141000;
+  --grad-a:#ffcf0d;--grad-b:#ffe98a;--header-bg:#0a0a12d9;--canvas:#05050a;
+  --card-shadow:none;--frame-shadow:0 0 0 1px #26263c,0 24px 60px #000c;--menu-shadow:0 10px 24px #000a;color-scheme:dark}
+
+/* 페이지 안 테마 선택(사이트와 같은 5종). 고르면 보는 사람 설정보다 우선 */
+body[data-skin="claude"]{--bg:#f0e9dc;--bg-grad-top:#f7f3ec;--bg-grad-bottom:#ece3d3;--panel:#fffdfa;--panel-2:#f3ede1;--border:#e6dccb;--text:#2a2620;--muted:#6f6656;--gold:#c4633b;--gold-dim:#a44f2d;--danger:#c0392b;--ok:#4e9a6b;--btn-text:#fff;--grad-a:#c4633b;--grad-b:#e0895f;--header-bg:#f7f3eccc;--canvas:#e7dece;--card-shadow:0 1px 2px #46321e0a,0 6px 20px #7855320d;--frame-shadow:0 1px 3px #46321e14,0 18px 50px #5a3c1e1c;--menu-shadow:0 10px 24px #2a26201f;color-scheme:light}
+body[data-skin="dark"]{--bg:#0a0a12;--bg-grad-top:#0a0a12;--bg-grad-bottom:#0a0a12;--panel:#12121f;--panel-2:#1a1a2c;--border:#26263c;--text:#f2f2f7;--muted:#9a9ab0;--gold:#ffcf0d;--gold-dim:#b8960a;--danger:#ff5c7a;--ok:#3ddc97;--btn-text:#141000;--grad-a:#ffcf0d;--grad-b:#ffe98a;--header-bg:#0a0a12d9;--canvas:#05050a;--card-shadow:none;--frame-shadow:0 0 0 1px #26263c,0 24px 60px #000c;--menu-shadow:0 10px 24px #000a;color-scheme:dark}
+body[data-skin="toss"]{--bg:#f2f4f6;--bg-grad-top:#fff;--bg-grad-bottom:#eef1f4;--panel:#fff;--panel-2:#f2f4f6;--border:#e5e8eb;--text:#191f28;--muted:#8b95a1;--gold:#3182f6;--gold-dim:#1b64da;--danger:#f04452;--ok:#12b886;--btn-text:#fff;--grad-a:#3182f6;--grad-b:#6aa9ff;--header-bg:#ffffffd1;--canvas:#e3e8ee;--card-shadow:0 1px 2px #46321e0a,0 6px 20px #7855320d;--frame-shadow:0 1px 3px #191f2814,0 18px 50px #191f281a;--menu-shadow:0 10px 24px #191f281f;color-scheme:light}
+body[data-skin="mac"]{--bg:#ececee;--bg-grad-top:#f5f5f7;--bg-grad-bottom:#e3e3e6;--panel:#fbfbfd;--panel-2:#eeeef1;--border:#d7d7dc;--text:#1d1d1f;--muted:#6e6e73;--gold:#007aff;--gold-dim:#0060df;--danger:#ff3b30;--ok:#34c759;--btn-text:#fff;--grad-a:#007aff;--grad-b:#64b5ff;--header-bg:#f5f5f7bf;--canvas:#dadade;--card-shadow:0 1px 2px #46321e0a,0 6px 20px #7855320d;--frame-shadow:0 1px 3px #1d1d1f14,0 18px 50px #1d1d1f1a;--menu-shadow:0 10px 24px #1d1d1f1f;color-scheme:light}
+body[data-skin="apple"]{--bg:#fff;--bg-grad-top:#fff;--bg-grad-bottom:#f5f5f7;--panel:#fff;--panel-2:#f5f5f7;--border:#d2d2d7;--text:#1d1d1f;--muted:#86868b;--gold:#0071e3;--gold-dim:#0058b0;--danger:#e30000;--ok:#2fa84f;--btn-text:#fff;--grad-a:#1d1d1f;--grad-b:#6e6e73;--header-bg:#ffffffd1;--canvas:#ebebef;--card-shadow:0 1px 2px #46321e0a,0 6px 20px #7855320d;--frame-shadow:0 1px 3px #1d1d1f14,0 18px 50px #1d1d1f1a;--menu-shadow:0 10px 24px #1d1d1f1f;color-scheme:light}
+body[data-font="noto"]{--ui-font:"Noto Sans KR","Malgun Gothic",sans-serif}
+body[data-font="plex"]{--ui-font:"IBM Plex Sans KR","Malgun Gothic",sans-serif}
+body[data-font="gothica1"]{--ui-font:"Gothic A1","Malgun Gothic",sans-serif}
+
+*{box-sizing:border-box}
+body{background:var(--canvas);color:var(--text);font-family:var(--ui-font);font-size:14px;line-height:1.5;word-break:keep-all;overflow-wrap:break-word;-webkit-font-smoothing:antialiased;padding-block:0 64px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--panel)}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,h4{text-wrap:balance}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.tnum{font-variant-numeric:tabular-nums}
+.wrap{max-width:1480px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body.view-grid .wrap.board-wrap{max-width:none}
+
+/* ---------- 공통 부품 (사이트의 mrk-* 클래스와 같은 값) ---------- */
+.grad{background:linear-gradient(120deg,var(--grad-a) 20%,var(--grad-b) 50%,var(--grad-a) 80%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--card-shadow)}
+.pad{padding:20px}
+.input{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:10px;outline:none;padding:10px 14px;transition:border-color .15s;font:inherit;font-size:14px;width:100%;min-width:0}
+.input:focus{border-color:var(--gold)}
+select.input{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:34px}
+.btn-gold{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--gold);color:var(--btn-text);border:0;border-radius:10px;font-weight:700;padding:10px 16px;font-size:14px;transition:transform .1s,filter .15s;white-space:nowrap}
+.btn-gold:hover:not(:disabled){filter:brightness(1.06);transform:translateY(-1px)}
+.btn-gold:disabled{opacity:.5;cursor:not-allowed}
+.btn-line{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:10px;font-weight:600;padding:9px 15px;font-size:14px;transition:border-color .15s;white-space:nowrap}
+.btn-line:hover{border-color:var(--gold)}
+.sm{padding:7px 12px;font-size:13px}
+.muted{color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--border);background:var(--panel);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;transition:color .15s,border-color .15s}
+.chip:hover{color:var(--text)}
+.chip.on{background:color-mix(in srgb,var(--gold) 15%,transparent);color:var(--gold);border-color:var(--gold)}
+.chip .c{font-variant-numeric:tabular-nums;opacity:.75;margin-left:4px}
+.status{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;border:1px solid var(--border);white-space:nowrap}
+.status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.status.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+.status.run{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 50%,transparent);background:color-mix(in srgb,var(--gold) 12%,transparent)}
+.status.run::before{animation:pulse-bar 1.6s ease-in-out infinite}
+.status.sched{color:var(--gold);border-color:var(--gold)}
+.status.done{color:var(--muted)}
+.status.bad{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,transparent);background:color-mix(in srgb,var(--danger) 8%,transparent)}
+@keyframes pulse-bar{0%,to{opacity:1}50%{opacity:.55}}
+.mrk-progress-active{animation:pulse-bar 1.6s ease-in-out infinite}
+
+/* ---------- 상단 쇼룸 막대 ---------- */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--header-bg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.bar-in{display:flex;align-items:center;gap:10px 14px;min-height:58px;padding-block:8px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:-.02em;font-size:15px;flex-shrink:0}
+.brand .k{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--gold);color:var(--btn-text);font-size:13px;font-weight:900}
+.brand small{font-weight:600;color:var(--muted);font-size:12px;letter-spacing:0}
+.jumps{flex:1 1 auto;min-width:0;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.jumps::-webkit-scrollbar{display:none}
+.jumps a{white-space:nowrap;padding:6px 10px;border-radius:999px;font-size:13px;font-weight:600;color:var(--muted);transition:color .15s,background .15s}
+.jumps a b{font-family:var(--mono);font-size:11px;color:var(--gold);margin-right:5px}
+.jumps a:hover,.jumps a.on{color:var(--text);background:var(--panel-2)}
+.ctrls{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:999px;padding:2px;background:var(--panel)}
+.seg button{border:0;background:none;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--muted)}
+.seg button.on{background:var(--gold);color:var(--btn-text)}
+@media (max-width:900px){.jumps{order:3;flex-basis:100%}}
+
+/* ---------- 소개 ---------- */
+.intro{display:grid;gap:32px;padding-block:40px 8px;align-items:center}
+@media (min-width:1080px){.intro{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:48px}}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--gold);margin:0 0 10px}
+.intro h1{font-size:clamp(30px,4.4vw,52px);line-height:1.12;font-weight:900;letter-spacing:-.035em;margin:0}
+.lead{font-size:16px;color:var(--muted);max-width:60ch;margin:16px 0 0;line-height:1.7}
+.intro-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.scope{display:grid;gap:12px;margin-top:26px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.scope div{border-top:2px solid var(--border);padding-top:10px}
+.scope div:first-child{border-top-color:var(--ok)}
+.scope h3{font-size:13px;margin:0 0 4px;font-weight:800}
+.scope p{margin:0;font-size:13px;color:var(--muted);line-height:1.6}
+.demo{padding:20px;display:grid;gap:16px;min-width:0}
+.demo-src{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;align-items:center}
+.demo-src h3{font-size:15px;margin:0 0 4px;font-weight:800;line-height:1.35}
+.demo-src p{margin:0;font-size:12px;color:var(--muted)}
+.demo-arrow{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--gold)}
+.demo-arrow::before,.demo-arrow::after{content:"";height:1px;flex:1;background:var(--border)}
+.mini-row{display:grid;grid-template-columns:repeat(6,minmax(88px,1fr));gap:10px;overflow-x:auto;padding-bottom:4px}
+
+/* ---------- 화면 판 ---------- */
+.board{display:grid;grid-template-columns:minmax(0,1fr);gap:64px;margin-top:48px}
+.screen{min-width:0}
+body.view-grid .board{grid-template-columns:repeat(auto-fill,minmax(min(100%,600px),1fr));gap:40px 28px;align-items:start}
+body.view-grid .viewport{zoom:.5}
+.slabel{display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap;margin-bottom:14px}
+.slabel .n{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--gold)}
+.slabel h2{font-size:22px;font-weight:900;letter-spacing:-.025em;margin:0}
+.slabel code{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.slabel .src{margin-left:auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid var(--border);color:var(--muted);background:var(--panel)}
+.slabel .src.same{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
+.slabel p{flex-basis:100%;margin:0;color:var(--muted);font-size:13px;max-width:80ch}
+body.view-grid .slabel p{display:none}
+.frame{border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--frame-shadow);background:var(--panel)}
+.chrome{height:38px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel-2);border-bottom:1px solid var(--border)}
+.dots{display:flex;gap:6px;flex-shrink:0}
+.dots i{width:11px;height:11px;border-radius:50%;background:#ff5f57}
+.dots i:nth-child(2){background:#febc2e}.dots i:nth-child(3){background:#28c840}
+.url{flex:1;min-width:0;max-width:560px;margin:0 auto;text-align:center;font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:3px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.url b{color:var(--text);font-weight:600}
+.chrome-sp{width:45px;flex-shrink:0}
+@media (max-width:560px){.chrome-sp{display:none}}
+
+/* ---------- 앱 화면 (프레임 안) ---------- */
+.viewport{background:linear-gradient(180deg,var(--bg-grad-top) 0%,var(--bg-grad-bottom) 100%);color:var(--text);font-family:var(--ui-font);font-size:16px;line-height:1.5}
+.ahead{border-bottom:1px solid var(--border);background:var(--header-bg);backdrop-filter:blur(8px)}
+.ahead-in{max-width:1152px;margin:0 auto;height:56px;display:flex;align-items:center;gap:16px;padding:0 16px}
+.alogo{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.alogo-k{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;background:var(--gold);color:var(--btn-text);font-size:14px;font-weight:900}
+.alogo-t{font-size:18px;font-weight:800;letter-spacing:-.025em}
+.anav{display:flex;align-items:center;gap:16px;font-size:14px;min-width:0;overflow-x:auto;scrollbar-width:none;white-space:nowrap;margin-left:auto}
+.anav::-webkit-scrollbar{display:none}
+.anav a{color:var(--muted);transition:color .15s}
+.anav a:hover{color:var(--text)}
+.anav a.hot{color:var(--gold);font-weight:700}
+.anav a.on{color:var(--text);font-weight:700}
+.apick{display:flex;gap:8px;flex-shrink:0}
+@media (max-width:640px){.apick{display:none}}
+.picker{position:relative}
+.pbtn{display:flex;align-items:center;gap:6px;border-radius:999px;border:1px solid var(--border);background:var(--panel);padding:6px 12px;font-size:12px;font-weight:600;color:var(--muted);transition:color .15s;white-space:nowrap}
+.pbtn:hover{color:var(--text)}
+.pmenu{position:absolute;right:0;top:100%;z-index:70;margin-top:4px;min-width:128px;overflow:hidden;border-radius:12px;border:1px solid var(--border);background:var(--panel);padding:4px 0;box-shadow:var(--menu-shadow)}
+.pmenu button{display:flex;width:100%;align-items:center;gap:8px;padding:8px 12px;text-align:left;font-size:14px;border:0;background:none;color:var(--text)}
+.pmenu button:hover{background:var(--panel-2)}
+.pmenu button.on{font-weight:700;color:var(--gold)}
+.afoot{border-top:1px solid var(--border);padding:24px 16px;text-align:center;font-size:12px;color:var(--muted)}
+.amain{max-width:1152px;margin:0 auto;padding:32px 16px 56px}
+.amain.narrow{max-width:768px}
+.ah1{font-size:24px;font-weight:900;letter-spacing:-.02em;margin:0;line-height:1.3}
+.asub{color:var(--muted);font-size:14px;margin:4px 0 0}
+.ahead-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;margin-bottom:20px}
+.back{display:inline-block;font-size:13px;color:var(--muted);margin-bottom:12px}
+.back:hover{color:var(--text)}
+.lab{display:block;font-size:13px;font-weight:700;margin-bottom:8px}
+.h3{font-size:15px;font-weight:800;margin:0 0 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.h3 small{font-size:12px;font-weight:600;color:var(--muted)}
+
+/* 로그인 */
+.login{max-width:384px;margin:0 auto;display:flex;flex-direction:column;gap:16px;padding:80px 16px}
+.login h1{text-align:center;font-size:24px;font-weight:900;margin:0}
+.login p{text-align:center;margin:0}
+.login form{display:flex;flex-direction:column;gap:12px;padding:20px}
+.login .btn-gold{padding:10px}
+.login .err{font-size:14px;color:var(--danger);text-align:left}
+
+/* 16:9 썸네일 */
+.thumb{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:12px;overflow:hidden;container-type:inline-size;isolation:isolate}
+.thumb-txt{position:absolute;left:6%;top:50%;transform:translateY(-50%);z-index:2;display:flex;flex-direction:column;gap:1.5cqw;max-width:66%;font-weight:900;font-size:8.4cqw;line-height:1.08;letter-spacing:-.045em;color:#fff;-webkit-text-stroke:1.1cqw #000;paint-order:stroke fill;font-family:"Gothic A1","Noto Sans KR",var(--ui-font)}
+.thumb-txt b{color:#ffd400;font-weight:900}
+.thumb .person{left:auto;right:3%;width:38%}
+.badge-dur{position:absolute;right:3%;bottom:4%;z-index:3;background:#000000b3;color:#fff;font-size:max(10px,3.6cqw);font-weight:700;border-radius:4px;padding:.05em .45em;font-variant-numeric:tabular-nums}
+.badge-hot{position:absolute;left:3%;top:5%;z-index:3;background:#ffd400;color:#111;font-size:max(10px,3.6cqw);font-weight:900;border-radius:4px;padding:.1em .5em}
+.th-a{background:radial-gradient(120% 90% at 85% 30%,#6b3b25 0%,#2a150c 55%,#120804 100%)}
+.th-b{background:radial-gradient(120% 90% at 85% 30%,#24496b 0%,#0e1d33 55%,#060c17 100%)}
+.th-c{background:radial-gradient(120% 90% at 85% 30%,#3f5a2b 0%,#18240f 55%,#0a1006 100%)}
+.th-d{background:radial-gradient(120% 90% at 85% 30%,#5b2a4b 0%,#25101f 55%,#11060e 100%)}
+.th-e{background:radial-gradient(120% 90% at 85% 30%,#6a5a1d 0%,#2c240a 55%,#141004 100%)}
+.th-f{background:radial-gradient(120% 90% at 85% 30%,#1f5b57 0%,#0b2523 55%,#051110 100%)}
+
+/* 사람 실루엣 (썸네일·쇼츠 공용) */
+.person{position:absolute;bottom:0;left:2%;width:96%;aspect-ratio:1/1.05;z-index:1}
+.person::before{content:"";position:absolute;left:0;right:0;bottom:0;height:64%;border-radius:46% 46% 0 0/34% 34% 0 0;background:linear-gradient(180deg,#46557a 0%,#27304a 40%,#161b2b 100%);box-shadow:inset 0 2px 0 #ffffff1f}
+.person::after{content:"";position:absolute;left:30%;width:40%;top:4%;aspect-ratio:1/1.12;border-radius:50% 50% 46% 46%;background:radial-gradient(circle at 42% 38%,#f1d2b2 0%,#d3a57e 55%,#a87653 100%);box-shadow:0 -0.1em 0 0 #2a1d16}
+
+/* 9:16 쇼츠 미리보기 */
+.short{position:relative;aspect-ratio:9/16;max-width:100%;width:100%;border-radius:12px;overflow:hidden;container-type:inline-size;isolation:isolate;background:linear-gradient(180deg,#3d3029 0%,#241a14 45%,#120c09 100%);color:#fff}
+.short.bg-b{background:linear-gradient(180deg,#26344f 0%,#151d30 45%,#0a0e18 100%)}
+.short.bg-c{background:linear-gradient(180deg,#2d3d2a 0%,#182316 45%,#0a1009 100%)}
+.short.bg-d{background:linear-gradient(180deg,#43293a 0%,#26161f 45%,#12090f 100%)}
+.short.bg-e{background:linear-gradient(180deg,#45401f 0%,#262210 45%,#121006 100%)}
+.short.bg-f{background:linear-gradient(180deg,#1f3f3d 0%,#112624 45%,#081211 100%)}
+.short .board-bg{position:absolute;left:8%;right:8%;top:17%;height:24%;border-radius:2px;background:repeating-linear-gradient(180deg,#ffffff10 0 1px,transparent 1px 12%),#ffffff14;z-index:0}
+.short .person{animation:sway 6s ease-in-out infinite}
+.short .track{position:absolute;left:27%;width:46%;top:44%;height:25%;border:max(1px,.6cqw) dashed #3ddc97;border-radius:4px;z-index:2;animation:sway 6s ease-in-out infinite}
+.short .track span{position:absolute;left:-1px;top:-1px;transform:translateY(-100%);background:#3ddc97;color:#06281a;font-size:max(7px,3.4cqw);font-weight:800;padding:0 .4em;border-radius:3px 3px 3px 0;white-space:nowrap}
+@keyframes sway{0%,100%{transform:translateX(-2.5%)}50%{transform:translateX(2.5%)}}
+.short .hook{position:absolute;left:6%;right:6%;top:7%;z-index:3;text-align:center;font-weight:900;font-size:7.6cqw;line-height:1.3;letter-spacing:-.04em;font-family:"Gothic A1","Noto Sans KR",var(--ui-font)}
+.short .hook span{background:#ffd400;color:#111;padding:.08em .35em;border-radius:.2em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.short .sub{position:absolute;left:5%;right:5%;bottom:13%;z-index:3;text-align:center;font-weight:900;font-size:7.2cqw;line-height:1.3;letter-spacing:-.03em;color:#fff;-webkit-text-stroke:1.2cqw #000;paint-order:stroke fill;font-family:"Gothic A1","Noto Sans KR",var(--ui-font);min-height:2.6em;display:flex;align-items:flex-end;justify-content:center;flex-wrap:wrap;gap:0 .28em}
+.short .sub .w.on{color:#ffd400}
+.short .voice{position:absolute;left:5%;top:calc(7% + 0px);z-index:4;display:none}
+.short .len{position:absolute;right:4%;bottom:3%;z-index:4;background:#00000099;color:#fff;font-size:max(8px,4cqw);font-weight:700;border-radius:4px;padding:0 .4em;font-variant-numeric:tabular-nums}
+.short .mic{position:absolute;left:4%;bottom:3%;z-index:4;background:#00000099;color:#fff;font-size:max(8px,4cqw);font-weight:700;border-radius:4px;padding:0 .4em}
+/* 자막 스타일 4종 */
+.short.st-outline .hook span{background:none;color:#fff;-webkit-text-stroke:1.3cqw #000;paint-order:stroke fill;padding:0}
+.short.st-outline .sub .w.on{color:#fff;background:#e53935;-webkit-text-stroke:0;padding:0 .15em;border-radius:.15em}
+.short.st-box .hook span{background:#000000c0;color:#fff}
+.short.st-box .sub{-webkit-text-stroke:0}
+.short.st-box .sub .w{background:#000000b0;padding:0 .12em}
+.short.st-box .sub .w.on{color:#3ddc97}
+.short.st-minimal .hook{font-weight:700;font-size:6.4cqw}
+.short.st-minimal .hook span{background:none;color:#fff;text-shadow:0 .1em .4em #000c;padding:0}
+.short.st-minimal .sub{-webkit-text-stroke:0;font-weight:700;font-size:6.2cqw;text-shadow:0 .08em .35em #000}
+.short.st-minimal .sub .w{opacity:.55}
+.short.st-minimal .sub .w.on{opacity:1;color:#fff}
+.short .play{position:absolute;inset:0;z-index:5;display:grid;place-items:center;background:transparent;border:0;color:#fff}
+.short .play i{display:grid;place-items:center;width:18cqw;height:18cqw;border-radius:50%;background:#000000a6;font-style:normal;font-size:7cqw;opacity:0;transition:opacity .2s}
+.short .play:hover i,.short.paused .play i,.short .play:focus-visible i{opacity:1}
+
+/* 뜨는 영상 */
+.tbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.tbar .right{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.tbar select{width:auto}
+.vgrid{display:grid;gap:20px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.vcard{display:flex;flex-direction:column;overflow:hidden}
+.vcard .thumb{border-radius:0}
+.vbody{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.vbody h3{font-size:15px;font-weight:800;line-height:1.4;margin:0;letter-spacing:-.01em}
+.vmeta{font-size:12px;color:var(--muted);margin:0}
+.vbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.meter{height:6px;border-radius:999px;background:var(--panel-2);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--gold);border-radius:999px}
+.vbar b{color:var(--gold);font-variant-numeric:tabular-nums}
+.vact{display:flex;gap:8px;margin-top:auto;padding-top:4px}
+.vact .btn-gold{flex:1}
+
+/* 새 프로젝트 */
+.mhero{text-align:center;margin-bottom:28px}
+.mhero h1{font-size:clamp(30px,5vw,48px);font-weight:900;letter-spacing:-.035em;line-height:1.15;margin:0}
+.mhero p{color:var(--muted);margin:12px auto 0;max-width:52ch;font-size:15px}
+.mstack{display:grid;gap:16px}
+.urlrow{display:flex;gap:8px}
+.fetched{display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}
+.fetched h4{margin:0;font-size:14px;line-height:1.4}
+.fetched p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.okline{color:var(--ok);font-weight:700;font-size:12px;margin-top:6px!important}
+.mgrid{display:grid;gap:16px}
+@media (min-width:720px){.mgrid{grid-template-columns:1fr 1fr}}
+.field{display:grid;gap:8px;margin-bottom:18px}
+.field:last-child{margin-bottom:0}
+.rangerow{display:flex;align-items:center;gap:12px}
+.rangerow input{flex:1;accent-color:var(--gold)}
+.rangerow output{font-weight:900;font-size:20px;min-width:2.2em;text-align:right;font-variant-numeric:tabular-nums}
+.segs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.segs button{border:1px solid var(--border);background:var(--panel-2);border-radius:10px;padding:8px 0;font-size:13px;font-weight:700;color:var(--muted)}
+.segs button.on{border-color:var(--gold);color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent)}
+.feat{display:grid;gap:4px}
+.feat label{display:grid;grid-template-columns:20px minmax(0,1fr);gap:10px;align-items:start;padding:10px;border-radius:10px;cursor:pointer;transition:background .15s}
+.feat label:hover{background:var(--panel-2)}
+.feat input{width:17px;height:17px;margin:2px 0 0;accent-color:var(--gold)}
+.feat b{display:block;font-size:14px}
+.feat span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.styles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stile{border:0;background:none;padding:0;text-align:center;display:grid;gap:6px;font-size:12px;font-weight:700;color:var(--muted)}
+.stile .short{border-radius:10px;outline:2px solid transparent;outline-offset:2px;transition:outline-color .15s}
+.stile.on{color:var(--gold)}
+.stile.on .short{outline-color:var(--gold)}
+.gobtn{width:100%;height:52px;font-size:16px}
+.mnote{text-align:center;font-size:12px;color:var(--muted);margin:0}
+
+/* 만드는 중 */
+.pbar{height:10px;border-radius:999px;background:var(--panel-2);overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--grad-a),var(--grad-b))}
+.pnums{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:8px}
+.pnums b{color:var(--text)}
+.stages{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:2px}
+.stages li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 4px;border-top:1px solid var(--border);font-size:14px}
+.stages li:first-child{border-top:0}
+.stages .ic{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:900;border:2px solid var(--border);color:var(--muted)}
+.stages .done .ic{background:var(--ok);border-color:var(--ok);color:#fff}
+.stages .now .ic{border-color:var(--gold);color:var(--gold)}
+.stages .now{font-weight:700}
+.stages .wait{color:var(--muted)}
+.stages em{font-style:normal;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stages .now em{color:var(--gold);font-weight:700}
+.pgrid{display:grid;gap:16px;margin-top:16px}
+@media (min-width:860px){.pgrid{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tile{display:grid;gap:6px;font-size:11px;color:var(--muted);text-align:center}
+.tile .wait{aspect-ratio:9/16;border:2px dashed var(--border);border-radius:12px;display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--muted)}
+.tile .rendering{position:relative}
+.tile .rendering::after{content:"";position:absolute;inset:0;background:#0009;border-radius:12px;z-index:6}
+.tile .rbar{position:absolute;left:12%;right:12%;top:50%;height:6px;border-radius:999px;background:#ffffff33;overflow:hidden;z-index:7}
+.tile .rbar i{display:block;height:100%;width:58%;background:#ffcf0d;border-radius:999px}
+.tile .rtxt{position:absolute;left:0;right:0;top:calc(50% + 12px);z-index:7;color:#fff;font-size:11px;font-weight:700}
+.log{margin:0;font-family:var(--mono);font-size:12px;line-height:1.75;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;max-height:340px;overflow:auto;white-space:pre-wrap;color:var(--text)}
+.log .t{color:var(--muted)}
+.log .g{color:var(--ok)}
+.log .y{color:var(--gold);font-weight:700}
+
+/* 결과 */
+.rgrid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:600px){.rgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1000px){.rgrid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.rcard{border:0;background:none;padding:0;text-align:left;display:grid;gap:8px;color:var(--text)}
+.rcard .short{border-radius:12px;outline:2px solid transparent;outline-offset:3px;transition:outline-color .15s}
+.rcard.on .short{outline-color:var(--ok)}
+.rcard h4{margin:0;font-size:13px;font-weight:800;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.7em}
+.rmeta{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.score{font-weight:900;color:var(--gold)}
+.detail{display:grid;gap:24px;margin-top:20px;padding:24px}
+@media (min-width:860px){.detail{grid-template-columns:300px minmax(0,1fr)}}
+.dprev{width:100%;max-width:300px;margin:0 auto}
+.dprev .short{border-radius:16px}
+.dinfo{display:grid;gap:18px;min-width:0;align-content:start}
+.dtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.dtop b{color:var(--text)}
+.dhook{font-size:24px;font-weight:900;letter-spacing:-.03em;line-height:1.3;margin:4px 0 0}
+.voicechip{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:999px;padding:4px 10px;margin-top:8px}
+.wave{display:inline-flex;gap:2px;align-items:center;height:12px}
+.wave i{width:2px;background:currentColor;border-radius:1px;animation:wave 1s ease-in-out infinite}
+.wave i:nth-child(1){height:40%}.wave i:nth-child(2){height:90%;animation-delay:.15s}.wave i:nth-child(3){height:60%;animation-delay:.3s}.wave i:nth-child(4){height:100%;animation-delay:.45s}.wave i:nth-child(5){height:50%;animation-delay:.6s}
+@keyframes wave{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
+.why{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px}
+.why li::marker{color:var(--gold)}
+.sec-t{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--muted);margin:0 0 8px}
+.copybox{display:grid;gap:8px}
+.cfield{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:start;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.cfield dt{font-size:12px;font-weight:800;color:var(--muted);padding-top:2px}
+.cfield dd{margin:0;font-size:14px;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;min-width:0}
+.copy{border:1px solid var(--border);background:var(--panel);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--muted)}
+.copy:hover{color:var(--text);border-color:var(--gold)}
+.copy.done{color:var(--ok);border-color:var(--ok)}
+.dcols{display:grid;gap:18px}
+@media (min-width:1100px){.dcols{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
+.wlist{margin:0;padding:0;list-style:none;font-family:var(--mono);font-size:12px;max-height:228px;overflow:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:10px}
+.wlist li{display:grid;grid-template-columns:76px minmax(0,1fr);gap:8px;padding:5px 12px;border-top:1px solid var(--border)}
+.wlist li:first-child{border-top:0}
+.wlist li span{color:var(--muted);font-variant-numeric:tabular-nums}
+.wlist li.on{background:color-mix(in srgb,var(--gold) 14%,transparent)}
+.wlist li.on b{color:var(--gold)}
+.dact{display:flex;gap:8px;flex-wrap:wrap}
+
+/* 내 프로젝트 */
+.pjgrid{display:grid;gap:20px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));margin-top:16px}
+.pj{display:flex;flex-direction:column;overflow:hidden}
+.pj .thumb{border-radius:0}
+.pj-b{padding:14px 16px 16px;display:grid;gap:8px}
+.pj-b h3{margin:0;font-size:15px;font-weight:800;line-height:1.4}
+.pj-m{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pj-f{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:10px;border-top:1px solid var(--border)}
+.pj-f a,.pj-f button{font-size:13px;font-weight:700;color:var(--gold);background:none;border:0;padding:0}
+.pj-f a:hover,.pj-f button:hover{text-decoration:underline;text-underline-offset:2px}
+.pj .mini-p{height:6px;border-radius:999px;background:var(--panel-2);overflow:hidden}
+.pj .mini-p i{display:block;height:100%;background:var(--gold)}
+.pj .errtxt{font-size:12px;color:var(--danger);margin:0}
+
+/* 예약 캘린더 */
+.cal{display:grid;gap:16px}
+@media (min-width:900px){.cal{grid-template-columns:250px minmax(0,1fr)}}
+.tray{align-self:start;display:grid;gap:10px}
+.tray ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.titem{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center;padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);font-size:13px;font-weight:600;cursor:grab;user-select:none}
+.titem:active{cursor:grabbing}
+.titem.sel{border-color:var(--gold);box-shadow:0 0 0 2px color-mix(in srgb,var(--gold) 30%,transparent)}
+.titem small{display:block;font-size:11px;color:var(--muted);font-weight:500}
+.titem .tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tray .hint{font-size:12px;color:var(--muted);margin:0;line-height:1.6}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.pf{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+.pf.yt{background:#ff2d55}.pf.ig{background:#c13584}.pf.tt{background:#19b5b0}.pf.th{background:var(--text)}
+.calhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.mnav{display:flex;align-items:center;gap:8px}
+.mnav button{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:16px;line-height:1}
+.mnav h3{margin:0;font-size:18px;font-weight:900;min-width:9.5em;text-align:center;font-variant-numeric:tabular-nums}
+.calscroll{overflow-x:auto;border-radius:12px}
+.month{min-width:660px;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.month .wd{background:var(--panel-2);font-size:12px;font-weight:800;text-align:center;padding:6px 0;color:var(--muted)}
+.month .wd:first-child{color:var(--danger)}
+.day{background:var(--panel);min-height:104px;padding:6px;display:flex;flex-direction:column;gap:4px;transition:background .15s;cursor:pointer}
+.day.out{background:var(--panel-2)}
+.day.out .dn{opacity:.45}
+.day.over{background:color-mix(in srgb,var(--gold) 14%,var(--panel))}
+.dn{font-size:12px;font-weight:700;width:22px;height:22px;display:grid;place-items:center;border-radius:50%;font-variant-numeric:tabular-nums}
+.day.sun .dn{color:var(--danger)}
+.day.today .dn{background:var(--gold);color:var(--btn-text)}
+.ev{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 6px;border-radius:6px;background:var(--panel-2);border:1px solid var(--border);cursor:grab;min-width:0}
+.ev .tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev time{color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0}
+.ev.past{opacity:.6;cursor:default}
+.ev.past::after{content:"✓";color:var(--ok);font-weight:900;margin-left:auto;flex-shrink:0}
+
+/* 연결 설정 */
+.sgrid{display:grid;gap:16px}
+@media (min-width:860px){.sgrid{grid-template-columns:1fr 1fr}}
+.srow{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--border)}
+.srow:first-of-type{border-top:0;padding-top:0}
+.sic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:900;font-size:13px;color:#fff}
+.sic.yt{background:#ff2d55}.sic.ig{background:linear-gradient(135deg,#f58529,#dd2a7b 50%,#8134af)}.sic.tt{background:#111;box-shadow:inset 0 0 0 1px #ffffff33}.sic.th{background:#000;box-shadow:inset 0 0 0 1px #ffffff33}
+.sic.ai{background:var(--gold);color:var(--btn-text)}
+.srow b{display:block;font-size:14px}
+.srow small{display:block;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.mask{font-family:var(--mono);letter-spacing:.05em}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px 14px;font-size:14px;align-items:center}
+.kv dt{color:var(--muted);font-size:13px}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.switch{position:relative;width:38px;height:22px;flex-shrink:0}
+.switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
+.switch i{position:absolute;inset:0;border-radius:999px;background:var(--border);transition:background .15s}
+.switch i::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 2px #0003}
+.switch input:checked+i{background:var(--ok)}
+.switch input:checked+i::after{transform:translateX(16px)}
+.switch input:focus-visible+i{outline:2px solid var(--gold);outline-offset:2px}
+
+/* 알림 */
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:90;background:var(--text);color:var(--panel);font-size:13px;font-weight:600;padding:10px 16px;border-radius:999px;transition:opacity .2s,transform .2s;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.foot{margin-top:64px;text-align:center;font-size:12px;color:var(--muted)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+
+<div class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="#top"><span class="k">K</span><span>K-쇼츠컷 전체 화면 <small>예시 데이터</small></span></a>
+    <nav class="jumps" aria-label="화면 바로가기">
+      <a href="#login"><b>0</b>로그인</a>
+      <a href="#trending"><b>1</b>뜨는 영상</a>
+      <a href="#maker"><b>2</b>새 프로젝트</a>
+      <a href="#progress"><b>3</b>만드는 중</a>
+      <a href="#result"><b>4</b>결과·예시 사례</a>
+      <a href="#projects"><b>5</b>내 프로젝트</a>
+      <a href="#calendar"><b>6</b>예약 캘린더</a>
+      <a href="#connect"><b>7</b>연결 설정</a>
+    </nav>
+    <div class="ctrls">
+      <div class="seg" role="group" aria-label="보기 크기">
+        <button type="button" data-view="large" class="on">크게 보기</button>
+        <button type="button" data-view="grid">한눈에 보기</button>
+      </div>
+      <span class="picker" data-kind="font"></span>
+      <span class="picker" data-kind="theme"></span>
+    </div>
+  </div>
+</div>
+
+<main id="top">
+  <section class="wrap intro">
+    <div>
+      <p class="eyebrow">K-쇼츠컷 · 모든 화면을 한 장에</p>
+      <h1>롱폼 한 편이<br>쇼츠 여섯 개가 되기까지</h1>
+      <p class="lead">로그인부터 뜨는 영상 찾기, 쇼츠 만들기, 결과 확인, 예약 업로드, 연결 설정까지 K-쇼츠컷의 화면 8개를 한 페이지에 펼쳤습니다. 화면 속 영상 제목, 조회수, 일정은 모두 예시입니다.</p>
+      <div class="intro-actions">
+        <a class="btn-gold" href="#result">예시 사례 바로 보기</a>
+        <button type="button" class="btn-line" data-view-set="grid">한눈에 보기로 펼치기</button>
+      </div>
+      <div class="scope">
+        <div>
+          <h3>사이트에서 그대로 옮긴 것</h3>
+          <p>색 테마 5종(클로드·토스·맥·애플·다크), 글꼴 4종, 상단 메뉴, 로그인 화면, 카드·입력창·버튼 모양. 사이트 CSS의 색 값을 그대로 썼습니다.</p>
+        </div>
+        <div>
+          <h3>예시로 다시 그린 것</h3>
+          <p>비밀번호 안쪽 화면 7개. 사이트 소개 문구(하이라이트 훅, 상철오빠 AI 보이스, 화자 추적, 단어 자막, 업로드 문구)를 기준으로 구성했습니다.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card demo">
+      <div class="demo-src">
+        <div class="thumb th-a" aria-hidden="true"><div class="thumb-txt"><span>절대 사면 안 되는</span><span>땅 <b>5가지</b></span></div><div class="person"></div><span class="badge-dur">58:12</span></div>
+        <div><h3>토지투자, 절대 사면 안 되는 땅 5가지</h3><p>원본 롱폼 · 58분 12초 · 화자 2명</p></div>
+      </div>
+      <div class="demo-arrow" id="demoArrow">쇼츠 6개 · 합계 4분 38초</div>
+      <div class="mini-row" id="miniRow"></div>
+    </div>
+  </section>
+
+  <div class="wrap board-wrap">
+    <div class="board" id="board">
+
+      <!-- 0 로그인 -->
+      <section class="screen" id="login">
+        <div class="slabel"><span class="n">0</span><h2>로그인</h2><code>/login</code><span class="src same">실제 화면과 동일</span>
+          <p>인터넷(터널 주소)으로 들어오면 가장 먼저 보이는 잠금 화면입니다. 실제 사이트에서 받은 화면 코드를 그대로 옮겼습니다.</p></div>
+        <div class="frame">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">fix-effect-nights-texas.trycloudflare.com<b>/login</b></div><span class="chrome-sp"></span></div>
+          <div class="viewport">
+            <div data-head=""></div>
+            <div class="login">
+              <h1>🔒 K-쇼츠컷</h1>
+              <p class="muted" style="font-size:14px">인터넷으로 들어오셨습니다. 비밀번호를 넣어 주세요.</p>
+              <form class="card" id="loginForm">
+                <input id="login-pw" type="password" class="input" placeholder="비밀번호" autocomplete="off">
+                <button type="submit" class="btn-gold" id="loginBtn" disabled>들어가기</button>
+                <p class="err" id="loginErr" hidden></p>
+              </form>
+              <p class="muted" style="font-size:12px">형님 PC가 켜져 있고 K-쇼츠컷이 실행 중일 때만 열립니다.</p>
+            </div>
+            <footer class="afoot">K-쇼츠컷 — MR.K가 만든 로컬 AI 쇼츠 공장 (알파컷 기능 + 우리 스타일)</footer>
+          </div>
+        </div>
+      </section>
+
+      <!-- 1 뜨는 영상 -->
+      <section class="screen" id="trending">
+        <div class="slabel"><span class="n">1</span><h2>뜨는 영상</h2><code>/</code><span class="src">예시로 재구성</span>
+          <p>내 분야에서 평소보다 조회수가 빨리 오르는 롱폼을 모아 보여 줍니다. 카테고리를 누르면 걸러지고, 정렬도 바뀝니다.</p></div>
+        <div class="frame">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">fix-effect-nights-texas.trycloudflare.com<b>/</b></div><span class="chrome-sp"></span></div>
+          <div class="viewport">
+            <div data-head="trending"></div>
+            <div class="amain">
+              <div class="ahead-row">
+                <div><h1 class="ah1">🔥 뜨는 영상</h1><p class="asub">최근 7일, 부동산 분야에서 평소보다 빠르게 오르는 롱폼입니다. 골라서 바로 쇼츠로 만드세요.</p></div>
+              </div>
+              <div class="tbar">
+                <div class="chips" id="trendCats"></div>
+                <div class="right"><label for="trendSort">정렬</label><select id="trendSort" class="input sm"><option value="x">급상승 배수</option><option value="v">조회수</option><option value="d">최신순</option></select></div>
+              </div>
+              <div class="vgrid" id="trendGrid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 새 프로젝트 -->
+      <section class="screen" id="maker">
+        <div class="slabel"><span class="n">2</span><h2>새 프로젝트</h2><code>/maker</code><span class="src">예시로 재구성</span>
+          <p>유튜브 링크 하나와 몇 가지 선택으로 쇼츠를 만듭니다. 개수·길이·자막 스타일을 바꿔 보세요. 자막 스타일은 이 페이지의 모든 쇼츠 예시에 바로 적용됩니다.</p></div>
+        <div class="frame">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">fix-effect-nights-texas.trycloudflare.com<b>/maker</b></div><span class="chrome-sp"></span></div>
+          <div class="viewport">
+            <div data-head="maker"></div>
+            <div class="amain narrow">
+              <div class="mhero">
+                <h1>링크 하나로<br><span class="grad">하이라이트 쇼츠</span></h1>
+                <p>유튜브 롱폼 링크를 넣으면 훅, 상철오빠 AI 보이스, 화자 추적, 단어 자막, 업로드 문구까지 한 번에 만듭니다.</p>
+              </div>
+              <div class="mstack">
+                <section class="card pad">
+                  <label class="lab" for="m-url">유튜브 링크</label>
+                  <div class="urlrow"><input id="m-url" class="input" value="https://youtu.be/aBcD3fGh1jK"><button type="button" class="btn-gold" id="m-fetch">불러오기</button></div>
+                  <div class="fetched">
+                    <div class="thumb th-a" aria-hidden="true"><div class="thumb-txt"><span>절대 사면 안 되는</span><span>땅 <b>5가지</b></span></div><div class="person"></div><span class="badge-dur">58:12</span></div>
+                    <div><h4>토지투자, 절대 사면 안 되는 땅 5가지 | 공법의 신 고상철</h4><p>MR.K 공법의 신 · 58:12 · 자막 없음</p><p class="okline" id="m-ok">✓ 영상 확인됨 · 쇼츠 후보 14구간</p></div>
+                  </div>
+                </section>
+                <div class="mgrid">
+                  <section class="card pad">
+                    <div class="field">
+                      <label class="lab" for="m-count" style="margin:0">쇼츠 개수</label>
+                      <div class="rangerow"><input id="m-count" type="range" min="1" max="10" value="6"><output id="m-count-out" for="m-count">6개</output></div>
+                    </div>
+                    <div class="field">
+                      <span class="lab" style="margin:0">쇼츠 길이</span>
+                      <div class="segs" id="m-len"><button type="button">30초</button><button type="button" class="on">45초</button><button type="button">60초</button><button type="button">자동</button></div>
+                    </div>
+                    <div class="field">
+                      <label class="lab" for="m-tone" style="margin:0">훅 말투</label>
+                      <select id="m-tone" class="input"><option>단정형 · "이 땅 사면 10년 묶입니다"</option><option>질문형 · "이 땅, 왜 싼 걸까요?"</option><option>숫자형 · "땅값 10배 차이, 이유는 하나"</option></select>
+                    </div>
+                  </section>
+                  <section class="card pad">
+                    <span class="lab">넣을 기능</span>
+                    <div class="feat">
+                      <label for="f1"><input id="f1" type="checkbox" checked><span><b>하이라이트 훅</b><span>첫 2초에 강한 한 줄을 크게 띄웁니다</span></span></label>
+                      <label for="f2"><input id="f2" type="checkbox" checked><span><b>상철오빠 AI 보이스</b><span>훅 문장을 내 목소리로 읽어 줍니다</span></span></label>
+                      <label for="f3"><input id="f3" type="checkbox" checked><span><b>화자 추적</b><span>말하는 사람을 따라 9:16으로 자릅니다</span></span></label>
+                      <label for="f4"><input id="f4" type="checkbox" checked><span><b>단어 자막</b><span>지금 말하는 단어를 색으로 짚어 줍니다</span></span></label>
+                      <label for="f5"><input id="f5" type="checkbox" checked><span><b>업로드 문구</b><span>제목·설명·해시태그를 써 둡니다</span></span></label>
+                    </div>
+                  </section>
+                </div>
+                <section class="card pad">
+                  <span class="lab">자막 스타일</span>
+                  <div class="styles" id="m-styles"></div>
+                </section>
+                <a class="btn-gold gobtn" href="#progress" id="m-go">쇼츠 6개 만들기</a>
+                <p class="mnote">형님 PC에서 처리합니다 · 58분 영상 기준 약 7분</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 만드는 중 -->
+      <section class="screen" id="progress">
+        <div class="slabel"><span class="n">3</span><h2>만드는 중</h2><code>/projects/p_0213</code><span class="src">예시로 재구성</span>
+          <p>받기 → 받아쓰기 → 하이라이트 찾기 → 화자 추적 → 자막·보이스 → 업로드 문구 순서로 진행 상황과 작업 기록이 보입니다.</p></div>
+        <div class="frame">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">fix-effect-nights-texas.trycloudflare.com<b>/projects/p_0213</b></div><span class="chrome-sp"></span></div>
+          <div class="viewport">
+            <div data-head="projects"></div>
+            <div class="amain">
+              <a class="back" href="#projects">← 내 프로젝트</a>
+              <div class="ahead-row">
+                <div><h1 class="ah1">공인중개사 공법, 12페이지 체계도 총정리</h1><p class="asub">원본 1:42:30 · 쇼츠 8개 · 오늘 오후 2:14 시작</p></div>
+                <span class="status run">만드는 중 64%</span>
+              </div>
+              <section class="card pad">
+                <div class="pbar"><i class="mrk-progress-active" style="width:64%"></i></div>
+                <div class="pnums"><span><b>5단계</b> 자막·AI 보이스 입히는 중 (5/8)</span><span class="tnum">남은 시간 약 3분</span></div>
+                <ol class="stages">
+                  <li class="done"><span class="ic">✓</span><span>영상 받기</span><em>1분 12초</em></li>
+                  <li class="done"><span class="ic">✓</span><span>받아쓰기 · 단어 16,204개</span><em>2분 33초</em></li>
+                  <li class="done"><span class="ic">✓</span><span>하이라이트 찾기 · 후보 21개 중 8개</span><em>41초</em></li>
+                  <li class="done"><span class="ic">✓</span><span>화자 추적 · 9:16 자르기</span><em>1분 07초</em></li>
+                  <li class="now"><span class="ic">5</span><span>자막·AI 보이스 입히기</span><em>5 / 8</em></li>
+                  <li class="wait"><span class="ic">6</span><span>업로드 문구 쓰기</span><em>대기</em></li>
+                </ol>
+              </section>
+              <div class="pgrid">
+                <section class="card pad"><h3 class="h3">쇼츠 8개 <small>4개 완성</small></h3><div class="tiles" id="progTiles"></div></section>
+                <section class="card pad"><h3 class="h3">작업 기록 <small>실시간</small></h3>
+<pre class="log"><span class="t">14:14:02</span>  영상 받는 중 · 1:42:30 · 1080p
+<span class="t">14:15:14</span>  <span class="g">받기 완료</span> (1.8GB)
+<span class="t">14:15:15</span>  받아쓰기 시작 · Whisper large-v3 · 로컬 GPU
+<span class="t">14:17:48</span>  <span class="g">받아쓰기 완료</span> · 단어 16,204개 · 화자 2명
+<span class="t">14:17:50</span>  하이라이트 찾는 중 · Claude
+<span class="t">14:18:31</span>  <span class="g">후보 21개 → 점수 상위 8개 선정</span>
+<span class="t">14:18:33</span>  화자 추적 · 얼굴 2개 (MR.K, 진행자)
+<span class="t">14:19:40</span>  <span class="g">9:16 자르기 완료</span> 8/8
+<span class="t">14:19:41</span>  단어 자막 입히는 중 · MR.K 노랑
+<span class="t">14:20:05</span>  상철오빠 AI 보이스 · 훅 8개 생성
+<span class="t">14:20:58</span>  <span class="y">쇼츠 5/8 렌더링 중…</span></pre>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 결과 -->
+      <section class="screen" id="result">
+        <div class="slabel"><span class="n">4</span><h2>결과 · 예시 사례</h2><code>/projects/p_0212</code><span class="src">예시로 재구성</span>
+          <p>58분 강의 한 편에서 뽑은 쇼츠 6개입니다. 카드를 누르면 오른쪽에 훅, AI가 고른 이유, 업로드 문구, 단어별 자막 타이밍이 나옵니다. 복사 버튼은 실제로 동작합니다.</p></div>
+        <div class="frame">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">fix-effect-nights-texas.trycloudflare.com<b>/projects/p_0212</b></div><span class="chrome-sp"></span></div>
+          <div class="viewport">
+            <div data-head="projects"></div>
+            <div class="amain">
+              <a class="back" href="#projects">← 내 프로젝트</a>
+              <div class="ahead-row">
+                <div><h1 class="ah1">토지투자, 절대 사면 안 되는 땅 5가지</h1><p class="asub" id="resSub">원본 58:12 → 쇼츠 6개 · 10월 25일 완성</p></div>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="status sched">5개 예약됨</span><a class="btn-gold" href="#calendar">남은 1개 예약하기</a></div>
+              </div>
+              <div class="rgrid" id="resGrid"></div>
+              <section class="card detail" id="detail">
+                <div class="dprev" id="dPrev"></div>
+                <div class="dinfo">
+                  <div>
+                    <div class="dtop tnum" id="dTop"></div>
+                    <p class="dhook" id="dHook"></p>
+                    <span class="voicechip" id="dVoice"></span>
+                  </div>
+                  <div class="dcols">
+                    <div>
+                      <p class="sec-t">업로드 문구</p>
+                      <dl class="copybox" id="dCopy" style="margin:0"></dl>
+                    </div>
+                    <div style="display:grid;gap:18px;align-content:start">
+                      <div><p class="sec-t">AI가 이 구간을 고른 이유</p><ul class="why" id="dWhy"></ul></div>
+                      <div><p class="sec-t">단어 자막 타이밍</p><ol class="wlist" id="dWords"></ol></div>
+                    </div>
+                  </div>
+                  <div class="dact">
+                    <a class="btn-gold sm" href="#calendar">유튜브 쇼츠 예약</a>
+                    <button type="button" class="btn-line sm" data-toast="예시 화면입니다. 실제 앱에서는 구간 앞뒤를 0.5초 단위로 다시 자를 수 있습니다.">구간 다시 자르기</button>
+                    <button type="button" class="btn-line sm" data-toast="예시 화면이라 파일은 받을 수 없습니다.">MP4 받기</button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 내 프로젝트 -->
+      <section class="screen" id="projects">
+        <div class="slabel"><span class="n">5</span><h2>내 프로젝트</h2><code>/projects</code><span class="src">예시로 재구성</span>
+          <p>지금까지 만든 프로젝트를 상태별로 봅니다. 위 칩을 누르면 걸러집니다.</p></div>
+        <div class="frame">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">fix-effect-nights-texas.trycloudflare.com<b>/projects</b></div><span class="chrome-sp"></span></div>
+          <div class="viewport">
+            <div data-head="projects"></div>
+            <div class="amain">
+              <div class="ahead-row">
+                <div><h1 class="ah1">내 프로젝트</h1><p class="asub">롱폼 6편 · 쇼츠 38개</p></div>
+                <a class="btn-gold" href="#maker">＋ 새 프로젝트</a>
+              </div>
+              <div class="chips" id="pjChips"></div>
+              <div class="pjgrid" id="pjGrid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6 예약 캘린더 -->
+      <section class="screen" id="calendar">
+        <div class="slabel"><span class="n">6</span><h2>예약 캘린더</h2><code>/calendar</code><span class="src">예시로 재구성</span>
+          <p>왼쪽 쇼츠를 날짜로 끌어다 놓으면 예약됩니다. 휴대폰에서는 쇼츠를 누른 다음 날짜를 누르세요. 이미 잡힌 일정도 끌어서 옮길 수 있습니다.</p></div>
+        <div class="frame">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">fix-effect-nights-texas.trycloudflare.com<b>/calendar</b></div><span class="chrome-sp"></span></div>
+          <div class="viewport">
+            <div data-head="calendar"></div>
+            <div class="amain">
+              <div class="ahead-row">
+                <div><h1 class="ah1">예약 캘린더</h1><p class="asub">유튜브 쇼츠 · 인스타 릴스 · 틱톡 · 스레드 업로드 일정</p></div>
+                <div class="legend"><span><i class="pf yt"></i>유튜브 쇼츠</span><span><i class="pf ig"></i>인스타 릴스</span><span><i class="pf tt"></i>틱톡</span><span><i class="pf th"></i>스레드</span></div>
+              </div>
+              <div class="cal">
+                <aside class="card pad tray">
+                  <h3 class="h3" style="margin:0">예약 대기 <small id="trayCount"></small></h3>
+                  <ul id="trayList"></ul>
+                  <button type="button" class="btn-line sm" id="autoPlace">빈 날 저녁 7시에 자동 배치</button>
+                  <p class="hint">끌어다 놓은 일정은 기본 저녁 7시에 올라갑니다.</p>
+                </aside>
+                <section class="card pad" style="min-width:0">
+                  <div class="calhead">
+                    <div class="mnav"><button type="button" id="mPrev" aria-label="이전 달">‹</button><h3 id="mTitle"></h3><button type="button" id="mNext" aria-label="다음 달">›</button></div>
+                    <button type="button" class="btn-line sm" id="mToday">오늘</button>
+                  </div>
+                  <div class="calscroll"><div class="month" id="month"></div></div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7 연결 설정 -->
+      <section class="screen" id="connect">
+        <div class="slabel"><span class="n">7</span><h2>연결 설정</h2><code>/settings</code><span class="src">예시로 재구성</span>
+          <p>업로드 계정, AI 엔진, 외부 접속(터널), 기본값을 한곳에서 관리합니다.</p></div>
+        <div class="frame">
+          <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">fix-effect-nights-texas.trycloudflare.com<b>/settings</b></div><span class="chrome-sp"></span></div>
+          <div class="viewport">
+            <div data-head="connect"></div>
+            <div class="amain">
+              <div class="ahead-row"><div><h1 class="ah1">연결 설정</h1><p class="asub">계정과 키는 형님 PC에만 저장됩니다.</p></div></div>
+              <div class="sgrid">
+                <section class="card pad">
+                  <h3 class="h3">업로드 계정</h3>
+                  <div class="srow"><span class="sic yt">▶</span><span><b>유튜브</b><small>MR.K 공법의 신 · 쇼츠 자동 업로드</small></span><span class="status ok">연결됨</span></div>
+                  <div class="srow"><span class="sic ig">◎</span><span><b>인스타그램</b><small>비즈니스 계정 · 릴스 업로드</small></span><span class="status ok">연결됨</span></div>
+                  <div class="srow"><span class="sic tt">♪</span><span><b>틱톡</b><small>아직 연결하지 않았습니다</small></span><button type="button" class="btn-gold sm" data-toast="예시 화면입니다. 실제 앱에서는 틱톡 로그인 창이 열립니다.">연결하기</button></div>
+                  <div class="srow"><span class="sic th">@</span><span><b>스레드</b><small>60일 토큰 · 만료까지 47일</small></span><span class="status ok">연결됨</span></div>
+                </section>
+                <section class="card pad">
+                  <h3 class="h3">AI 엔진</h3>
+                  <div class="srow"><span class="sic ai">C</span><span><b>하이라이트 찾기 · Claude</b><small>API 키 <span class="mask">••••••••••••</span></small></span><span class="status ok">정상</span></div>
+                  <div class="srow"><span class="sic ai">W</span><span><b>받아쓰기 · Whisper large-v3</b><small>로컬 GPU · 한국어</small></span><span class="status ok">정상</span></div>
+                  <div class="srow"><span class="sic ai">🎙</span><span><b>상철오빠 AI 보이스</b><small>학습 음성 32분 · 훅 나레이션용</small></span><button type="button" class="btn-line sm" data-toast="예시 화면이라 소리는 나지 않습니다.">미리 듣기</button></div>
+                  <div class="srow"><span class="sic ai">◉</span><span><b>화자 추적</b><small>얼굴 + 입 모양 · 최대 2명</small></span><label class="switch" for="s-track"><input id="s-track" type="checkbox" checked aria-label="화자 추적 켜기"><i></i></label></div>
+                </section>
+                <section class="card pad">
+                  <h3 class="h3">외부 접속 <span class="status ok">켜짐</span></h3>
+                  <dl class="kv" style="margin:0">
+                    <dt>방식</dt><dd>Cloudflare 터널</dd>
+                    <dt>주소</dt><dd style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span id="tunnelUrl" style="font-family:var(--mono);font-size:13px">https://fix-effect-nights-texas.trycloudflare.com</span><button type="button" class="copy" data-copy="#tunnelUrl">복사</button></dd>
+                    <dt>비밀번호</dt><dd style="display:flex;gap:8px;align-items:center"><span class="mask">••••••••</span><button type="button" class="copy" data-toast="예시 화면입니다. 실제 앱에서 새 비밀번호를 정할 수 있습니다.">바꾸기</button></dd>
+                    <dt>참고</dt><dd class="muted" style="font-size:13px">PC를 다시 켜면 터널 주소가 바뀝니다.</dd>
+                  </dl>
+                </section>
+                <section class="card pad">
+                  <h3 class="h3">기본값</h3>
+                  <dl class="kv" style="margin:0">
+                    <dt>쇼츠 길이</dt><dd>45초</dd>
+                    <dt>자막 스타일</dt><dd id="defStyle">MR.K 노랑</dd>
+                    <dt>워터마크</dt><dd style="display:flex;justify-content:space-between;align-items:center;gap:8px">MR.K 공법의 신<label class="switch" for="s-wm"><input id="s-wm" type="checkbox" checked aria-label="워터마크 넣기"><i></i></label></dd>
+                    <dt>엔딩 문구</dt><dd>풀영상은 채널에서 보세요</dd>
+                  </dl>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+    <p class="foot">K-쇼츠컷 화면 재현 · 실제 사이트 디자인 값 기준 · 영상·숫자·일정은 예시입니다</p>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const body=document.body;
+
+/* ---------- 데이터 (모두 예시) ---------- */
+const THEMES=[{key:'claude',label:'클로드',emoji:'🟠'},{key:'toss',label:'토스',emoji:'🔵'},{key:'mac',label:'맥',emoji:'⚪'},{key:'apple',label:'애플',emoji:'🍎'},{key:'dark',label:'다크',emoji:'🌙'}];
+const FONTS=[{key:'pretendard',label:'프리텐다드',stack:"'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif"},{key:'noto',label:'노토산스',stack:"'Noto Sans KR', sans-serif"},{key:'plex',label:'IBM Plex',stack:"'IBM Plex Sans KR', sans-serif"},{key:'gothica1',label:'Gothic A1',stack:"'Gothic A1', sans-serif"}];
+const NAV=[['trending','🔥 뜨는 영상'],['maker','새 프로젝트'],['projects','내 프로젝트'],['calendar','예약 캘린더'],['connect','연결 설정']];
+const SUBSTYLES=[{k:'yellow',l:'MR.K 노랑'},{k:'outline',l:'흰 글씨 검은 테'},{k:'box',l:'박스 자막'},{k:'minimal',l:'미니멀'}];
+
+const FULL='토지투자, 절대 사면 안 되는 땅 5가지';
+const SHORTS=[
+ {hook:'이 땅 사면 10년 묶입니다',from:'03:12',sec:46,score:92,voice:2.1,bg:'',
+  words:'맹지는 도로에 붙어 있지 않은 땅입니다 건축법상 대지는 도로에 2미터 이상 접해야 건축허가가 나옵니다 싸다고 덜컥 사시면 안 됩니다',
+  why:['첫 2초에 "10년 묶입니다"라는 손해 이야기가 나옵니다','"2미터"라는 숫자가 있어 저장·공유가 잘 되는 구간입니다','앞뒤 맥락 없이도 이해되는 완결된 설명입니다'],
+  title:'맹지 사면 10년 묶이는 이유 #shorts',
+  desc:'도로에 2m 이상 붙어 있지 않은 땅은 건축허가가 나지 않습니다.\n싸다고 덜컥 사기 전에 지적도부터 확인하세요.\n\n▶ 풀영상: '+FULL,
+  tags:'#토지투자 #맹지 #부동산공법 #공법의신 #고상철'},
+ {hook:'땅값 10배 차이, 용도지역 하나 때문',from:'14:05',sec:47,score:88,voice:2.6,bg:'bg-b',
+  words:'바로 붙어 있는 땅인데 한쪽은 평당 30만 원 한쪽은 300만 원입니다 차이는 딱 하나 용도지역입니다 무엇을 얼마나 지을 수 있는지가 여기서 정해집니다',
+  why:['30만 원과 300만 원, 숫자 대비가 바로 눈에 들어옵니다','질문을 던지고 3초 안에 답을 줘 끝까지 보게 됩니다','공법 입문자가 많이 찾는 단어(용도지역)가 들어 있습니다'],
+  title:'옆 땅인데 값이 10배 차이 나는 이유 #shorts',
+  desc:'같은 동네, 바로 붙은 땅인데 가격이 10배 차이 납니다.\n답은 용도지역. 무엇을, 얼마나 지을 수 있는지가 여기서 갈립니다.\n\n▶ 풀영상: '+FULL,
+  tags:'#용도지역 #토지투자 #부동산공법 #공법의신 #고상철'},
+ {hook:'농지는 아무나 못 삽니다',from:'22:40',sec:51,score:84,voice:1.8,bg:'bg-c',
+  words:'농지를 사려면 농지취득자격증명 이른바 농취증이 필요합니다 주말농장이라도 계획서를 내야 하고 요건이 안 되면 등기가 넘어오지 않습니다',
+  why:['"아무나 못 산다"는 단정형 훅이 궁금증을 만듭니다','주말농장이라는 생활 소재라 보는 사람 폭이 넓습니다','실수했을 때 결과(등기 불가)가 분명합니다'],
+  title:'주말농장 하려고 농지 샀다가 등기 못 하는 이유 #shorts',
+  desc:'농지는 돈만 있다고 살 수 있는 땅이 아닙니다.\n농취증(농지취득자격증명)부터 확인하세요.\n\n▶ 풀영상: '+FULL,
+  tags:'#농지 #농취증 #주말농장 #토지투자 #공법의신'},
+ {hook:'그린벨트 풀린다는 말, 믿지 마세요',from:'31:10',sec:39,score:81,voice:2.3,bg:'bg-d',
+  words:'개발제한구역이 풀린다는 말만 믿고 사시면 위험합니다 해제는 도시관리계획으로 결정되고 고시가 나야 확정입니다 소문 말고 고시문을 보세요',
+  why:['"믿지 마세요"로 시작해 경고성 콘텐츠로 읽힙니다','확인 방법(고시문)까지 알려 줘 댓글 반응이 좋습니다','39초로 이번 묶음에서 가장 짧아 끝까지 보는 비율이 높습니다'],
+  title:'그린벨트 해제 소문에 땅 사기 전에 보세요 #shorts',
+  desc:'해제는 도시·군관리계획 결정과 고시로 확정됩니다.\n"곧 풀린다"는 말보다 고시문이 먼저입니다.\n\n▶ 풀영상: '+FULL,
+  tags:'#그린벨트 #개발제한구역 #기획부동산 #토지투자 #공법의신'},
+ {hook:'공법, 12페이지면 끝납니다',from:'47:02',sec:53,score:79,voice:1.9,bg:'bg-e',
+  words:'공법 조문이 수천 개라 겁먹으시는데 뼈대는 하나입니다 국토계획법 체계도 12페이지에 다 들어갑니다 이 순서대로만 보세요',
+  why:['수험생에게 바로 쓸모 있는 약속(12페이지)이 들어 있습니다','채널 대표 자료(체계도)로 이어지는 연결 고리입니다','시험 시즌에 많이 찾는 주제입니다'],
+  title:'부동산공법 12페이지로 끝내는 법 #shorts',
+  desc:'수천 개 조문도 뼈대는 하나입니다.\n공법의 신 고상철의 12페이지 체계도 순서대로 보세요.\n\n▶ 풀영상: '+FULL,
+  tags:'#부동산공법 #공인중개사 #감정평가사 #공법의신 #고상철'},
+ {hook:'땅 계약 전, 이 서류 한 장만 보세요',from:'52:18',sec:42,score:77,voice:2.4,bg:'bg-f',
+  words:'땅 계약하기 전에 토지이음에서 토지이용계획확인원을 꼭 떼 보세요 용도지역과 각종 규제가 한 장에 다 나옵니다 이거 안 보고 사시면 안 됩니다',
+  why:['바로 따라 할 수 있는 행동(서류 떼기)을 알려 줍니다','저장해 두고 다시 보는 정보형 구간입니다','영상 끝 정리 부분이라 설명이 깔끔합니다'],
+  title:'땅 사기 전 무조건 떼 봐야 하는 서류 #shorts',
+  desc:'토지이음에서 토지이용계획확인원을 열람하면\n용도지역과 규제가 한 장에 정리돼 나옵니다.\n\n▶ 풀영상: '+FULL,
+  tags:'#토지이용계획확인원 #토지이음 #토지투자 #부동산공법 #공법의신'}
+];
+
+const TRENDS=[
+ {t:'맹지 샀다가 10년 묶인 사람들의 공통점',th:['맹지 샀다가','<b>10년</b> 묶였다'],ch:'땅공부 채널',v:480000,ago:3,x:12.4,len:'42:18',cat:'토지',bg:'th-a'},
+ {t:'토지거래허가구역에서 허가 없이 계약하면 생기는 일',th:['허가 없이 계약','<b>무효</b>입니다'],ch:'월급쟁이 토지투자',v:310000,ago:2,x:8.1,len:'27:40',cat:'토지',bg:'th-b'},
+ {t:'경매 초보가 절대 입찰하면 안 되는 물건',th:['경매 초보','<b>이 물건</b> 피하세요'],ch:'경매로 집사기',v:260000,ago:4,x:6.7,len:'35:02',cat:'경매',bg:'th-d'},
+ {t:'공인중개사 공법, 마지막 한 달 공부법',th:['공법 마지막','<b>한 달</b> 공부법'],ch:'합격노트',v:190000,ago:1,x:5.9,len:'51:20',cat:'시험',bg:'th-e'},
+ {t:'용도지역 모르고 땅 사면 벌어지는 일',th:['용도지역 모르면','<b>땅값</b> 날립니다'],ch:'도시계획 이야기',v:150000,ago:5,x:4.2,len:'33:15',cat:'토지',bg:'th-c'},
+ {t:'월세 100만 원 나오는 소형 상가 고르는 법',th:['월세 100만 원','<b>소형 상가</b>'],ch:'퇴근 후 재테크',v:220000,ago:6,x:3.8,len:'44:09',cat:'재테크',bg:'th-f'}
+];
+
+const PROJECTS=[
+ {t:FULL,th:['절대 사면 안 되는','땅 <b>5가지</b>'],bg:'th-a',len:'58:12',n:6,st:'sched',stl:'예약됨',date:'10월 25일',href:'#result',act:'결과 보기'},
+ {t:'공인중개사 공법, 12페이지 체계도 총정리',th:['공법 체계도','<b>12페이지</b>'],bg:'th-e',len:'1:42:30',n:8,st:'run',stl:'만드는 중',date:'오늘',href:'#progress',act:'진행 보기',p:64},
+ {t:'디벨로퍼가 땅 고르는 순서',th:['디벨로퍼의','<b>땅 고르는</b> 순서'],bg:'th-b',len:'47:05',n:5,st:'sched',stl:'예약됨',date:'10월 20일',href:'#calendar',act:'일정 보기'},
+ {t:'경매로 토지 낙찰받기 전 체크리스트',th:['경매 토지','<b>체크리스트</b>'],bg:'th-d',len:'39:48',n:4,st:'ok',stl:'완성',date:'10월 19일',href:'#calendar',act:'예약하기'},
+ {t:'지구단위계획구역, 투자자는 어디를 봐야 하나',th:['지구단위계획','<b>어디를</b> 볼까'],bg:'th-c',len:'52:10',n:0,st:'bad',stl:'실패',date:'10월 17일',err:'자막 동기화 실패 · 원본 음성이 중간에 끊겼습니다',act:'다시 시도'},
+ {t:'부동산 AI로 상권 분석하기 (특강)',th:['AI로 하는','<b>상권 분석</b>'],bg:'th-f',len:'1:05:44',n:7,st:'done',stl:'발행 완료',date:'10월 14일',href:'#calendar',act:'일정 보기'}
+];
+
+const PROG=[
+ {hook:'공법 첫날, 이것부터 외우세요',bg:'bg-e',w:'공법은 국토계획법 하나만 잡으면 나머지가 따라옵니다'},
+ {hook:'용도지역 21개, 3초 만에 외우는 법',bg:'bg-b',w:'주거 여섯 상업 넷 공업 셋 녹지 셋 여기에 관리 셋'},
+ {hook:'건폐율·용적률 헷갈리면 이것만',bg:'bg-c',w:'건폐율은 바닥 넓이 용적률은 층을 다 더한 넓이입니다'},
+ {hook:'개발행위허가, 시험에 나오는 3가지',bg:'bg-d',w:'건축물 건축 공작물 설치 토지 형질 변경 이 세 가지부터'},
+ {hook:'지구단위계획, 한 문장 정리',bg:'bg-f',w:'',rendering:true}
+];
+
+/* 일정: d=YYYY-MM-DD, p=yt|ig|tt|th */
+const TODAY='2026-10-26';
+let EVENTS=[
+ {id:'e1',d:'2026-10-14',tm:'19:00',p:'yt',t:'AI 상권분석 ① 데이터 3개면 끝'},
+ {id:'e2',d:'2026-10-15',tm:'12:00',p:'ig',t:'AI 상권분석 ② 유동인구 보는 법'},
+ {id:'e3',d:'2026-10-17',tm:'19:00',p:'yt',t:'AI 상권분석 ③ 임대료 예측'},
+ {id:'e4',d:'2026-10-20',tm:'19:00',p:'yt',t:'디벨로퍼 ① 땅부터 보지 마세요'},
+ {id:'e5',d:'2026-10-22',tm:'12:00',p:'ig',t:'디벨로퍼 ② 도로가 먼저입니다'},
+ {id:'e6',d:'2026-10-24',tm:'08:00',p:'th',t:'디벨로퍼 ③ 인허가 순서'},
+ {id:'e7',d:'2026-10-27',tm:'19:00',p:'yt',t:'맹지 사면 10년 묶이는 이유'},
+ {id:'e8',d:'2026-10-28',tm:'12:00',p:'ig',t:'땅값 10배 차이, 용도지역'},
+ {id:'e9',d:'2026-10-29',tm:'19:00',p:'yt',t:'농지는 아무나 못 삽니다'},
+ {id:'e10',d:'2026-10-30',tm:'08:00',p:'th',t:'그린벨트 해제 소문'},
+ {id:'e11',d:'2026-10-31',tm:'19:00',p:'tt',t:'공법, 12페이지면 끝납니다'},
+ {id:'e12',d:'2026-11-03',tm:'19:00',p:'yt',t:'디벨로퍼 ④ 사업성 계산'},
+ {id:'e13',d:'2026-11-05',tm:'12:00',p:'ig',t:'디벨로퍼 ⑤ 시공사 고르기'}
+];
+let TRAY=[
+ {id:'t1',p:'yt',t:'땅 계약 전, 이 서류 한 장만 보세요',sec:42},
+ {id:'t2',p:'yt',t:'경매 토지 체크리스트 ①',sec:44},
+ {id:'t3',p:'ig',t:'경매 토지 체크리스트 ②',sec:38},
+ {id:'t4',p:'tt',t:'경매 토지 체크리스트 ③',sec:51}
+];
+const PF={yt:'유튜브 쇼츠',ig:'인스타 릴스',tt:'틱톡',th:'스레드'};
+
+/* ---------- 도우미 ---------- */
+const toastEl=$('#toast');let toastT;
+function toast(msg){toastEl.textContent=msg;toastEl.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('show'),2600)}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function toSec(mmss){const [m,s]=mmss.split(':').map(Number);return m*60+s}
+function fmt(sec){const m=Math.floor(sec/60),s=sec%60;return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')}
+function fmtDec(t){const m=Math.floor(t/60),s=t-m*60;return String(m).padStart(2,'0')+':'+s.toFixed(1).padStart(4,'0')}
+function views(v){return v>=10000?(v/10000).toFixed(v%10000?1:0).replace(/\.0$/,'')+'만':v.toLocaleString('ko-KR')}
+let subStyle=store.get('kshort-sub')||'yellow';
+
+/* 9:16 쇼츠 미리보기 */
+function shortHTML(o,extra){
+  extra=extra||{};
+  const cls=['short',o.bg||'',extra.tile?'tile-s':'','st-'+(extra.style||subStyle)].join(' ');
+  return `<div class="${cls}" ${extra.fixed?'data-fixed="1"':''} data-words="${esc(o.words||o.w||'')}" aria-hidden="true">
+    <div class="board-bg"></div><div class="person"></div>
+    ${extra.notrack?'':'<div class="track"><span>화자 1</span></div>'}
+    <div class="hook"><span>${esc(o.hook)}</span></div>
+    <div class="sub"></div>
+    ${o.sec?`<span class="len">0:${String(o.sec).padStart(2,'0')}</span>`:''}
+    ${extra.mic?'<span class="mic">🎙 AI 보이스</span>':''}
+    ${extra.play?'<button type="button" class="play" aria-label="재생/일시정지"><i>❚❚</i></button>':''}
+  </div>`;
+}
+function thumbHTML(lines,bg,dur,hot){
+  return `<div class="thumb ${bg}" aria-hidden="true"><div class="thumb-txt"><span>${lines[0]}</span><span>${lines[1]}</span></div><div class="person"></div>${hot?`<span class="badge-hot">${hot}</span>`:''}${dur?`<span class="badge-dur">${dur}</span>`:''}</div>`;
+}
+
+/* ---------- 앱 헤더 ---------- */
+$$('[data-head]').forEach(el=>{
+  const active=el.dataset.head;
+  el.outerHTML=`<header class="ahead"><div class="ahead-in">
+    <a class="alogo" href="#trending"><span class="alogo-k">K</span><span class="alogo-t">K-<span class="grad">쇼츠컷</span></span></a>
+    <nav class="anav">${NAV.map(([k,l])=>`<a href="#${k}" class="${k==='trending'?'hot ':''}${k===active&&k!=='trending'?'on':''}">${l}</a>`).join('')}</nav>
+    <div class="apick"><span class="picker" data-kind="font"></span><span class="picker" data-kind="theme"></span></div>
+  </div></header>`;
+});
+
+/* ---------- 테마·글꼴 선택 ---------- */
+function viewerDark(){const t=document.documentElement.getAttribute('data-theme');if(t==='dark')return true;if(t==='light')return false;return !!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)}
+function curTheme(){return body.dataset.skin||(viewerDark()?'dark':'claude')}
+function curFont(){return body.dataset.font||'pretendard'}
+function renderPickers(){
+  $$('.picker').forEach(p=>{
+    const k=p.dataset.kind,list=k==='theme'?THEMES:FONTS;
+    p.innerHTML=`<button type="button" class="pbtn" aria-haspopup="true" aria-expanded="false" title="${k==='theme'?'테마 선택':'글꼴 선택'}"></button><div class="pmenu" hidden>${list.map(o=>`<button type="button" data-key="${o.key}"${k==='font'?` style="font-family:${o.stack}"`:''}>${k==='theme'?o.emoji+' ':''}${o.label}</button>`).join('')}</div>`;
+  });
+  syncPickers();
+}
+function syncPickers(){
+  const t=THEMES.find(x=>x.key===curTheme()),f=FONTS.find(x=>x.key===curFont());
+  $$('.picker').forEach(p=>{
+    const k=p.dataset.kind,cur=k==='theme'?t.key:f.key;
+    $('.pbtn',p).textContent=k==='theme'?`${t.emoji} ${t.label} ▾`:`가 ${f.label} ▾`;
+    $$('.pmenu button',p).forEach(b=>b.classList.toggle('on',b.dataset.key===cur));
+  });
+}
+function closeMenus(except){$$('.pmenu').forEach(m=>{if(m!==except){m.hidden=true;m.previousElementSibling.setAttribute('aria-expanded','false')}})}
+document.addEventListener('click',e=>{
+  const pb=e.target.closest('.pbtn');
+  if(pb){const m=pb.nextElementSibling;closeMenus(m);m.hidden=!m.hidden;pb.setAttribute('aria-expanded',String(!m.hidden));return}
+  const mi=e.target.closest('.pmenu button');
+  if(mi){
+    const kind=mi.closest('.picker').dataset.kind,key=mi.dataset.key;
+    if(kind==='theme'){body.dataset.skin=key;store.set('kshort-theme',key)}
+    else{if(key==='pretendard')delete body.dataset.font;else body.dataset.font=key;store.set('kshort-font',key)}
+    closeMenus();syncPickers();return;
+  }
+  if(!e.target.closest('.picker'))closeMenus();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenus()});
+(function(){const t=store.get('kshort-theme');if(t&&THEMES.some(x=>x.key===t))body.dataset.skin=t;const f=store.get('kshort-font');if(f&&f!=='pretendard'&&FONTS.some(x=>x.key===f))body.dataset.font=f})();
+renderPickers();
+if(window.matchMedia){const mq=matchMedia('(prefers-color-scheme: dark)');(mq.addEventListener?mq.addEventListener('change',syncPickers):mq.addListener(syncPickers))}
+new MutationObserver(syncPickers).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ---------- 보기 크기 ---------- */
+function setView(v){body.classList.toggle('view-grid',v==='grid');$$('.seg [data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===v));store.set('kshort-view',v)}
+$$('.seg [data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+$$('[data-view-set]').forEach(b=>b.addEventListener('click',()=>{setView(b.dataset.viewSet);$('#board').scrollIntoView({behavior:reduce?'auto':'smooth'})}));
+if(store.get('kshort-view')==='grid')setView('grid');
+
+/* ---------- 0 로그인 ---------- */
+const pw=$('#login-pw'),lb=$('#loginBtn');
+pw.addEventListener('input',()=>{lb.disabled=!pw.value});
+$('#loginForm').addEventListener('submit',e=>{e.preventDefault();const er=$('#loginErr');er.textContent='예시 화면이라 로그인은 되지 않습니다. 실제 비밀번호를 넣지 마세요.';er.hidden=false;pw.value='';lb.disabled=true});
+
+/* ---------- 소개 미니 쇼츠 ---------- */
+const total=SHORTS.reduce((a,s)=>a+s.sec,0);
+const totalTxt=`${Math.floor(total/60)}분 ${total%60}초`;
+$('#demoArrow').textContent=`쇼츠 ${SHORTS.length}개 · 합계 ${totalTxt}`;
+$('#resSub').textContent=`원본 58:12 → 쇼츠 ${SHORTS.length}개 (합계 ${totalTxt}) · 10월 25일 완성`;
+$('#miniRow').innerHTML=SHORTS.map((s,i)=>`<a href="#result" data-pick="${i}" title="${esc(s.hook)}">${shortHTML(s,{notrack:true})}</a>`).join('');
+
+/* ---------- 1 뜨는 영상 ---------- */
+const cats=['전체','토지','경매','재테크','시험'];let tCat='전체';
+function renderTrends(){
+  const sort=$('#trendSort').value;
+  let list=TRENDS.filter(v=>tCat==='전체'||v.cat===tCat);
+  list.sort((a,b)=>sort==='v'?b.v-a.v:sort==='d'?a.ago-b.ago:b.x-a.x);
+  const maxX=Math.max(...TRENDS.map(v=>v.x));
+  $('#trendCats').innerHTML=cats.map(c=>`<button type="button" class="chip${c===tCat?' on':''}" data-cat="${c}">${c}<span class="c">${c==='전체'?TRENDS.length:TRENDS.filter(v=>v.cat===c).length}</span></button>`).join('');
+  $('#trendGrid').innerHTML=list.map(v=>`<article class="card vcard">
+    ${thumbHTML(v.th,v.bg,v.len,'×'+v.x+' 급상승')}
+    <div class="vbody">
+      <h3>${esc(v.t)}</h3>
+      <p class="vmeta">${esc(v.ch)} · 조회수 ${views(v.v)} · ${v.ago}일 전</p>
+      <div class="vbar"><span>평소 대비</span><div class="meter"><i style="width:${Math.round(v.x/maxX*100)}%"></i></div><b>×${v.x}</b></div>
+      <div class="vact"><a class="btn-gold sm" href="#maker">이 영상으로 쇼츠 만들기</a><button type="button" class="btn-line sm" data-toast="예시 영상이라 원본 링크는 없습니다.">원본</button></div>
+    </div></article>`).join('');
+}
+$('#trendCats').addEventListener('click',e=>{const c=e.target.closest('[data-cat]');if(!c)return;tCat=c.dataset.cat;renderTrends()});
+$('#trendSort').addEventListener('change',renderTrends);
+renderTrends();
+
+/* ---------- 2 새 프로젝트 ---------- */
+const cnt=$('#m-count'),cntOut=$('#m-count-out'),go=$('#m-go');
+function syncCount(){cntOut.textContent=cnt.value+'개';go.textContent=`쇼츠 ${cnt.value}개 만들기`}
+cnt.addEventListener('input',syncCount);syncCount();
+$('#m-len').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;$$('#m-len button').forEach(x=>x.classList.toggle('on',x===b))});
+$('#m-fetch').addEventListener('click',()=>{const ok=$('#m-ok');ok.textContent='불러오는 중…';setTimeout(()=>{ok.textContent='✓ 영상 확인됨 · 쇼츠 후보 14구간'},700)});
+const styleDemo={hook:'이 땅 사면 10년 묶입니다',bg:'',words:'맹지는 도로에 붙어 있지 않은 땅입니다'};
+function renderStyles(){
+  $('#m-styles').innerHTML=SUBSTYLES.map(s=>`<button type="button" class="stile${s.k===subStyle?' on':''}" data-st="${s.k}">${shortHTML(styleDemo,{style:s.k,fixed:true,notrack:true})}${s.l}</button>`).join('');
+}
+renderStyles();
+$('#m-styles').addEventListener('click',e=>{
+  const b=e.target.closest('[data-st]');if(!b)return;subStyle=b.dataset.st;store.set('kshort-sub',subStyle);
+  $$('.stile').forEach(x=>x.classList.toggle('on',x===b));
+  $$('.short:not([data-fixed])').forEach(s=>{SUBSTYLES.forEach(x=>s.classList.remove('st-'+x.k));s.classList.add('st-'+subStyle)});
+  $('#defStyle').textContent=SUBSTYLES.find(x=>x.k===subStyle).l;
+  toast(`자막 스타일을 "${SUBSTYLES.find(x=>x.k===subStyle).l}"로 바꿨습니다. 아래 예시 쇼츠에 모두 적용됩니다.`);
+});
+$('#defStyle').textContent=SUBSTYLES.find(x=>x.k===subStyle).l;
+
+/* ---------- 3 만드는 중 ---------- */
+$('#progTiles').innerHTML=PROG.map((o,i)=>o.rendering
+  ?`<div class="tile"><div class="rendering">${shortHTML({hook:o.hook,bg:o.bg},{notrack:true})}<div class="rbar"><i class="mrk-progress-active"></i></div><div class="rtxt">렌더링 58%</div></div>#${i+1}</div>`
+  :`<div class="tile">${shortHTML({hook:o.hook,bg:o.bg,words:o.w},{notrack:true})}#${i+1} 완성</div>`).join('')
+  +[6,7,8].map(n=>`<div class="tile"><div class="wait">대기</div>#${n}</div>`).join('');
+
+/* ---------- 4 결과 ---------- */
+let sel=0;
+$('#resGrid').innerHTML=SHORTS.map((s,i)=>`<button type="button" class="rcard${i===0?' on':''}" data-i="${i}" aria-pressed="${i===0}">
+  ${shortHTML(s,{mic:true})}
+  <h4>${esc(s.hook)}</h4>
+  <div class="rmeta"><span>${s.from} · ${s.sec}초</span><span class="score">${s.score}점</span></div>
+</button>`).join('');
+function renderDetail(i){
+  sel=i;const s=SHORTS[i],st=toSec(s.from);
+  $$('.rcard').forEach((c,j)=>{c.classList.toggle('on',j===i);c.setAttribute('aria-pressed',String(j===i))});
+  $('#dPrev').innerHTML=shortHTML(s,{play:true,mic:true});
+  $('#dTop').innerHTML=`<b>쇼츠 #${i+1}</b><span>${s.from} → ${fmt(st+s.sec)} (${s.sec}초)</span><span>·</span><span>바이럴 점수 <b class="score">${s.score}</b></span>`;
+  $('#dHook').textContent=s.hook;
+  $('#dVoice').innerHTML=`<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>상철오빠 AI 보이스로 읽음 · ${s.voice}초`;
+  $('#dWhy').innerHTML=s.why.map(w=>`<li>${esc(w)}</li>`).join('');
+  $('#dCopy').innerHTML=[['제목',s.title],['설명',s.desc],['태그',s.tags]].map(([k,v],j)=>`<div class="cfield"><dt>${k}</dt><dd id="cp-${j}">${esc(v)}</dd><button type="button" class="copy" data-copy="#cp-${j}">복사</button></div>`).join('');
+  const words=s.words.split(' '),step=s.sec/words.length;
+  $('#dWords').innerHTML=words.map((w,j)=>`<li data-wi="${j}"><span>${fmtDec(st+j*step)}</span><b>${esc(w)}</b></li>`).join('');
+  bindShorts();
+}
+$('#resGrid').addEventListener('click',e=>{const c=e.target.closest('.rcard');if(c)renderDetail(+c.dataset.i)});
+$('#miniRow').addEventListener('click',e=>{const a=e.target.closest('[data-pick]');if(a)renderDetail(+a.dataset.pick)});
+
+/* ---------- 5 내 프로젝트 ---------- */
+let pjF='전체';
+const pjCats=['전체','만드는 중','완성','예약됨','발행 완료','실패'];
+function renderProjects(){
+  $('#pjChips').innerHTML=pjCats.map(c=>`<button type="button" class="chip${c===pjF?' on':''}" data-pf="${c}">${c}<span class="c">${c==='전체'?PROJECTS.length:PROJECTS.filter(p=>p.stl===c).length}</span></button>`).join('');
+  $('#pjGrid').innerHTML=PROJECTS.filter(p=>pjF==='전체'||p.stl===pjF).map(p=>`<article class="card pj">
+    ${thumbHTML(p.th,p.bg,p.len)}
+    <div class="pj-b">
+      <h3>${esc(p.t)}</h3>
+      <div class="pj-m"><span>원본 ${p.len}${p.n?` · 쇼츠 ${p.n}개`:''}</span><span class="status ${p.st}">${p.stl}${p.p?' '+p.p+'%':''}</span></div>
+      ${p.p?`<div class="mini-p"><i class="mrk-progress-active" style="width:${p.p}%"></i></div>`:''}
+      ${p.err?`<p class="errtxt">${esc(p.err)}</p>`:''}
+      <div class="pj-f"><span class="muted" style="font-size:12px">${p.date}</span>${p.href?`<a href="${p.href}">${p.act} →</a>`:`<button type="button" data-toast="예시 화면입니다. 실제 앱에서는 실패한 단계부터 다시 만듭니다.">${p.act} →</button>`}</div>
+    </div></article>`).join('');
+}
+$('#pjChips').addEventListener('click',e=>{const c=e.target.closest('[data-pf]');if(!c)return;pjF=c.dataset.pf;renderProjects()});
+renderProjects();
+
+/* ---------- 6 예약 캘린더 ---------- */
+let ym={y:2026,m:9};let picked=null;
+const ds=(y,m,d)=>`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+function kDate(d){const [y,m,dd]=d.split('-').map(Number);return `${m}월 ${dd}일`}
+function renderTray(){
+  $('#trayCount').textContent=TRAY.length+'개';
+  $('#trayList').innerHTML=TRAY.length?TRAY.map(t=>`<li class="titem${picked===t.id?' sel':''}" draggable="true" data-tid="${t.id}" tabindex="0"><i class="pf ${t.p}"></i><span class="tt">${esc(t.t)}<small>${PF[t.p]} · ${t.sec}초</small></span></li>`).join(''):'<li class="muted" style="font-size:13px">대기 중인 쇼츠가 없습니다. 모두 예약했습니다.</li>';
+}
+function renderMonth(){
+  const {y,m}=ym,first=new Date(y,m,1).getDay(),days=new Date(y,m+1,0).getDate(),prevDays=new Date(y,m,0).getDate();
+  $('#mTitle').textContent=`${y}년 ${m+1}월`;
+  let cells=['일','월','화','수','목','금','토'].map(w=>`<div class="wd">${w}</div>`).join('');
+  const total=Math.ceil((first+days)/7)*7;
+  for(let i=0;i<total;i++){
+    let d,mm=m,yy=y,out=false;
+    if(i<first){d=prevDays-first+i+1;mm=m-1;out=true}else if(i>=first+days){d=i-first-days+1;mm=m+1;out=true}else d=i-first+1;
+    if(mm<0){mm=11;yy--}if(mm>11){mm=0;yy++}
+    const key=ds(yy,mm,d),evs=EVENTS.filter(e=>e.d===key).sort((a,b)=>a.tm.localeCompare(b.tm));
+    const cls=['day',out?'out':'',i%7===0?'sun':'',key===TODAY?'today':''].join(' ');
+    cells+=`<div class="${cls}" data-date="${key}" aria-label="${kDate(key)}"><span class="dn">${d}</span>${evs.map(e=>{const past=e.d<TODAY;return `<div class="ev${past?' past':''}" ${past?'':'draggable="true"'} data-eid="${e.id}" title="${esc(PF[e.p]+' · '+e.t)}"><i class="pf ${e.p}"></i><time>${e.tm}</time><span class="tt">${esc(e.t)}</span></div>`}).join('')}</div>`;
+  }
+  $('#month').innerHTML=cells;
+}
+function place(src,date){
+  if(date<TODAY){toast('지난 날짜에는 예약할 수 없습니다.');return}
+  if(src.startsWith('t')){const i=TRAY.findIndex(t=>t.id===src);if(i<0)return;const t=TRAY.splice(i,1)[0];EVENTS.push({id:'e'+Date.now(),d:date,tm:'19:00',p:t.p,t:t.t});toast(`${kDate(date)} 저녁 7시, ${PF[t.p]}로 예약했습니다.`)}
+  else{const e=EVENTS.find(x=>x.id===src);if(!e)return;e.d=date;toast(`"${e.t}" 일정을 ${kDate(date)}로 옮겼습니다.`)}
+  picked=null;renderTray();renderMonth();
+}
+const calRoot=$('#calendar');
+calRoot.addEventListener('dragstart',e=>{const it=e.target.closest('[data-tid],[data-eid]');if(!it)return;e.dataTransfer.setData('text/plain',it.dataset.tid||it.dataset.eid);e.dataTransfer.effectAllowed='move'});
+calRoot.addEventListener('dragover',e=>{const d=e.target.closest('.day');if(!d)return;e.preventDefault();$$('.day.over').forEach(x=>x!==d&&x.classList.remove('over'));d.classList.add('over')});
+calRoot.addEventListener('dragleave',e=>{const d=e.target.closest('.day');if(d&&!d.contains(e.relatedTarget))d.classList.remove('over')});
+calRoot.addEventListener('drop',e=>{const d=e.target.closest('.day');if(!d)return;e.preventDefault();d.classList.remove('over');const id=e.dataTransfer.getData('text/plain');if(id)place(id,d.dataset.date)});
+$('#trayList').addEventListener('click',e=>{const it=e.target.closest('[data-tid]');if(!it)return;picked=picked===it.dataset.tid?null:it.dataset.tid;renderTray();if(picked)toast('이제 예약할 날짜를 누르세요.')});
+$('#trayList').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const it=e.target.closest('[data-tid]');if(it){e.preventDefault();it.click()}}});
+$('#month').addEventListener('click',e=>{const d=e.target.closest('.day');if(d&&picked)place(picked,d.dataset.date)});
+$('#mPrev').addEventListener('click',()=>{ym.m--;if(ym.m<0){ym.m=11;ym.y--}renderMonth()});
+$('#mNext').addEventListener('click',()=>{ym.m++;if(ym.m>11){ym.m=0;ym.y++}renderMonth()});
+$('#mToday').addEventListener('click',()=>{ym={y:2026,m:9};renderMonth()});
+$('#autoPlace').addEventListener('click',()=>{
+  if(!TRAY.length){toast('대기 중인 쇼츠가 없습니다.');return}
+  const d=new Date(2026,9,27);let n=0;
+  while(TRAY.length&&n<120){const key=ds(d.getFullYear(),d.getMonth(),d.getDate());if(!EVENTS.some(e=>e.d===key)){const t=TRAY.shift();EVENTS.push({id:'e'+key,d:key,tm:'19:00',p:t.p,t:t.t})}d.setDate(d.getDate()+1);n++}
+  ym={y:2026,m:10};picked=null;renderTray();renderMonth();toast('빈 날짜 저녁 7시에 모두 배치했습니다. 11월을 보여 드립니다.');
+});
+renderTray();renderMonth();
+
+/* ---------- 복사·알림 ---------- */
+document.addEventListener('click',e=>{
+  const c=e.target.closest('[data-copy]');
+  if(c){
+    const src=$(c.dataset.copy),text=src?src.textContent:'';
+    const ok=()=>{c.textContent='복사됨';c.classList.add('done');setTimeout(()=>{c.textContent='복사';c.classList.remove('done')},1600)};
+    const fallback=()=>{const r=document.createRange();r.selectNodeContents(src);const s=getSelection();s.removeAllRanges();s.addRange(r);toast('복사가 막혀 있어 글자를 선택해 두었습니다. Ctrl+C로 복사하세요.')};
+    try{navigator.clipboard.writeText(text).then(ok,fallback)}catch(err){fallback()}
+    return;
+  }
+  const t=e.target.closest('[data-toast]');if(t)toast(t.dataset.toast);
+});
+
+/* ---------- 단어 자막 재생 ---------- */
+let players=[];
+function bindShorts(){
+  players=$$('.short').filter(s=>s.dataset.words).map((el,k)=>{
+    const words=el.dataset.words.split(' ');
+    const chunks=[];for(let i=0;i<words.length;i+=3)chunks.push(words.slice(i,i+3));
+    const old=players.find(p=>p.el===el);
+    return {el,words,chunks,i:old?old.i:(k*5)%words.length,paused:old?old.paused:false,sub:$('.sub',el),detail:!!el.closest('#dPrev')};
+  });
+  players.forEach(draw);
+}
+function draw(p){
+  const ci=Math.floor(p.i/3),wi=p.i%3;
+  p.sub.innerHTML=p.chunks[ci].map((w,j)=>`<span class="w${j===wi?' on':''}">${esc(w)}</span>`).join('');
+  if(p.detail){$$('#dWords li').forEach(li=>li.classList.toggle('on',+li.dataset.wi===p.i))}
+}
+document.addEventListener('click',e=>{
+  const pl=e.target.closest('.play');if(!pl)return;
+  const el=pl.closest('.short'),p=players.find(x=>x.el===el);if(!p)return;
+  p.paused=!p.paused;el.classList.toggle('paused',p.paused);$('i',pl).textContent=p.paused?'▶':'❚❚';
+});
+renderDetail(0);
+if(!reduce){setInterval(()=>{players.forEach(p=>{if(p.paused)return;p.i=(p.i+1)%p.words.length;draw(p)})},420)}
+
+/* ---------- 바로가기 강조 ---------- */
+if('IntersectionObserver' in window){
+  const links=$$('.jumps a');
+  const io=new IntersectionObserver(es=>{es.forEach(en=>{if(en.isIntersecting){links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+en.target.id))}})},{rootMargin:'-45% 0px -50% 0px'});
+  $$('.screen').forEach(s=>io.observe(s));
+}
+})();
+</script>
