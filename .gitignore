@@ -10,3 +10,6 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+
+# 디자인 검사기 캐시
+.impeccable/hook.cache.json

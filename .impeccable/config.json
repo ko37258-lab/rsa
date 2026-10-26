@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "showcase/kshortcut.html"
+        ],
+        "createdAt": "2026-10-26T11:53:13.239Z",
+        "reason": "Claude: replica of the user's existing K-쇼츠컷 site, whose CSS defines .mrk-gradient-text on the logo/hero; fidelity to the existing design system"
+      }
+    ]
+  }
+}
