@@ -81,7 +81,7 @@ def env(monkeypatch, tmp_path):
             on_progress(Progress("transcribe", 1, 3))
         return seen.get("out") or FileTranscript("음 오늘은 건폐률을 어 설명하겠습니다", duration=2700)
 
-    def fake_ai(system, user, cfg, max_tokens=16000):
+    def fake_ai(system, user, cfg, max_tokens=16000, cancel=None):
         seen["ai"].append({"user": user, "max_tokens": max_tokens, "system": system})
         if seen.get("ai_error"):
             raise llm.LlmError(seen["ai_error"])
@@ -167,7 +167,7 @@ def test_cancel_during_polish_keeps_the_transcript(env, monkeypatch):
     job = filejob.FileJob(app, env.path, window=win)
     gate = threading.Event()
 
-    def slow_ai(system, user, cfg, max_tokens=16000):
+    def slow_ai(system, user, cfg, max_tokens=16000, cancel=None):
         gate.wait(2)
         return "늦게 온 정리"
 
@@ -225,6 +225,26 @@ def test_repolish_with_another_mode(env):
         time.sleep(0.01)
     assert win.last("show_result")[2] == "보고서" and len(env.seen["ai"]) == 2
     assert env.history[-1]["mode"] == "report"
+
+
+def test_repolish_uses_the_edited_transcript(env):
+    """원문 탭에서 잘못 들은 말을 고친 뒤 다시 정리하면 고친 글로 정리합니다."""
+    app = FakeApp()
+    job, _win = run_job(app, env.path)
+    job.repolish("lecture", "고친 원문: 오늘은 건폐율을 설명하겠습니다")
+    while job.running:
+        time.sleep(0.01)
+    assert "고친 원문" in env.seen["ai"][-1]["user"] and job.raw.startswith("고친 원문")
+
+
+def test_cancel_right_after_failure_never_leaves_the_window_working(env, monkeypatch):
+    """작업 스레드가 실패를 넘긴 바로 그때 멈추기를 눌러도 창은 멈춘 화면이 됩니다."""
+    app = FakeApp()
+    win = FakeWindow()
+    job = filejob.FileJob(app, env.path, window=win)
+    job.running = False  # 작업 스레드가 막 끝낸 순간
+    job.cancel()
+    assert win.last("show_failure")[0] == "받아쓰기를 멈췄습니다."
 
 
 def test_failed_repolish_keeps_previous_result_with_its_mode(env):

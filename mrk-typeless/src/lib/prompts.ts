@@ -25,10 +25,17 @@ function styleBlock(styleNote: string): string {
   return styleNote.trim() ? `\n\n[나만의 문체]\n${styleNote.trim()}` : "";
 }
 
+/** 이 기기의 오늘 날짜 'YYYY-MM-DD' (중개매물 정리의 정리일) */
+function today(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function buildPolishPrompt(raw: string, mode: Mode, ctx: PromptContext): AiRequest {
   const extras: string[] = [];
   if (mode.id === "translate") extras.push(`[번역할 언어] ${ctx.targetLanguage}`);
   if (mode.id === "email" && ctx.signature.trim()) extras.push(`맺음말 아래에 서명 "${ctx.signature.trim()}"을 붙입니다.`);
+  if (mode.id === "listing") extras.push(`[오늘 날짜] ${today()}`);
 
   const system = `당신은 'MR.K - Typeless'의 받아쓰기 편집기입니다. 사람이 말로 한 내용을 음성인식으로 받아쓴 원문을 받아, 그 사람이 원래 쓰려던 글로 다듬습니다.
 

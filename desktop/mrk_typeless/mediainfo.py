@@ -28,7 +28,7 @@ def duration_seconds(path: str) -> float | None:
                 sec = _mp3(f, size)
             else:
                 sec = None
-    except (OSError, struct.error, ValueError, ZeroDivisionError):
+    except Exception:  # 망가진 파일 머리는 '길이 모름'으로 봅니다 (Gemini에 올린 뒤 계산)
         return None
     return sec if sec is not None and 0 < sec < MAX_SECONDS else None
 

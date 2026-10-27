@@ -1,5 +1,7 @@
 """Claude에게 주는 지시문 (웹앱 mrk-typeless/src/lib/prompts.ts와 같은 내용)."""
 
+import time
+
 from .modes import get_mode
 
 
@@ -26,6 +28,8 @@ def build_polish_prompt(raw: str, mode_id: str, cfg: dict, dictionary: dict) -> 
     signature = (cfg.get("signature") or "").strip()
     if mode["id"] == "email" and signature:
         extras.append(f'맺음말 아래에 서명 "{signature}"을 붙입니다.')
+    if mode["id"] == "listing":
+        extras.append(f"[오늘 날짜] {time.strftime('%Y-%m-%d')}")
     extra_text = "\n" + "\n".join(extras) if extras else ""
 
     system = f"""당신은 'MR.K - Typeless'의 받아쓰기 편집기입니다. 사람이 말로 한 내용을 음성인식으로 받아쓴 원문을 받아, 그 사람이 원래 쓰려던 글로 다듬습니다.

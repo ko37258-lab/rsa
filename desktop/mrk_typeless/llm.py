@@ -24,13 +24,13 @@ def output_budget(text: str) -> int:
     return min(64000, max(DEFAULT_MAX_TOKENS, math.ceil(len(text) * 2.5)))
 
 
-def run_ai(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
-    """설정에서 고른 AI로 정리합니다. 키가 없으면 LlmError."""
+def run_ai(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS, cancel=None) -> str:
+    """설정에서 고른 AI로 정리합니다. 키가 없으면 LlmError. cancel(threading.Event)이 켜지면 Claude 스트리밍을 끊습니다."""
     engine = polish_engine(cfg)
     if engine == "gemini":
         return run_gemini(system, user, cfg, max_tokens)
     if engine == "claude":
-        return run_claude(system, user, cfg, max_tokens)
+        return run_claude(system, user, cfg, max_tokens, cancel)
     raise LlmError("AI 키가 없습니다. 트레이 아이콘 → 설정에서 Gemini나 Claude 키를 넣어 주세요.")
 
 
@@ -55,7 +55,7 @@ def run_gemini(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_
     return text
 
 
-def run_claude(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
+def run_claude(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS, cancel=None) -> str:
     api_key = (cfg.get("claude_api_key") or "").strip()
     if not api_key:
         raise LlmError("Claude API 키가 없습니다. 트레이 아이콘 → 설정에서 넣어 주세요.")
@@ -78,6 +78,9 @@ def run_claude(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_
         if long:
             # 출력 한도가 큰 요청은 SDK가 스트리밍을 요구합니다 (오래 걸리는 요청이 중간에 끊기지 않게).
             with client.beta.messages.stream(**params) as stream:
+                for _event in stream:
+                    if cancel is not None and cancel.is_set():
+                        raise LlmError("정리를 멈췄습니다.")  # with를 빠져나가며 연결을 끊습니다
                 message = stream.get_final_message()
         else:
             message = client.beta.messages.create(**params)

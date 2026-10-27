@@ -366,7 +366,11 @@ class App:
     # ---------- 메뉴 동작 (tk 스레드) ----------
     def open_file_job(self) -> None:
         """트레이 메뉴 '녹음 파일 받아쓰기…': 녹음·영상 파일을 골라 받아쓰고 정리합니다.
-        말하기 단축키와 따로 돌아가므로, 받아쓰는 동안에도 Win+H로 말할 수 있습니다."""
+        말하기 단축키와 따로 돌아가므로, 받아쓰는 동안에도 Win+H로 말할 수 있습니다.
+        파일 고르기 창은 _pump 밖에서 엽니다 — 창이 열린 동안에도 말하기 표시 같은 화면 일이 멈추지 않게."""
+        self.root.after(1, self._open_file_job)
+
+    def _open_file_job(self) -> None:
         from .filejob import FileJob
         from .filestt import file_mime
         from .ui import ask_media_file
@@ -390,7 +394,8 @@ class App:
         save_config(self.cfg)
         try:
             self.file_job = FileJob(self, path)
-        except OSError as e:
+        except Exception as e:
+            log.exception("녹음 파일 열기 실패: %s", path)
             self.overlay.show_error(f"파일을 열지 못했습니다: {e}")
             return
         self.file_job.start()
@@ -407,6 +412,8 @@ class App:
         SettingsWindow.open(self.root, self.cfg, self._apply_settings, state, first_run, on_help=self.open_help)
 
     def _apply_settings(self, cfg: dict, autostart_on: bool | None) -> None:
+        # 설정 창이 열려 있는 동안 바뀐 값(녹음 파일을 고른 폴더)은 설정 창의 옛 사본으로 덮지 않습니다.
+        cfg = {**cfg, "last_media_dir": self.cfg.get("last_media_dir", "")}
         self.cfg = cfg
         save_config(cfg)
         if autostart_on is not None:
@@ -498,6 +505,19 @@ class App:
         )
 
     def quit(self) -> None:
+        job = self.file_job
+        if job is not None and job.running:
+            from tkinter import messagebox
+
+            if not messagebox.askyesno("MR.K Typeless", "녹음 파일을 받아쓰는 중입니다. 끄면 멈춥니다. 그래도 끌까요?"):
+                return
+            job.cancel()
+        # Gemini에 올려 두고 아직 지우지 않은 녹음이 있으면 끄기 전에 지웁니다 (최대 몇 초만 기다림).
+        from . import filestt
+
+        cleaner = threading.Thread(target=filestt.delete_pending, daemon=True)
+        cleaner.start()
+        cleaner.join(timeout=8)
         try:
             import keyboard
 

@@ -36,14 +36,15 @@ def length_label(seconds: float | None) -> str:
     return f"{minutes // 60}시간 {minutes % 60}분" if minutes >= 60 else f"{minutes}분"
 
 
-def polish_text(raw: str, mode: str, cfg: dict, dictionary: dict) -> str:
-    """받아쓴 원문을 고른 형식으로 정리합니다. 긴 녹음은 출력 한도를 길이에 맞춰 늘립니다."""
+def polish_text(raw: str, mode: str, cfg: dict, dictionary: dict, cancel: threading.Event | None = None) -> str:
+    """받아쓴 원문을 고른 형식으로 정리합니다. 긴 녹음은 출력 한도를 길이에 맞춰 늘립니다.
+    멈추기를 누르면 Claude 스트리밍은 그 자리에서 끊어 더 쓰지 않게(요금이 나오지 않게) 합니다."""
     text, _ = apply_replacements(raw, dictionary.get("replacements", []))
     if polish_engine(cfg) == "local":
         cleaned, _ = local_cleanup(text)
         return cleaned
     system, user = build_polish_prompt(text, mode, cfg, dictionary)
-    return llm.run_ai(system, user, cfg, max_tokens=llm.output_budget(user))
+    return llm.run_ai(system, user, cfg, max_tokens=llm.output_budget(user), cancel=cancel)
 
 
 class FileJob:
@@ -104,11 +105,12 @@ class FileJob:
     def cancel(self) -> None:
         """멈추기: 이미 보낸 요청은 끝까지 기다리되 결과는 버립니다. 받아쓴 원문이 있으면 남겨 둡니다."""
         self._cancel.set()
-        was_running, self.running = self.running, False
+        self.running = False
+        # 작업 스레드가 결과를 넘기던 바로 그때 눌러도 창이 '진행 중'으로 남지 않게, 언제나 멈춘 화면을 보여 줍니다.
         if self.raw:
             notes = [*self._notes, "정리를 멈췄습니다. 받아쓴 원문은 남겨 두었습니다."] if not self.result else self._notes
             self.window.show_result(self.result, self.raw, get_mode(self.result_mode if self.result else self.mode)["label"], notes)
-        elif was_running:
+        else:
             self.window.show_failure("받아쓰기를 멈췄습니다.", True)
 
     def close(self) -> bool:
@@ -125,8 +127,10 @@ class FileJob:
         if not self.running:
             self._begin()
 
-    def repolish(self, mode: str) -> None:
-        """결과 창에서 다른 형식을 골라 다시 정리합니다."""
+    def repolish(self, mode: str, raw: str | None = None) -> None:
+        """결과 창에서 다른 형식을 골라 다시 정리합니다. 원문 탭에서 고친 글(raw)이 있으면 그 글로 정리합니다."""
+        if raw and raw.strip():
+            self.raw = raw.strip()
         if self.running or not self.raw:
             return
         self.mode = mode
@@ -241,7 +245,7 @@ class FileJob:
             who = "Gemini" if engine == "gemini" else "Claude"
             self._ui(cancel, "set_working", f"{who}가 '{label}' 형식으로 정리하는 중…", None, "글이 길면 정리에도 몇 분 걸립니다.")
         try:
-            result = polish_text(self.raw, mode, cfg, self.app._dictionary())
+            result = polish_text(self.raw, mode, cfg, self.app._dictionary(), cancel)
         except Exception as e:
             if not isinstance(e, llm.LlmError):
                 log.exception("녹음 파일 정리 실패: %s", self.name)

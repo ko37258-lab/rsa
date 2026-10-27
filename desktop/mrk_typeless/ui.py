@@ -554,7 +554,7 @@ class FileJobWindow:
         self.mode_box = ttk.Combobox(row, textvariable=self.mode_var, values=[label for _, label in modes], state="readonly", width=14, font=(FONT, 10))
         self.mode_box.pack(side="left", padx=(8, 0))
         self.mode_box.bind("<<ComboboxSelected>>", lambda _e: on_mode(self._mode_id()))
-        self.repolish_btn = ttk.Button(row, text="이 형식으로 다시 정리", style="Job.TButton", command=lambda: on_repolish(self._mode_id()))
+        self.repolish_btn = ttk.Button(row, text="이 형식으로 다시 정리", style="Job.TButton", command=self._repolish)
 
         # 진행 상황
         self.progress = tk.Frame(body, bg=self.BG)
@@ -623,6 +623,7 @@ class FileJobWindow:
         box.delete("1.0", "end")
         box.insert("1.0", text)
         box.edit_reset()
+        box.edit_modified(False)
 
     def _current(self) -> tuple[str, str]:
         """(지금 보이는 탭의 글, 탭 이름)"""
@@ -651,6 +652,12 @@ class FileJobWindow:
         )
         if isinstance(target, str) and target:
             self._on_save(target, text)
+
+    def _repolish(self) -> None:
+        """원문 탭에서 고친 글로 다시 정리합니다. 정리된 글을 손으로 고쳤으면 사라지기 전에 묻습니다."""
+        if self.polished_text.edit_modified() and not self.confirm("정리된 글에서 고친 내용이 사라집니다. 다시 정리할까요?"):
+            return
+        self._on_repolish(self._mode_id(), self.raw_text.get("1.0", "end").strip())
 
     def _close(self) -> None:
         if self._on_close():

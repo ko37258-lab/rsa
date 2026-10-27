@@ -393,3 +393,60 @@ def test_openai_too_big_without_gemini_key_explains(server, tmp_path):
     server()
     with pytest.raises(SttError, match="25MB"):
         filestt.transcribe_file(make_file(tmp_path, size=26 * 1024 * 1024), "openai", "sk-o", "ko")
+
+
+# ---------- 2차 검토 반영 ----------
+
+def test_openai_unsupported_format_or_unknown_length_goes_to_gemini(server, tmp_path):
+    fake = server()
+    out = filestt.transcribe_file(make_file(tmp_path, "아이폰.mov", 2000), "openai", "sk-o", "ko", gemini_key="AIza", duration=60)
+    assert out.switched_from == "openai" and ".mov" in out.reason
+    out = filestt.transcribe_file(make_file(tmp_path, "녹음.ogg", 2000), "openai", "sk-o", "ko", gemini_key="AIza")
+    assert out.switched_from == "openai" and "길이를 알 수 없습니다" in out.reason
+    assert not any("api.openai.com" in c["url"] for c in fake.calls)
+
+
+def test_answer_without_candidates_is_not_taken_as_silence(server, tmp_path, monkeypatch):
+    fake = server()
+    real_post = fake.post
+    n = {"i": 0}
+
+    def post(url, **kw):
+        if url.endswith(":generateContent"):
+            n["i"] += 1
+            if n["i"] == 2:  # 둘째 구간: 후보 없는 빈 답
+                fake._record("POST", url, kw.get("headers"), kw.get("json"))
+                return resp(200, {"promptFeedback": {}})
+        return real_post(url, **kw)
+
+    monkeypatch.setattr(filestt.requests, "post", post)
+    out = filestt.transcribe_file(make_file(tmp_path, size=2000), "gemini", "k", "ko", duration=45 * 60)
+    assert out.text == "구간 00:00~20:00\n\n[20:00~40:00 구간은 받아쓰지 못했습니다]\n\n구간 40:00~끝" and out.missed == 1
+
+
+def test_quitting_mid_job_deletes_uploaded_recording(server, tmp_path):
+    fake = server(upload_state="PROCESSING")
+    cancel = threading.Event()
+    seen = {}
+
+    def on_progress(p):
+        if p.stage == "prepare":
+            seen["pending"] = dict(filestt._live)
+            cancel.set()
+
+    with pytest.raises(Cancelled):
+        filestt.transcribe_file(
+            make_file(tmp_path, size=INLINE_MAX_BYTES + 1), "gemini", "k", "ko", duration=600, on_progress=on_progress, cancel=cancel
+        )
+    assert seen["pending"] == {"files/abc": "k"}  # 올린 뒤에는 '지울 목록'에 있다가
+    assert filestt._live == {} and fake.deleted()  # 지우면 빠집니다
+    filestt._live["files/old"] = "k"  # 끌 때 남은 것이 있으면
+    assert filestt.delete_pending() == 1 and filestt._live == {}
+
+
+def test_broken_mp4_header_gives_unknown_length(tmp_path):
+    from mrk_typeless.mediainfo import duration_seconds
+
+    p = tmp_path / "깨진.m4a"
+    p.write_bytes(b"\0\0\0\x10ftypM4A \0\0\0\0" + b"\0\0\0\x08moov" + b"\0\0\0\x08mvhd")  # mvhd 내용이 없음
+    assert duration_seconds(str(p)) is None

@@ -23,11 +23,21 @@ class FakeMessages:
         self.log.append(("stream", params))
         outer = self
 
+        class Stream:
+            def __iter__(self):
+                for i in range(3):
+                    outer.log.append(("event", i))
+                    yield types.SimpleNamespace(type="content_block_delta")
+
+            def get_final_message(self):
+                return outer._message()
+
         class Ctx:
             def __enter__(self):
-                return types.SimpleNamespace(get_final_message=outer._message)
+                return Stream()
 
             def __exit__(self, *exc):
+                outer.log.append(("closed", None))
                 return False
 
         return Ctx()
@@ -58,6 +68,18 @@ def test_long_polish_streams_with_a_bigger_budget(claude):
     kind, params = claude[1]
     assert kind == "stream" and params["max_tokens"] == 64000 and params["fallbacks"] == "default"
     assert claude[0][1]["timeout"] == 900
+
+
+def test_cancel_stops_a_long_claude_stream(claude):
+    """멈추기를 누르면 스트리밍을 끊어 더 쓰지 않게 합니다 (요금이 계속 나오지 않게)."""
+    import threading
+
+    cancel = threading.Event()
+    cancel.set()
+    cfg = {**DEFAULTS, "claude_api_key": "sk-ant"}
+    with pytest.raises(llm.LlmError, match="멈췄습니다"):
+        llm.run_ai("sys", "가" * 30000, cfg, max_tokens=64000, cancel=cancel)
+    assert ("event", 0) in claude and ("event", 1) not in claude and ("closed", None) in claude
 
 
 def test_long_gemini_polish_waits_longer(monkeypatch):

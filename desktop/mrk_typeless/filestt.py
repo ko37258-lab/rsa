@@ -33,11 +33,13 @@ SEGMENT_SECONDS = 20 * 60
 # Gemini Files API 한 파일 한도
 MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
 # OpenAI 받아쓰기 한도: 파일 25MB. gpt-4o-transcribe는 한 번에 2,000토큰까지만 돌려주므로
-# 10분이 넘는 녹음은 뒷부분이 잘립니다 (길이 한도 1,500초보다 먼저 걸림).
+# 10분이 넘는 녹음은 뒷부분이 잘립니다 (길이 한도 1,500초보다 먼저 걸림). 받는 형식도 정해져 있습니다.
 OPENAI_MAX_BYTES = 25 * 1024 * 1024
 OPENAI_MAX_SECONDS = 600
-# ElevenLabs로 바로 보낼 때 파일을 통째로 메모리에 올리므로, 이보다 크면 Gemini로 올립니다 (ElevenLabs 한도는 3GB·10시간).
-ELEVEN_MAX_BYTES = 1024 * 1024 * 1024
+OPENAI_EXTS = {".flac", ".m4a", ".mp3", ".mp4", ".mpeg", ".mpga", ".oga", ".ogg", ".wav", ".webm"}
+# ElevenLabs·OpenAI로 바로 보낼 때는 파일을 통째로 메모리에 올리고(보내는 본문으로 한 벌 더) 보내므로,
+# 이보다 크면 Gemini로 나눠 올립니다 (ElevenLabs 자체 한도는 3GB·10시간).
+ELEVEN_MAX_BYTES = 300 * 1024 * 1024
 ELEVEN_MAX_SECONDS = 10 * 3600
 # 서버가 바쁠 때 다시 해 보는 횟수, 이보다 오래 기다리라고 하면 기다리지 않는 한도
 MAX_TRIES = 3
@@ -68,6 +70,20 @@ FILE_TYPES = " ".join(f"*{ext}" for ext in EXT_MIME)
 
 class Cancelled(Exception):
     """멈추기를 눌렀습니다."""
+
+
+# Gemini에 올려 두고 아직 지우지 않은 파일 {이름: 키}. 받아쓰는 도중 프로그램을 끄면 끄기 전에 지웁니다.
+_live: dict[str, str] = {}
+_live_lock = threading.Lock()
+
+
+def delete_pending() -> int:
+    """아직 지우지 않은 녹음 파일을 모두 지웁니다 (프로그램을 끌 때). 지운 수를 돌려줍니다."""
+    with _live_lock:
+        pending = list(_live.items())
+    for name, key in pending:
+        delete(name, key)
+    return len(pending)
 
 
 @dataclass
@@ -287,6 +303,8 @@ def upload(path: str, mime: str, api_key: str, on_progress: ProgressFn | None = 
         info = {}
     if not info.get("name") or not info.get("uri"):
         raise SttError("Gemini에 파일을 올렸지만 결과를 읽지 못했습니다. 다시 해 주세요.")
+    with _live_lock:
+        _live[info["name"]] = key
 
     # 올린 파일은 잠깐 'PROCESSING'이었다가 'ACTIVE'가 됩니다. 기다리다 멈추거나 실패하면 올린 녹음을 바로 지웁니다.
     if on_progress:
@@ -333,6 +351,8 @@ def delete(name: str, api_key: str) -> None:
     """다 쓴 파일을 지웁니다 (48시간 뒤 저절로 지워지지만, 녹음이므로 바로 지웁니다). 실패해도 괜찮습니다."""
     with contextlib.suppress(requests.RequestException):
         requests.delete(f"{API_ROOT}/v1beta/{name}", headers={"x-goog-api-key": api_key.strip()}, timeout=15)
+    with _live_lock:
+        _live.pop(name, None)
 
 
 def _duration_from_gemini(info: dict, mime: str, api_key: str) -> float | None:
@@ -378,7 +398,12 @@ def _generate(parts: list, api_key: str, cancel: threading.Event | None, config:
                 raise SttError("받아쓰기 결과를 읽지 못했습니다. 다시 해 주세요.") from e
             if gemini.is_blocked(data):
                 raise SttError("Gemini가 이 녹음을 받아쓰지 않았습니다.")
-            return gemini.text_of(data).strip(), gemini.is_truncated(data)
+            text = gemini.text_of(data).strip()
+            # 답이 없거나(후보 없음) 이유 없이 끝난 빈 답은 받아쓴 것으로 치지 않습니다 (조용히 한 구간이 사라지지 않게).
+            # 말소리가 없어 빈 글로 끝난 경우(STOP)는 그대로 받아들입니다.
+            if not data.get("candidates") or (not text and gemini.finish_reason(data) not in ("STOP", "MAX_TOKENS")):
+                raise SttError("Gemini가 받아쓴 글을 돌려주지 않았습니다. 다시 해 주세요.", "busy")
+            return text, gemini.is_truncated(data)
         if res.status_code not in RETRY_STATUS or attempt >= MAX_TRIES:
             raise _failure(res)
         asked = _retry_delay(res)
@@ -510,12 +535,17 @@ def transcribe_file(
         return via_gemini()
 
     limit = None
-    if provider == "openai" and size > OPENAI_MAX_BYTES:
+    ext = os.path.splitext(path)[1].lower()
+    if provider == "openai" and ext not in OPENAI_EXTS:
+        limit = f"OpenAI 받아쓰기는 {ext} 파일을 받지 않습니다"
+    elif provider == "openai" and size > OPENAI_MAX_BYTES:
         limit = "OpenAI 받아쓰기는 25MB까지만 받습니다"
     elif provider == "openai" and (duration or 0) > OPENAI_MAX_SECONDS:
         limit = "OpenAI 받아쓰기는 10분이 넘는 녹음을 끝까지 받아쓰지 못합니다"
+    elif provider == "openai" and duration is None and gemini_key:
+        limit = "OpenAI 받아쓰기는 10분이 넘는 녹음의 뒷부분을 자르는데, 이 녹음은 길이를 알 수 없습니다"
     elif provider == "elevenlabs" and size > ELEVEN_MAX_BYTES:
-        limit = "ElevenLabs로 바로 보내기에는 파일이 너무 큽니다(1GB까지)"
+        limit = "ElevenLabs로 바로 보내기에는 파일이 너무 큽니다(300MB까지)"
     elif provider == "elevenlabs" and (duration or 0) > ELEVEN_MAX_SECONDS:
         limit = "ElevenLabs 받아쓰기는 10시간까지만 받습니다"
     if limit:
