@@ -91,6 +91,8 @@ export function DictateView({
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const rawRef = useRef(raw);
   const exampleRef = useRef(isExample);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const ai = useAiRun();
   // 지금 보이는 정리 글을 만든 엔진 (비교에서 다른 쪽을 고르면 바뀝니다)
   const [resultEngine, setResultEngine] = useState<EngineId>(engine);
@@ -282,24 +284,28 @@ export function DictateView({
           onProgress: (progress) => setFileJob((j) => j && { ...j, progress }),
         });
         if (ctl.signal.aborted) return;
+        const notes: string[] = [];
         if (out.switchedFrom) {
           if (out.switchForGood) onSettings({ sttProvider: "gemini" });
-          setFileNotice(
-            `${out.reason}. 그래서 Gemini로 받아썼습니다.${out.switchForGood ? " 앞으로도 Gemini로 받아씁니다." : ""}`,
-          );
+          notes.push(`${out.reason}. 그래서 Gemini로 받아썼습니다.${out.switchForGood ? " 앞으로도 Gemini로 받아씁니다." : ""}`);
         }
+        if (out.missed)
+          notes.push(`${out.missed}곳은 받아쓰지 못해 원문에 [표시]를 남겼습니다. 그 부분만 다시 올리거나 직접 채워 주세요.`);
         const text = sanitizeDictation(out.text).trim();
         if (!text) {
           setFileError("이 녹음에서 말소리를 찾지 못했습니다. 다른 파일을 올려 주세요.");
           return;
         }
-        leaveExample();
+        // 첫 화면의 예시 결과가 남아 받아쓴 녹음의 정리 결과처럼 보이지 않게 지웁니다.
+        if (leaveExample()) ai.show("");
         updateRaw(text);
         spokenRef.current = durationSec ? Math.round(durationSec * 1000) : undefined;
         fileAbortRef.current = null;
         setFileJob(null);
-        if (settings.autoPolish) await polish(false, spokenRef.current);
-        else setFileNotice((n) => `${n ? `${n} ` : ""}받아쓴 글을 원문 칸에 넣었습니다. '정리하기'를 누르세요.`);
+        // 받아쓰는 몇 분 사이에 형식·엔진을 바꿨을 수 있으니, 지금 화면의 설정으로 정리합니다.
+        if (settingsRef.current.autoPolish) await latest.current.polish(false, spokenRef.current);
+        else notes.push("받아쓴 글을 원문 칸에 넣었습니다. '정리하기'를 누르세요.");
+        setFileNotice(notes.join(" ") || null);
       } catch (e) {
         if (!ctl.signal.aborted)
           setFileError(e instanceof SttError ? e.message : "녹음 파일을 받아쓰는 중 문제가 생겼습니다. 다시 올려 주세요.");
@@ -308,7 +314,7 @@ export function DictateView({
         setFileJob((j) => (fileAbortRef.current ? j : null));
       }
     },
-    [ai.busy, dictionary.terms, leaveExample, onSettings, polish, settings, speech.listening, updateRaw],
+    [ai, dictionary.terms, leaveExample, onSettings, settings, speech.listening, updateRaw],
   );
 
   const cancelFile = useCallback(() => {
@@ -318,11 +324,30 @@ export function DictateView({
     setFileNotice("녹음 파일 받아쓰기를 멈췄습니다.");
   }, []);
 
-  // 화면에 녹음 파일을 끌어다 놓으면 받아씁니다 (그냥 두면 브라우저가 파일을 열어 이 화면을 떠납니다).
-  const droppedFile = (e: React.DragEvent): File | null => {
-    const f = e.dataTransfer?.files?.[0];
-    return f && fileMime(f.name, f.type) ? f : null;
-  };
+  // 화면 어디에든 녹음 파일을 끌어다 놓으면 받아씁니다. 받아쓰기 칸 밖에 놓쳐도 브라우저가 파일을 열어
+  // 이 화면(받아쓴 글)을 떠나지 않게 막습니다.
+  const handleFileRef = useRef(handleFile);
+  handleFileRef.current = handleFile;
+  useEffect(() => {
+    if (__ARTIFACT__ || !active) return;
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types?.includes("Files");
+    const over = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      const f = e.dataTransfer?.files?.[0];
+      if (f && fileMime(f.name, f.type)) void handleFileRef.current(f);
+      else setFileError("녹음·영상 파일만 올릴 수 있습니다 (m4a·mp3·wav·mp4 등).");
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("drop", drop);
+    };
+  }, [active]);
 
   // 비교에서 고른 글로 바꾸고, 방금 기록도 그 글로 고칩니다 (같은 원문이면 기록이 덮어써집니다).
   const adopt = useCallback(
@@ -367,8 +392,8 @@ export function DictateView({
   }, [ai, leaveExample, speech, updateRaw, usedMic]);
 
   // 단축키: Space 길게 누르기 = 말하기, Ctrl/⌘+Enter = 정리, Esc = 멈춤
-  const latest = useRef({ active, startListening, stopAndPolish, polish, speech, ai });
-  latest.current = { active, startListening, stopAndPolish, polish, speech, ai };
+  const latest = useRef({ active, startListening, stopAndPolish, polish, speech, ai, cancelFile });
+  latest.current = { active, startListening, stopAndPolish, polish, speech, ai, cancelFile };
 
   const scheduleVoicePolish = useCallback(() => {
     clearVoiceTimer();
@@ -388,9 +413,14 @@ export function DictateView({
   useEffect(() => {
     let spaceHeld = false;
     const down = (e: KeyboardEvent) => {
-      const { active, startListening, polish, speech, ai } = latest.current;
+      const { active, startListening, polish, speech, ai, cancelFile } = latest.current;
       // 사용법 같은 대화 상자가 열려 있으면 뒤에서 단축키가 동작하지 않게 합니다.
       if (!active || document.querySelector("dialog[open]")) return;
+      // 녹음 파일을 받아쓰는 동안에는 Esc(멈추기)만 받습니다. Space로 마이크가 켜지거나 Ctrl+Enter로 옛 원문이 정리되지 않게.
+      if (fileAbortRef.current) {
+        if (e.key === "Escape") cancelFile();
+        return;
+      }
       if (e.key === "Escape") {
         if (speech.listening || speech.transcribing) {
           speech.cancel();
@@ -466,19 +496,7 @@ export function DictateView({
         </p>
       </section>
 
-      <section
-        className="stage"
-        onDragOver={(e) => {
-          if (!__ARTIFACT__ && e.dataTransfer?.types?.includes("Files")) e.preventDefault();
-        }}
-        onDrop={(e) => {
-          if (__ARTIFACT__) return;
-          const f = droppedFile(e);
-          if (f || e.dataTransfer?.files?.length) e.preventDefault();
-          if (f) void handleFile(f);
-          else if (e.dataTransfer?.files?.length) setFileError("녹음·영상 파일만 올릴 수 있습니다 (m4a·mp3·wav·mp4 등).");
-        }}
-      >
+      <section className="stage">
         <div className="stage__mic">
           {!usedMic && <HandNote text="꾹 누르고 말해 보세요" className="stage__note" />}
           <MicButton
@@ -538,6 +556,7 @@ export function DictateView({
             id="raw"
             className="pad__text"
             value={raw}
+            readOnly={!!fileJob}
             placeholder="마이크를 누르고 말하거나, 이 칸을 누르고 키보드의 음성 입력으로 말하세요."
             onFocus={() => {
               // 예시 문장이 있으면 지우고 새로 받아씁니다.
@@ -802,7 +821,10 @@ function FileJobStatus({
         </button>
       </div>
       {job.durationSec && job.durationSec > 20 * 60 && (
-        <p className="filejob__hint">20분씩 나눠 받아씁니다. 긴 녹음은 몇 분 걸릴 수 있으니 이 화면을 닫지 마세요.</p>
+        <p className="filejob__hint">
+          {p?.stage === "transcribe" && p.total > 1 ? "20분씩 나눠 받아씁니다. " : ""}긴 녹음은 몇 분 걸릴 수 있으니 이 화면을 닫지
+          마세요.
+        </p>
       )}
     </div>
   );

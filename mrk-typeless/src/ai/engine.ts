@@ -16,7 +16,7 @@ export interface RunOptions {
  * 1시간 강의를 '자동 정리'하면 원문만큼 긴 글이 나오므로 16,000으로는 중간에 잘렸습니다.
  */
 export function outputBudget(text: string): number {
-  return Math.min(64000, Math.max(16000, Math.ceil(text.length * 1.5)));
+  return Math.min(64000, Math.max(16000, Math.ceil(text.length * 2.5)));
 }
 
 export class EngineError extends Error {

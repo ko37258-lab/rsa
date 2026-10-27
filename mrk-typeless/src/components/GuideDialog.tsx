@@ -156,6 +156,9 @@ export function GuideDialog({ open, onClose }: Props) {
                   <li>
                     Gemini 키 하나로 됩니다. 1시간이 넘는 녹음도 20분씩 나눠 받아쓰고, 다 쓴 녹음 파일은 Google 서버에서 바로 지웁니다.
                   </li>
+                  <li>
+                    아이폰 <b>음성 메모</b>는 녹음을 열고 공유 → <b>파일에 저장</b>을 한 뒤, 올리기에서 그 파일을 고르세요.
+                  </li>
                 </ul>
               </div>
             )}
