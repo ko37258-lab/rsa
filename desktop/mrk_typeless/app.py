@@ -68,6 +68,7 @@ class App:
         self._stt_note = ""
         self.newer_version: str | None = None  # 켤 때 확인한 새 버전 (없으면 None)
         self.file_job = None  # 녹음 파일 받아쓰기 (filejob.FileJob, 한 번에 하나)
+        self._picking_file = False
         self.tray = Tray(self)
 
     # ---------- 화면(tk) 스레드로 일 넘기기 ----------
@@ -368,9 +369,20 @@ class App:
         """트레이 메뉴 '녹음 파일 받아쓰기…': 녹음·영상 파일을 골라 받아쓰고 정리합니다.
         말하기 단축키와 따로 돌아가므로, 받아쓰는 동안에도 Win+H로 말할 수 있습니다.
         파일 고르기 창은 _pump 밖에서 엽니다 — 창이 열린 동안에도 말하기 표시 같은 화면 일이 멈추지 않게."""
+        if self._picking_file:
+            return  # 파일 고르기 창이 이미 열려 있습니다
         self.root.after(1, self._open_file_job)
 
     def _open_file_job(self) -> None:
+        if self._picking_file:
+            return
+        self._picking_file = True
+        try:
+            self._pick_and_start()
+        finally:
+            self._picking_file = False
+
+    def _pick_and_start(self) -> None:
         from .filejob import FileJob
         from .filestt import file_mime
         from .ui import ask_media_file

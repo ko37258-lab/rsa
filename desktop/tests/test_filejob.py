@@ -81,7 +81,7 @@ def env(monkeypatch, tmp_path):
             on_progress(Progress("transcribe", 1, 3))
         return seen.get("out") or FileTranscript("음 오늘은 건폐률을 어 설명하겠습니다", duration=2700)
 
-    def fake_ai(system, user, cfg, max_tokens=16000, cancel=None):
+    def fake_ai(system, user, cfg, max_tokens=16000, cancel=None, allow_partial=False):
         seen["ai"].append({"user": user, "max_tokens": max_tokens, "system": system})
         if seen.get("ai_error"):
             raise llm.LlmError(seen["ai_error"])
@@ -167,7 +167,7 @@ def test_cancel_during_polish_keeps_the_transcript(env, monkeypatch):
     job = filejob.FileJob(app, env.path, window=win)
     gate = threading.Event()
 
-    def slow_ai(system, user, cfg, max_tokens=16000, cancel=None):
+    def slow_ai(system, user, cfg, max_tokens=16000, cancel=None, allow_partial=False):
         gate.wait(2)
         return "늦게 온 정리"
 
@@ -191,13 +191,34 @@ def test_polish_failure_still_shows_the_transcript(env):
     assert polished == "" and raw and "한도" in notes[-1] and "받아쓴 원문" in notes[-1]
 
 
-def test_transcription_failure_offers_retry(env, monkeypatch):
-    def fail(*a, **k):
-        raise filestt.SttError("Gemini API 키가 맞지 않습니다.")
-
-    monkeypatch.setattr(filestt, "transcribe_file", fail)
+def test_transcription_failure_offers_retry_only_when_it_can_help(env, monkeypatch):
+    errors = [filestt.SttError("Gemini 서버가 바쁩니다. 잠시 뒤 다시 받아쓰기해 주세요.", "busy")]
+    monkeypatch.setattr(filestt, "transcribe_file", lambda *a, **k: (_ for _ in ()).throw(errors[0]))
     _job, win = run_job(FakeApp(), env.path)
-    assert win.last("show_failure") == ("Gemini API 키가 맞지 않습니다.", True)
+    assert win.last("show_failure")[1] is True  # 바쁜 것은 다시 해 볼 만함
+    errors[0] = filestt.SttError("Gemini API 키가 맞지 않습니다.", "key")
+    _job, win = run_job(FakeApp(), env.path)
+    assert win.last("show_failure") == ("Gemini API 키가 맞지 않습니다.", False)  # 키 문제는 다시 해도 같음
+
+
+def test_dictation_wording_and_english_server_text_are_adapted_for_files():
+    assert filejob.for_file("ElevenLabs 받아쓰기 서버가 잠시 멈췄습니다. 조금 뒤 다시 말해 주세요.").endswith("다시 해 주세요.")
+    assert filejob.for_file("녹음이 너무 깁니다. 나눠서 말해 주세요.") == "녹음이 너무 깁니다. 나눠서 올려 주세요."
+    assert filejob.for_file("Gemini가 요청을 거절했습니다 (400): Request contains an invalid argument.") == "Gemini가 요청을 거절했습니다 (400)."
+    assert "(OpenAI:" not in filejob.for_file("OpenAI가 이 키의 받아쓰기 요청을 거절했습니다 (OpenAI: Project does not have access).")
+
+
+def test_truncated_polish_keeps_what_was_written(env, monkeypatch):
+    monkeypatch.setattr(llm, "run_ai", lambda *a, **k: "앞부분 정리" + llm.PARTIAL_NOTE)
+    _job, win = run_job(FakeApp(), env.path)
+    polished, _raw, _label, notes = win.last("show_result")
+    assert polished.startswith("앞부분 정리") and "끝까지 되지 않았습니다" in notes[-1]
+
+
+def test_long_claude_polish_gets_up_to_128k(env):
+    env.seen["out"] = FileTranscript("가" * 60000, duration=3 * 3600)
+    run_job(FakeApp(claude_api_key="sk-ant"), env.path)
+    assert env.seen["ai"][0]["max_tokens"] == 128000
 
 
 def test_switch_to_gemini_for_good_updates_settings_and_tells(env):

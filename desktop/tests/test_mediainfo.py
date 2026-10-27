@@ -71,26 +71,64 @@ def mp3_frame_header(kbps_index: int = 9) -> bytes:
     return bytes([0xFF, 0xFB, (kbps_index << 4) | 0x00, 0x00])
 
 
+FRAME_LEN = 144000 * 128 // 44100  # 128kbps·44.1kHz 프레임 길이 (417바이트)
+
+
+def mp3_frames(n: int, first: bytes = b"") -> bytes:
+    frame = mp3_frame_header() + b"\0" * (FRAME_LEN - 4)
+    head = (first + frame)[:FRAME_LEN] if first else frame
+    return head + frame * (n - 1)
+
+
 def test_mp3_vbr_reads_xing_frame_count(tmp_path):
     frames = 44100 * 90 // 1152  # 약 90초
-    frame = mp3_frame_header() + b"\0" * 32 + b"Xing" + struct.pack(">II", 1, frames) + b"\0" * 300
+    xing = mp3_frame_header() + b"\0" * 32 + b"Xing" + struct.pack(">II", 1, frames)
     id3 = b"ID3" + bytes([4, 0, 0]) + bytes([0, 0, 0, 20]) + b"\0" * 20
     p = tmp_path / "강의.mp3"
-    p.write_bytes(id3 + frame + b"\0" * 1000)
+    p.write_bytes(id3 + mp3_frames(10, first=xing))
     assert duration_seconds(str(p)) == pytest.approx(frames * 1152 / 44100)
 
 
 def test_mp3_cbr_uses_size_and_bitrate(tmp_path):
-    seconds = 120
-    audio = mp3_frame_header() + b"\0" * (128000 // 8 * seconds - 4)
+    n = round(120 * 44100 / 1152)
     p = tmp_path / "cbr.mp3"
-    p.write_bytes(audio)
-    assert duration_seconds(str(p)) == pytest.approx(seconds, rel=0.01)
+    p.write_bytes(mp3_frames(n))
+    assert duration_seconds(str(p)) == pytest.approx(120, rel=0.01)
 
 
-@pytest.mark.parametrize("data", [b"", b"OggS" + b"\0" * 100, b"\x1a\x45\xdf\xa3" + b"\0" * 50, b"RIFF\0\0\0\0WAVE"])
-def test_unknown_or_broken_files_give_none(tmp_path, data):
-    p = tmp_path / "x.bin"
+def test_aac_adts_is_not_read_as_mp3(tmp_path):
+    """.aac(ADTS)는 FF F1로 시작해 mp3 머리처럼 보이지만 mp3로 읽지 않습니다 (Gemini에 올린 뒤 계산)."""
+    import random
+
+    rng = random.Random(7)
+    payload = bytes(rng.randrange(256) for _ in range(200_000))
+    p = tmp_path / "녹음.aac"
+    p.write_bytes(bytes([0xFF, 0xF1, 0x50, 0x80]) + payload)
+    assert duration_seconds(str(p)) is None
+    q = tmp_path / "가짜.mp3"  # 우연히 프레임 머리처럼 보이는 바이트만 있고 다음 프레임이 없음
+    q.write_bytes(b"\0" * 100 + mp3_frame_header() + payload[:5000])
+    assert duration_seconds(str(q)) is None
+
+
+def test_flac_with_id3_tag(tmp_path):
+    rate, samples = 48000, 48000 * 300
+    info = bytearray(34)
+    info[10] = (rate >> 12) & 0xFF
+    info[11] = (rate >> 4) & 0xFF
+    info[12] = (rate & 0xF) << 4
+    info[14:18] = struct.pack(">I", samples)
+    id3 = b"ID3" + bytes([4, 0, 0]) + bytes([0, 0, 0, 30]) + b"\0" * 30
+    p = tmp_path / "태그.flac"
+    p.write_bytes(id3 + b"fLaC" + bytes([0x80, 0, 0, 34]) + bytes(info))
+    assert duration_seconds(str(p)) == pytest.approx(300)
+
+
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [("x.m4a", b""), ("x.ogg", b"OggS" + b"\0" * 100), ("x.webm", b"\x1a\x45\xdf\xa3" + b"\0" * 50), ("x.wav", b"RIFF\0\0\0\0WAVE")],
+)
+def test_unknown_or_broken_files_give_none(tmp_path, name, data):
+    p = tmp_path / name
     p.write_bytes(data)
     assert duration_seconds(str(p)) is None
 

@@ -92,3 +92,28 @@ def test_long_gemini_polish_waits_longer(monkeypatch):
     monkeypatch.setattr(gemini, "generate", fake_generate)
     llm.run_gemini("sys", "긴 글", {**DEFAULTS, "gemini_api_key": "AIza"}, max_tokens=50000)
     assert seen == {"timeout": 900, "max_tokens": 50000}
+
+
+def test_truncated_long_polish_is_kept_when_allowed(monkeypatch, claude):
+    """녹음 파일 정리는 출력 한도에 걸려도 정리한 데까지 살립니다 (말로 입력할 때는 지금처럼 알림)."""
+
+    def cut(model, key, body, what, timeout=90):
+        return {"candidates": [{"content": {"parts": [{"text": "앞부분"}]}, "finishReason": "MAX_TOKENS"}]}
+
+    monkeypatch.setattr(gemini, "generate", cut)
+    cfg = {**DEFAULTS, "gemini_api_key": "AIza"}
+    with pytest.raises(llm.LlmError):
+        llm.run_gemini("sys", "글", cfg)
+    assert llm.run_gemini("sys", "글", cfg, allow_partial=True) == "앞부분" + llm.PARTIAL_NOTE
+
+
+def test_history_with_long_file_transcripts_stays_small(tmp_path, monkeypatch):
+    from mrk_typeless import config
+
+    monkeypatch.setattr(config, "APP_DIR", tmp_path)
+    monkeypatch.setattr(config, "HISTORY_PATH", tmp_path / "history.jsonl")
+    for i in range(12):
+        config.append_history({"kind": "file", "raw": "가" * 100_000, "result": str(i)})
+    size = (tmp_path / "history.jsonl").stat().st_size
+    assert size <= config.HISTORY_MAX_BYTES
+    assert '"result": "11"' in (tmp_path / "history.jsonl").read_text(encoding="utf-8")  # 가장 최근 것은 남음

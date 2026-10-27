@@ -197,7 +197,7 @@ def _failure(res: requests.Response) -> SttError:
     message = str(err.get("message") or "")
     reason = next((d.get("reason") for d in err.get("details") or [] if isinstance(d, dict) and d.get("reason")), "") or err.get("status") or ""
     if res.status_code == 400 and re.search(r"mime|unsupported|invalid argument.*(audio|file)", message, re.IGNORECASE):
-        return SttError("이 파일 형식은 받아쓸 수 없습니다. m4a·mp3·wav·mp4 같은 녹음·영상 파일을 골라 주세요.")
+        return SttError("이 파일 형식은 받아쓸 수 없습니다. m4a·mp3·wav·mp4 같은 녹음·영상 파일을 골라 주세요.", "input")
     # 키·권한·하루 한도 문제는 다음 구간에서도 똑같이 막히므로 표시해 둡니다 (구간 받아쓰기를 거기서 멈춤).
     if res.status_code in (401, 403, 404) or "API_KEY" in str(reason):
         kind = "key"
@@ -431,10 +431,10 @@ def transcribe_with_gemini(
     """Gemini로 파일을 받아씁니다."""
     mime = file_mime(path)
     if not mime:
-        raise SttError("이 파일 형식은 받아쓸 수 없습니다. m4a·mp3·wav·mp4 같은 녹음·영상 파일을 골라 주세요.")
+        raise SttError("이 파일 형식은 받아쓸 수 없습니다. m4a·mp3·wav·mp4 같은 녹음·영상 파일을 골라 주세요.", "input")
     size = os.path.getsize(path)
     if size > MAX_FILE_BYTES:
-        raise SttError("파일이 2GB보다 큽니다. 나눠서 올려 주세요.")
+        raise SttError("파일이 2GB보다 큽니다. 나눠서 올려 주세요.", "input")
     video = mime.startswith("video/")
     # 영상은 말소리만 받아쓰면 되므로 화면을 낮은 해상도로 봅니다 (긴 강의 영상도 입력 한도에 걸리지 않게).
     config = {"mediaResolution": "MEDIA_RESOLUTION_LOW"} if video else {}
@@ -516,12 +516,12 @@ def transcribe_file(
         raise SttError("받아쓰기 API 키가 없습니다. 트레이 아이콘 → 설정에서 넣어 주세요.")
     mime = file_mime(path)
     if not mime:
-        raise SttError("이 파일 형식은 받아쓸 수 없습니다. m4a·mp3·wav·mp4 같은 녹음·영상 파일을 골라 주세요.")
+        raise SttError("이 파일 형식은 받아쓸 수 없습니다. m4a·mp3·wav·mp4 같은 녹음·영상 파일을 골라 주세요.", "input")
     size = os.path.getsize(path)
     if size == 0:
-        raise SttError("빈 파일입니다. 다른 녹음 파일을 골라 주세요.")
+        raise SttError("빈 파일입니다. 다른 녹음 파일을 골라 주세요.", "input")
     if size > MAX_FILE_BYTES:
-        raise SttError("파일이 2GB보다 큽니다. 나눠서 올려 주세요.")
+        raise SttError("파일이 2GB보다 큽니다. 나눠서 올려 주세요.", "input")
     if duration is None:
         duration = mediainfo.duration_seconds(path)
     gemini_key = (gemini_key or "").strip()
@@ -551,7 +551,7 @@ def transcribe_file(
     if limit:
         if gemini_key:
             return via_gemini(provider, limit)
-        raise SttError(f"{limit}. 설정에서 받아쓰기 서비스를 Gemini로 바꾸면 2GB까지 긴 녹음도 받아씁니다.")
+        raise SttError(f"{limit}. 설정에서 받아쓰기 서비스를 Gemini로 바꾸면 2GB까지 긴 녹음도 받아씁니다.", "input")
 
     _check(cancel)
     if on_progress:

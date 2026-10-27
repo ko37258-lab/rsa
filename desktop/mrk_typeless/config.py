@@ -174,9 +174,16 @@ def _trim_history() -> None:
     try:
         if HISTORY_PATH.stat().st_size <= HISTORY_MAX_BYTES:
             return
-        lines = HISTORY_PATH.read_text(encoding="utf-8").splitlines(keepends=True)
+        lines = HISTORY_PATH.read_text(encoding="utf-8").splitlines(keepends=True)[-HISTORY_KEEP_LINES:]
+        # 녹음 파일 기록은 한 줄이 길어 300줄로도 넘칠 수 있으니, 한도의 절반까지 줄여 매번 다시 쓰지 않게 합니다.
+        kept, total = [], 0
+        for line in reversed(lines):
+            total += len(line.encode("utf-8"))
+            if kept and total > HISTORY_MAX_BYTES // 2:
+                break
+            kept.append(line)
         tmp = HISTORY_PATH.with_suffix(".tmp")
-        tmp.write_text("".join(lines[-HISTORY_KEEP_LINES:]), encoding="utf-8")
+        tmp.write_text("".join(reversed(kept)), encoding="utf-8")
         tmp.replace(HISTORY_PATH)
     except OSError:
         pass

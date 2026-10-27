@@ -14,27 +14,30 @@ class LlmError(Exception):
 
 
 TRUNCATED_MESSAGE = "글이 너무 길어 끝까지 정리하지 못했습니다. 나눠서 말해 주세요."
+# 녹음 파일처럼 긴 글은 끊겨도 정리한 데까지 살리고 이 표시를 붙입니다 (allow_partial).
+PARTIAL_NOTE = "\n\n[글이 길어 정리가 여기서 끊겼습니다. 나머지는 '받아쓴 원문'에 있습니다]"
 # 보통 정리의 출력 한도. 이보다 크게 잡는 긴 글(녹음 파일)은 Claude를 스트리밍으로 부릅니다.
 DEFAULT_MAX_TOKENS = 16000
 
 
-def output_budget(text: str) -> int:
+def output_budget(text: str, cap: int = 64000) -> int:
     """정리 결과의 출력 한도 (웹앱 engine.ts의 outputBudget과 같음). 짧은 글은 16,000토큰, 1시간 강의 녹음처럼
-    긴 원문은 길이에 맞춰 64,000까지 늘립니다 (Claude 5.5는 스트리밍으로 128K까지, Gemini는 65,536까지 받습니다)."""
-    return min(64000, max(DEFAULT_MAX_TOKENS, math.ceil(len(text) * 2.5)))
+    긴 원문은 길이에 맞춰 cap까지 늘립니다 (Claude 5.5는 스트리밍으로 128,000까지, Gemini는 65,536까지 받습니다)."""
+    return min(cap, max(DEFAULT_MAX_TOKENS, math.ceil(len(text) * 2.5)))
 
 
-def run_ai(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS, cancel=None) -> str:
-    """설정에서 고른 AI로 정리합니다. 키가 없으면 LlmError. cancel(threading.Event)이 켜지면 Claude 스트리밍을 끊습니다."""
+def run_ai(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS, cancel=None, allow_partial: bool = False) -> str:
+    """설정에서 고른 AI로 정리합니다. 키가 없으면 LlmError. cancel(threading.Event)이 켜지면 Claude 스트리밍을 끊습니다.
+    allow_partial이면 출력 한도에 걸려 끊긴 글도 버리지 않고 PARTIAL_NOTE를 붙여 돌려줍니다."""
     engine = polish_engine(cfg)
     if engine == "gemini":
-        return run_gemini(system, user, cfg, max_tokens)
+        return run_gemini(system, user, cfg, max_tokens, allow_partial)
     if engine == "claude":
-        return run_claude(system, user, cfg, max_tokens, cancel)
+        return run_claude(system, user, cfg, max_tokens, cancel, allow_partial)
     raise LlmError("AI 키가 없습니다. 트레이 아이콘 → 설정에서 Gemini나 Claude 키를 넣어 주세요.")
 
 
-def run_gemini(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
+def run_gemini(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS, allow_partial: bool = False) -> str:
     api_key = (cfg.get("gemini_api_key") or "").strip()
     if not api_key:
         raise LlmError("Gemini API 키가 없습니다. 트레이 아이콘 → 설정에서 넣어 주세요.")
@@ -51,11 +54,13 @@ def run_gemini(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_
     if not text:
         raise LlmError("정리된 글이 비어 있습니다. 조금 더 길게 말해 주세요.")
     if gemini.is_truncated(data):
+        if allow_partial:
+            return text + PARTIAL_NOTE
         raise LlmError(TRUNCATED_MESSAGE)
     return text
 
 
-def run_claude(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS, cancel=None) -> str:
+def run_claude(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS, cancel=None, allow_partial: bool = False) -> str:
     api_key = (cfg.get("claude_api_key") or "").strip()
     if not api_key:
         raise LlmError("Claude API 키가 없습니다. 트레이 아이콘 → 설정에서 넣어 주세요.")
@@ -111,5 +116,7 @@ def run_claude(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_
         raise LlmError("정리된 글이 비어 있습니다. 조금 더 길게 말해 주세요.")
     # 출력 한도에 걸려 중간에 끊긴 글은 붙여넣지 않고 알립니다.
     if message.stop_reason == "max_tokens":
+        if allow_partial:
+            return text + PARTIAL_NOTE
         raise LlmError(TRUNCATED_MESSAGE)
     return text

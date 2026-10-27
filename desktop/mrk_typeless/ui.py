@@ -526,10 +526,14 @@ class FileJobWindow:
         self._on_copy, self._on_save, self._on_repolish = on_copy, on_save, on_repolish
         self._flash_job = None
         self.title = title
+        self._result_label = ""  # 지금 보이는 정리된 글의 형식 (저장할 파일 이름에 씀)
+        # Windows 화면 배율(125%·150%)에서는 글자가 커지므로 창 크기·줄 바꿈 폭도 같이 키웁니다.
+        scale = max(1.0, root.winfo_fpixels("1i") / 96)
+        self._px = lambda n: round(n * scale)
         win = self.win = tk.Toplevel(root)
         win.title(f"녹음 파일 받아쓰기 · {title}")
         win.configure(bg=self.BG)
-        win.minsize(520, 260)
+        win.minsize(self._px(520), self._px(260))
         self._compact = True  # 진행 중에는 작게, 결과가 나오면 글을 읽기 좋게 키웁니다
         win.protocol("WM_DELETE_WINDOW", self._close)
         style = ttk.Style(win)
@@ -542,7 +546,7 @@ class FileJobWindow:
         body.pack(fill="both", expand=True)
 
         # 머리: 파일 이름 · 크기·길이
-        tk.Label(body, text=title, font=(FONT, 13, "bold"), fg=self.INK, bg=self.BG, anchor="w", justify="left", wraplength=480).pack(fill="x")
+        tk.Label(body, text=title, font=(FONT, 13, "bold"), fg=self.INK, bg=self.BG, anchor="w", justify="left", wraplength=self._px(480)).pack(fill="x")
         self.meta = tk.Label(body, text=meta, font=(FONT, 9), fg=self.MUTED, bg=self.BG, anchor="w")
         self.meta.pack(fill="x", pady=(2, 10))
 
@@ -558,18 +562,18 @@ class FileJobWindow:
 
         # 진행 상황
         self.progress = tk.Frame(body, bg=self.BG)
-        self.status = tk.Label(self.progress, text="", font=(FONT, 10, "bold"), fg=self.INK, bg=self.BG, anchor="w", justify="left", wraplength=480)
+        self.status = tk.Label(self.progress, text="", font=(FONT, 10, "bold"), fg=self.INK, bg=self.BG, anchor="w", justify="left", wraplength=self._px(480))
         self.status.pack(fill="x")
         self.bar = ttk.Progressbar(self.progress, mode="indeterminate", maximum=100)
         self.bar.pack(fill="x", pady=(8, 6))
-        self.hint = tk.Label(self.progress, text="", font=(FONT, 9), fg=self.TEXT, bg=self.BG, anchor="w", justify="left", wraplength=480)
+        self.hint = tk.Label(self.progress, text="", font=(FONT, 9), fg=self.TEXT, bg=self.BG, anchor="w", justify="left", wraplength=self._px(480))
         self.hint.pack(fill="x")
         self.cancel_btn = ttk.Button(self.progress, text="멈추기", style="Job.TButton", command=on_cancel)
         self.cancel_btn.pack(anchor="e", pady=(8, 0))
 
         # 결과
         self.result = tk.Frame(body, bg=self.BG)
-        self.notice = tk.Label(self.result, text="", font=(FONT, 9), fg=self.INK, bg=self.WARN_BG, anchor="w", justify="left", wraplength=480, padx=10, pady=6)
+        self.notice = tk.Label(self.result, text="", font=(FONT, 9), fg=self.INK, bg=self.WARN_BG, anchor="w", justify="left", wraplength=self._px(480), padx=10, pady=6)
         self.tabs = ttk.Notebook(self.result, style="Job.TNotebook")
         self.polished_text = self._text_tab("정리된 글")
         self.raw_text = self._text_tab("받아쓴 원문")
@@ -579,7 +583,7 @@ class FileJobWindow:
         # 아래 버튼, 그 위에 복사·저장 결과 한 줄
         self.buttons = tk.Frame(body, bg=self.BG)
         self.buttons.pack(side="bottom", fill="x", pady=(8, 0))
-        self.flash_label = tk.Label(body, text="", font=(FONT, 9), fg=self.PRIMARY, bg=self.BG, anchor="w", justify="left", wraplength=480)
+        self.flash_label = tk.Label(body, text="", font=(FONT, 9), fg=self.PRIMARY, bg=self.BG, anchor="w", justify="left", wraplength=self._px(480))
         self.flash_label.pack(side="bottom", fill="x", pady=(8, 0))
         ttk.Button(self.buttons, text="닫기", style="Job.TButton", command=self._close).pack(side="right")
         self.save_btn = ttk.Button(self.buttons, text="파일로 저장…", style="Job.TButton", command=self._save)
@@ -589,9 +593,10 @@ class FileJobWindow:
         self._actions(False)
 
         win.update_idletasks()
-        x = (win.winfo_screenwidth() - 620) // 2
-        y = max(20, (win.winfo_screenheight() - 600) // 3)
-        win.geometry(f"620x320+{x}+{y}")
+        width, height = self._px(620), self._px(320)
+        x = max(0, (win.winfo_screenwidth() - width) // 2)
+        y = max(20, (win.winfo_screenheight() - self._px(600)) // 3)
+        win.geometry(f"{width}x{height}+{x}+{y}")
         win.lift()
         win.focus_force()
 
@@ -629,7 +634,7 @@ class FileJobWindow:
         """(지금 보이는 탭의 글, 탭 이름)"""
         raw = self.tabs.index(self.tabs.select()) == 1
         box = self.raw_text if raw else self.polished_text
-        return box.get("1.0", "end").strip(), "원문" if raw else self.mode_var.get()
+        return box.get("1.0", "end").strip(), "원문" if raw else (self._result_label or self.mode_var.get())
 
     def _copy(self) -> None:
         text, _ = self._current()
@@ -660,6 +665,9 @@ class FileJobWindow:
         self._on_repolish(self._mode_id(), self.raw_text.get("1.0", "end").strip())
 
     def _close(self) -> None:
+        edited = bool(self._result_label) and (self.polished_text.edit_modified() or self.raw_text.edit_modified())
+        if edited and not self.confirm("고친 내용은 저장되지 않습니다. 창을 닫을까요? (먼저 '복사'나 '파일로 저장'을 누르세요)"):
+            return
         if self._on_close():
             self.win.destroy()
 
@@ -694,6 +702,7 @@ class FileJobWindow:
         self.progress.pack_forget()
         self.retry_btn.pack_forget()
         self.mode_var.set(mode_label)
+        self._result_label = mode_label
         self.repolish_btn.pack(side="left", padx=(8, 0))
         self.result.pack(fill="both", expand=True, pady=(12, 0))
         self.notice.pack_forget()
@@ -709,7 +718,8 @@ class FileJobWindow:
         self._actions(True)
         if self._compact:
             self._compact = False
-            self.win.geometry(f"620x600+{self.win.winfo_x()}+{self.win.winfo_y()}")
+            height = min(self._px(600), self.win.winfo_screenheight() - self.win.winfo_y() - 60)
+            self.win.geometry(f"{self._px(620)}x{max(self._px(320), height)}+{self.win.winfo_x()}+{self.win.winfo_y()}")
         # 받아쓰는 동안 다른 창을 쓰고 있었을 수 있으니, 포커스는 빼앗지 않고 앞으로만 올립니다.
         self.win.lift()
 

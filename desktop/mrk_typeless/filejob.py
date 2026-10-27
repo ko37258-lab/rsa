@@ -7,6 +7,7 @@
 
 import logging
 import os
+import re
 import threading
 
 from . import filestt, llm, mediainfo
@@ -20,6 +21,7 @@ from .stt import SttError
 log = logging.getLogger("mrk_typeless")
 
 PROVIDER_NAMES = {"gemini": "Gemini", "elevenlabs": "ElevenLabs", "openai": "OpenAI"}
+HINT = "긴 녹음은 몇 분 걸립니다. 그동안 다른 일을 하거나 Win+H로 말해도 됩니다."
 
 
 def size_label(size: int) -> str:
@@ -36,6 +38,20 @@ def length_label(seconds: float | None) -> str:
     return f"{minutes // 60}시간 {minutes % 60}분" if minutes >= 60 else f"{minutes}분"
 
 
+# 다시 해 봐도 똑같이 실패하는 이유 (다시 해 보기 버튼을 보이지 않음)
+NO_RETRY = {"input", "key", "quota", "credit", "blocked", "permission"}
+
+
+def for_file(message: str) -> str:
+    """말로 받아쓸 때 쓰던 안내를 녹음 파일에 맞게 고치고, 서버가 보낸 영어 설명은 화면에서 뺍니다 (로그에는 남김)."""
+    m = message.replace("나눠서 말해 주세요", "나눠서 올려 주세요").replace("다시 말해 주세요", "다시 해 주세요")
+    m = re.sub(r" ?\((?:ElevenLabs|OpenAI): [^)]*\)", "", m)
+    m = re.sub(r"(거절했습니다 \(\d+\)): [\x00-\x7f]+$", r"\1.", m)
+    if m != message:
+        log.info("안내 문구 원문: %s", message)
+    return m
+
+
 def polish_text(raw: str, mode: str, cfg: dict, dictionary: dict, cancel: threading.Event | None = None) -> str:
     """받아쓴 원문을 고른 형식으로 정리합니다. 긴 녹음은 출력 한도를 길이에 맞춰 늘립니다.
     멈추기를 누르면 Claude 스트리밍은 그 자리에서 끊어 더 쓰지 않게(요금이 나오지 않게) 합니다."""
@@ -44,7 +60,8 @@ def polish_text(raw: str, mode: str, cfg: dict, dictionary: dict, cancel: thread
         cleaned, _ = local_cleanup(text)
         return cleaned
     system, user = build_polish_prompt(text, mode, cfg, dictionary)
-    return llm.run_ai(system, user, cfg, max_tokens=llm.output_budget(user), cancel=cancel)
+    cap = 128000 if polish_engine(cfg) == "claude" else 64000
+    return llm.run_ai(system, user, cfg, max_tokens=llm.output_budget(user, cap), cancel=cancel, allow_partial=True)
 
 
 class FileJob:
@@ -53,7 +70,9 @@ class FileJob:
         self.path = path
         self.name = os.path.basename(path)
         self.size = os.path.getsize(path)
-        self.duration = mediainfo.duration_seconds(path)
+        # 길이는 작업 스레드에서 읽습니다 (OneDrive '온라인 전용' 파일은 읽는 순간 내려받느라 화면이 멈춤)
+        self.duration: float | None = None
+        self._duration_read = False
         self.mode = app.cfg.get("mode") or "clean"
         self.window = window
         self.running = False
@@ -91,8 +110,7 @@ class FileJob:
         self.raw = self.result = ""
         self._notes = []
         segmented = len(filestt.plan_segments(self.duration)) > 1
-        hint = "긴 녹음은 몇 분 걸립니다. 그동안 다른 일을 하거나 Win+H로 말해도 됩니다." + (" 20분씩 나눠 받아씁니다." if segmented else "")
-        self.window.set_working("받아쓸 준비를 하는 중…", None, hint)
+        self.window.set_working("받아쓸 준비를 하는 중…", None, HINT + (" 20분씩 나눠 받아씁니다." if segmented else ""))
         threading.Thread(target=self._run, args=(self._cancel,), daemon=True).start()
 
     def meta(self) -> str:
@@ -141,7 +159,13 @@ class FileJob:
     def copy(self, text: str) -> None:
         from .clipboard import set_text
 
-        set_text(text)
+        try:
+            set_text(text)
+        except Exception:
+            # 다른 프로그램(클립보드 관리자·원격 데스크톱)이 클립보드를 잡고 있으면 실패합니다.
+            log.exception("복사 실패")
+            self.window.flash("복사하지 못했습니다. 잠시 뒤 다시 눌러 주세요.", True)
+            return
         self.window.flash("복사했습니다. 붙여넣을 곳에서 Ctrl+V를 누르세요.")
 
     def save(self, target: str, text: str) -> None:
@@ -183,6 +207,11 @@ class FileJob:
     def _run(self, cancel: threading.Event) -> None:
         cfg = dict(self.app.cfg)
         try:
+            if not self._duration_read:
+                self.duration, self._duration_read = mediainfo.duration_seconds(self.path), True
+                self._ui(cancel, "set_meta", self.meta())
+                if len(filestt.plan_segments(self.duration)) > 1:
+                    self._ui(cancel, "set_working", "받아쓸 준비를 하는 중…", None, HINT + " 20분씩 나눠 받아씁니다.")
             dictionary = self.app._dictionary()
             provider = cfg.get("stt_provider") or "gemini"
             out = filestt.transcribe_file(
@@ -212,7 +241,7 @@ class FileJob:
                 notes.append(f"뒷부분은 받아쓰지 못했습니다: {out.stopped}")
             if not raw:
                 # Gemini로 넘긴 일(설정이 바뀜)은 실패해도 알려 둡니다.
-                raise SttError(" ".join(["이 녹음에서 말소리를 찾지 못했습니다. 다른 파일을 골라 주세요.", *notes]))
+                raise SttError(" ".join(["이 녹음에서 말소리를 찾지 못했습니다. 다른 파일을 골라 주세요.", *notes]), "input")
             if out.duration and not self.duration:
                 self.duration = out.duration
                 self._ui(cancel, "set_meta", self.meta())
@@ -225,7 +254,7 @@ class FileJob:
         except SttError as e:
             if not cancel.is_set():
                 self.running = False
-                self._ui(cancel, "show_failure", str(e), True)
+                self._ui(cancel, "show_failure", for_file(str(e)), e.kind not in NO_RETRY)
         except Exception:
             log.exception("녹음 파일 받아쓰기 실패: %s", self.name)
             if not cancel.is_set():
@@ -251,7 +280,7 @@ class FileJob:
                 log.exception("녹음 파일 정리 실패: %s", self.name)
             if cancel.is_set():
                 return
-            why = f"{e} " if isinstance(e, llm.LlmError) else ""
+            why = f"{for_file(str(e))} " if isinstance(e, llm.LlmError) else ""
             self.running = False
             # 정리에 실패하면 전에 정리해 둔 글(다른 형식)도 지우지 않고 원문과 함께 보여 줍니다.
             shown = get_mode(self.result_mode)["label"] if self.result else label
@@ -259,6 +288,8 @@ class FileJob:
             return
         if cancel.is_set():
             return  # 멈췄습니다 (멈춘 화면은 cancel()이 이미 보여 줬습니다)
+        if result.endswith(llm.PARTIAL_NOTE):
+            notes.append("글이 길어 정리가 끝까지 되지 않았습니다. 끊긴 곳 뒤는 '받아쓴 원문' 탭에서 보세요.")
         self.result, self.result_mode, self.running = result, mode, False
         self._ui(cancel, "show_result", result, self.raw, label, notes)
         if self.app.state == "idle":
