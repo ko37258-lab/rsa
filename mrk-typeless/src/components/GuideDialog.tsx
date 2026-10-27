@@ -233,7 +233,7 @@ export function GuideDialog({ open, onClose }: Props) {
                 <li>Gemini 무료 등급에서는 보낸 내용이 Google 서비스 개선에 쓰일 수 있습니다. 민감한 내용은 유료 등급이나 Claude 키를 쓰세요.</li>
               </ul>
             </div>
-            <p className="gsec__subtitle">글의 형식 7가지 (받아쓰기 탭 위쪽에서 고름)</p>
+            <p className="gsec__subtitle">글의 형식 {MODES.length}가지 (받아쓰기 탭 위쪽에서 고름)</p>
             <ul className="gmodes">
               {MODES.map((m) => (
                 <li key={m.id}>

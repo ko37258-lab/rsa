@@ -334,7 +334,7 @@ def test_mode_hotkeys_registered(app, monkeypatch):
     monkeypatch.setitem(sys.modules, "keyboard", kb)
     app.register_hotkeys()
     combos = registered(app)
-    assert all(f"ctrl+alt+{i}" in combos for i in range(1, 8))
+    assert all(f"ctrl+alt+{i}" in combos for i in range(1, 9))  # 8 중개매물 정리
 
 
 def _run_dictation(app):

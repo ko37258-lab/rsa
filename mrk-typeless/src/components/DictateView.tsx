@@ -850,7 +850,10 @@ function FileJobStatus({
         </span>
       </div>
       <div className="filejob__bar" aria-hidden="true">
-        <span className={ratio === null ? "is-indeterminate" : ""} style={ratio === null ? undefined : { width: `${Math.max(4, ratio * 100)}%` }} />
+        <span
+          className={ratio === null ? "is-indeterminate" : ""}
+          style={ratio === null ? undefined : { transform: `translateX(${(Math.max(0.04, ratio) - 1) * 100}%)` }}
+        />
       </div>
       <div className="filejob__foot">
         <span className="filejob__label">{label}</span>

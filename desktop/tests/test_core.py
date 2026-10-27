@@ -52,7 +52,15 @@ def test_edit_prompt():
 
 
 def test_modes_match_web_app():
-    assert [m["id"] for m in MODES] == ["clean", "message", "email", "report", "lecture", "consult", "translate"]
+    assert [m["id"] for m in MODES] == ["clean", "message", "email", "report", "lecture", "consult", "translate", "listing"]
+    # 웹앱과 같은 지시문 (한쪽만 고치지 않게)
+    from pathlib import Path
+
+    web = (Path(__file__).resolve().parents[2] / "mrk-typeless" / "src" / "lib" / "modes.ts").read_text(encoding="utf-8")
+    for m in MODES:
+        assert f'label: "{m["label"]}"' in web
+        for line in m["instruction"].split("\n"):
+            assert json.dumps(line, ensure_ascii=False) in web or line in web, line
     assert get_mode("nope")["id"] == "clean"
 
 

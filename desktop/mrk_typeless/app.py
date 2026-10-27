@@ -137,8 +137,8 @@ class App:
                 lambda p=purpose, t=trigger: self._on_record_key_up(p, t),
             )
         add(self.cfg["hotkey_polish"], DEFAULTS["hotkey_polish"], self._on_polish_hotkey)
-        # Ctrl+Alt+1~7: 글 형식 바로 바꾸기 (자동 정리·메시지·이메일·보고서·강의 원고·상담 노트·번역)
-        for i, mode in enumerate(MODES[:7], start=1):
+        # Ctrl+Alt+1~8: 글 형식 바로 바꾸기 (자동 정리·메시지·이메일·보고서·강의 원고·상담 노트·번역·중개매물 정리)
+        for i, mode in enumerate(MODES[:9], start=1):
             add(f"ctrl+alt+{i}", f"ctrl+alt+{i}", lambda m=mode["id"]: self.post(self.set_mode, m))
         # 새 단축키를 다 만든 뒤에야 예전 것을 풉니다 — 중간에 실패해도 단축키가 하나도 없는 때가 없게
         keyboard.unhook_all()

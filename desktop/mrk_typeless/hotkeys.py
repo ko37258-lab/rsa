@@ -211,7 +211,7 @@ class HotkeyRouter:
         except ValueError as e:  # keyboard가 모르는 키 이름
             raise HotkeyError(f"'{combo.key}' 키를 찾지 못했습니다. 예: ctrl+shift+space, f9") from e
         if combo.key.isdigit():
-            # 숫자 단축키(Ctrl+Alt+1~7)는 윗줄 숫자만 — 숫자 패드 번호를 같이 쓰는 End·방향키를 잡지 않게 합니다.
+            # 숫자 단축키(Ctrl+Alt+1~8)는 윗줄 숫자만 — 숫자 패드 번호를 같이 쓰는 End·방향키를 잡지 않게 합니다.
             codes = tuple(c for c in codes if c not in _KEYPAD_CODES)
         if not codes:
             raise HotkeyError(f"'{combo.key}' 키를 찾지 못했습니다.")

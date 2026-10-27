@@ -881,16 +881,19 @@ textarea:focus {
   overflow: hidden;
 }
 
+/* 진행 막대는 폭(width) 대신 옆으로 밀어(transform) 채웁니다. 오른쪽 끝의 둥근 모양은 그대로 남습니다. */
 .filejob__bar span {
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 0;
   border-radius: inherit;
   background: var(--primary);
-  transition: width 0.3s var(--ease-out);
+  transition: transform 0.3s var(--ease-out);
 }
 
 .filejob__bar span.is-indeterminate {
+  right: auto;
   width: 35%;
+  transition: none;
   animation: filejob-slide 1.4s ease-in-out infinite;
 }
 
