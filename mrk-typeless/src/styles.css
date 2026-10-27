@@ -817,6 +817,118 @@ textarea:focus {
   padding: 2px 10px;
 }
 
+/* 녹음 파일 올리기 */
+.stage__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: var(--step--1);
+}
+
+.stage__file svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.filejob {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--primary-soft-2);
+  animation: fade-up 0.25s var(--ease-out);
+}
+
+.filejob__head,
+.filejob__foot {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filejob__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: var(--step--1);
+  color: var(--ink);
+}
+
+.filejob__meta {
+  flex: none;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text);
+}
+
+.filejob__bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  overflow: hidden;
+}
+
+.filejob__bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 0.3s var(--ease-out);
+}
+
+.filejob__bar span.is-indeterminate {
+  width: 35%;
+  animation: filejob-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes filejob-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+.filejob__label {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--step--1);
+  color: var(--primary-text);
+}
+
+.filejob__cancel {
+  flex: none;
+  white-space: nowrap;
+}
+
+.filejob__hint {
+  margin: 0;
+  font-size: 0.6875rem;
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filejob__bar span.is-indeterminate {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
+
 .stage__pad {
   display: grid;
   gap: 10px;

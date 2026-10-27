@@ -1,6 +1,6 @@
 import type { AiRequest } from "../lib/prompts";
 import type { Settings } from "../lib/settings";
-import { EngineError, type RunOptions } from "./engine";
+import { EngineError, outputBudget, type RunOptions } from "./engine";
 import {
   failureMessage,
   GEMINI_BASE,
@@ -21,7 +21,7 @@ export async function runWithGemini(req: AiRequest, settings: Settings, opts: Ru
     systemInstruction: { parts: [{ text: req.system }] },
     contents: [{ role: "user", parts: [{ text: req.user }] }],
     generationConfig: {
-      maxOutputTokens: 16000,
+      maxOutputTokens: outputBudget(req.user),
       thinkingConfig: { thinkingLevel: thinkingLevelFor(settings.geminiModel, settings.effort) },
     },
   });

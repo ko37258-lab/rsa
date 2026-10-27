@@ -9,7 +9,15 @@ import { localCleanup } from "../lib/localCleanup";
 import { sanitizeDictation } from "../lib/sanitize";
 import { MODES, getMode, type ModeId } from "../lib/modes";
 import { buildPolishPrompt, type AiRequest } from "../lib/prompts";
-import type { EngineId, Settings } from "../lib/settings";
+import { sttKeyFor, sttProviderFor, type EngineId, type Settings } from "../lib/settings";
+import { SttError } from "../ai/transcribe";
+import {
+  fileMime,
+  MAX_FILE_BYTES,
+  mediaDurationSec,
+  transcribeAudioFile,
+  type FileProgress,
+} from "../ai/transcribeFile";
 import { countChars, estimateSavedMs, formatClock, formatDuration } from "../lib/stats";
 import { load, save } from "../lib/storage";
 import { HandNote } from "./HandNote";
@@ -225,6 +233,97 @@ export function DictateView({
     if (settings.autoPolish && heardSomething) await polish(false, spokenMs);
   }, [polish, settings.autoPolish, speech]);
 
+  // ── 녹음 파일 올리기: 휴대폰 녹음·강의 녹음·영상을 글로 바꾼 뒤 원문 칸에 넣고 정리합니다 ──
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileAbortRef = useRef<AbortController | null>(null);
+  const [fileJob, setFileJob] = useState<{
+    name: string;
+    size: number;
+    durationSec: number | null;
+    progress: FileProgress | null;
+  } | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (fileAbortRef.current || speech.listening || ai.busy) return;
+      setFileError(null);
+      setFileNotice(null);
+      const provider = sttProviderFor(settings);
+      const apiKey = sttKeyFor(settings).trim();
+      if (!apiKey) {
+        setFileError("녹음 파일을 글로 바꾸려면 설정에서 Gemini API 키를 넣어 주세요. Google AI Studio에서 무료로 만들 수 있습니다.");
+        return;
+      }
+      if (!fileMime(file.name, file.type)) {
+        setFileError(`'${file.name}'은 녹음·영상 파일이 아닙니다. m4a·mp3·wav·mp4 같은 파일을 올려 주세요.`);
+        return;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        setFileError("파일이 2GB보다 큽니다. 나눠서 올려 주세요.");
+        return;
+      }
+      const ctl = new AbortController();
+      fileAbortRef.current = ctl;
+      setFileJob({ name: file.name, size: file.size, durationSec: null, progress: null });
+      try {
+        const durationSec = await mediaDurationSec(file);
+        if (ctl.signal.aborted) return;
+        setFileJob((j) => j && { ...j, durationSec });
+        const out = await transcribeAudioFile(file, {
+          provider,
+          apiKey,
+          geminiKey: settings.geminiKey,
+          lang: settings.speechLang,
+          hints: dictionary.terms,
+          durationSec,
+          signal: ctl.signal,
+          onProgress: (progress) => setFileJob((j) => j && { ...j, progress }),
+        });
+        if (ctl.signal.aborted) return;
+        if (out.switchedFrom) {
+          if (out.switchForGood) onSettings({ sttProvider: "gemini" });
+          setFileNotice(
+            `${out.reason}. 그래서 Gemini로 받아썼습니다.${out.switchForGood ? " 앞으로도 Gemini로 받아씁니다." : ""}`,
+          );
+        }
+        const text = sanitizeDictation(out.text).trim();
+        if (!text) {
+          setFileError("이 녹음에서 말소리를 찾지 못했습니다. 다른 파일을 올려 주세요.");
+          return;
+        }
+        leaveExample();
+        updateRaw(text);
+        spokenRef.current = durationSec ? Math.round(durationSec * 1000) : undefined;
+        fileAbortRef.current = null;
+        setFileJob(null);
+        if (settings.autoPolish) await polish(false, spokenRef.current);
+        else setFileNotice((n) => `${n ? `${n} ` : ""}받아쓴 글을 원문 칸에 넣었습니다. '정리하기'를 누르세요.`);
+      } catch (e) {
+        if (!ctl.signal.aborted)
+          setFileError(e instanceof SttError ? e.message : "녹음 파일을 받아쓰는 중 문제가 생겼습니다. 다시 올려 주세요.");
+      } finally {
+        if (fileAbortRef.current === ctl) fileAbortRef.current = null;
+        setFileJob((j) => (fileAbortRef.current ? j : null));
+      }
+    },
+    [ai.busy, dictionary.terms, leaveExample, onSettings, polish, settings, speech.listening, updateRaw],
+  );
+
+  const cancelFile = useCallback(() => {
+    fileAbortRef.current?.abort();
+    fileAbortRef.current = null;
+    setFileJob(null);
+    setFileNotice("녹음 파일 받아쓰기를 멈췄습니다.");
+  }, []);
+
+  // 화면에 녹음 파일을 끌어다 놓으면 받아씁니다 (그냥 두면 브라우저가 파일을 열어 이 화면을 떠납니다).
+  const droppedFile = (e: React.DragEvent): File | null => {
+    const f = e.dataTransfer?.files?.[0];
+    return f && fileMime(f.name, f.type) ? f : null;
+  };
+
   // 비교에서 고른 글로 바꾸고, 방금 기록도 그 글로 고칩니다 (같은 원문이면 기록이 덮어써집니다).
   const adopt = useCallback(
     async (text: string, from: EngineId, brand: string) => {
@@ -367,12 +466,24 @@ export function DictateView({
         </p>
       </section>
 
-      <section className="stage">
+      <section
+        className="stage"
+        onDragOver={(e) => {
+          if (!__ARTIFACT__ && e.dataTransfer?.types?.includes("Files")) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          if (__ARTIFACT__) return;
+          const f = droppedFile(e);
+          if (f || e.dataTransfer?.files?.length) e.preventDefault();
+          if (f) void handleFile(f);
+          else if (e.dataTransfer?.files?.length) setFileError("녹음·영상 파일만 올릴 수 있습니다 (m4a·mp3·wav·mp4 등).");
+        }}
+      >
         <div className="stage__mic">
           {!usedMic && <HandNote text="꾹 누르고 말해 보세요" className="stage__note" />}
           <MicButton
             listening={speech.listening}
-            disabled={speech.transcribing}
+            disabled={speech.transcribing || !!fileJob}
             pulse={speech.pulse}
             label={speech.listening ? "받아쓰기 멈추고 정리하기" : "누르고 말하기"}
             onPressStart={startListening}
@@ -388,6 +499,32 @@ export function DictateView({
             길게 누르면 누르는 동안만, 짧게 누르면 다시 누를 때까지 받아씁니다.
           </p>
           <span className="stage__engine">{recordMode ? "녹음 받아쓰기" : "브라우저 음성인식"}</span>
+          {!__ARTIFACT__ && (
+            <>
+              <button
+                type="button"
+                className="btn btn--ghost stage__file"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!!fileJob || speech.listening || ai.busy}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 16V4m0 0-4 4m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                </svg>
+                녹음 파일 올리기
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.ogg,.flac,.webm,.mp4,.mov"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void handleFile(f);
+                }}
+              />
+            </>
+          )}
         </div>
 
         <div className="stage__pad">
@@ -455,6 +592,7 @@ export function DictateView({
           )}
           {speech.interim && <p className="pad__interim">{speech.interim}</p>}
           {speech.listening && recordMode && <p className="pad__interim">녹음하고 있습니다. 다 말하면 마이크를 떼거나 다시 누르세요.</p>}
+          {fileJob && <FileJobStatus job={fileJob} onCancel={cancelFile} />}
           <div className="pad__bar">
             <span className="pad__count">{countChars(raw)}자</span>
             <div className="pad__actions">
@@ -509,6 +647,21 @@ export function DictateView({
         </aside>
       )}
       {speech.error && <p className="notice">{speech.error}</p>}
+      {fileError && (
+        <p className="notice" role="alert">
+          {fileError}{" "}
+          {!sttKeyFor(settings).trim() && (
+            <button type="button" className="link" onClick={onOpenSettings}>
+              설정 열기
+            </button>
+          )}
+        </p>
+      )}
+      {fileNotice && !fileError && (
+        <p className="notice notice--info" role="status">
+          {fileNotice}
+        </p>
+      )}
       {speech.notice && !speech.error && (
         <p className="notice notice--info" role="status">
           {speech.notice}
@@ -596,6 +749,61 @@ export function DictateView({
       <p className="shortcuts">
         <kbd>Space</kbd> 길게 누르기 말하기 · <kbd>{MOD_KEY}</kbd>+<kbd>Enter</kbd> 정리 · <kbd>Esc</kbd> 멈춤
       </p>
+    </div>
+  );
+}
+
+function sizeMb(bytes: number): string {
+  return bytes >= 100 * 1024 * 1024 ? `${Math.round(bytes / 1048576)}MB` : `${(bytes / 1048576).toFixed(1)}MB`;
+}
+
+function lengthLabel(sec: number): string {
+  const m = Math.round(sec / 60);
+  if (m < 1) return `${Math.round(sec)}초`;
+  return m >= 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m}분`;
+}
+
+/** 녹음 파일 받아쓰기 진행 상황: 올리는 중 몇 %, 몇 번째 구간인지, 멈추기 */
+function FileJobStatus({
+  job,
+  onCancel,
+}: {
+  job: { name: string; size: number; durationSec: number | null; progress: FileProgress | null };
+  onCancel: () => void;
+}) {
+  const p = job.progress;
+  let label = "녹음 길이를 확인하는 중…";
+  let ratio: number | null = null;
+  if (p?.stage === "upload") {
+    ratio = p.total ? p.done / p.total : 0;
+    label = `파일 올리는 중 · ${Math.round(ratio * 100)}% (${sizeMb(p.done)} / ${sizeMb(p.total)})`;
+  } else if (p?.stage === "prepare") {
+    label = "Gemini가 파일을 준비하는 중…";
+  } else if (p?.stage === "transcribe") {
+    ratio = p.total > 1 ? p.done / p.total : null;
+    label = p.total > 1 ? `글로 바꾸는 중 · ${Math.min(p.done + 1, p.total)}/${p.total} 구간` : "글로 바꾸는 중…";
+  }
+  return (
+    <div className="filejob" role="status" aria-live="polite">
+      <div className="filejob__head">
+        <span className="filejob__name">{job.name}</span>
+        <span className="filejob__meta">
+          {sizeMb(job.size)}
+          {job.durationSec ? ` · ${lengthLabel(job.durationSec)}` : ""}
+        </span>
+      </div>
+      <div className="filejob__bar" aria-hidden="true">
+        <span className={ratio === null ? "is-indeterminate" : ""} style={ratio === null ? undefined : { width: `${Math.max(4, ratio * 100)}%` }} />
+      </div>
+      <div className="filejob__foot">
+        <span className="filejob__label">{label}</span>
+        <button type="button" className="btn btn--ghost filejob__cancel" onClick={onCancel}>
+          멈추기
+        </button>
+      </div>
+      {job.durationSec && job.durationSec > 20 * 60 && (
+        <p className="filejob__hint">20분씩 나눠 받아씁니다. 긴 녹음은 몇 분 걸릴 수 있으니 이 화면을 닫지 마세요.</p>
+      )}
     </div>
   );
 }

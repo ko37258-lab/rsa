@@ -10,7 +10,7 @@ import Anthropic, {
 } from "@anthropic-ai/sdk";
 import type { AiRequest } from "../lib/prompts";
 import type { Settings } from "../lib/settings";
-import { EngineError, type RunOptions } from "./engine";
+import { EngineError, outputBudget, type RunOptions } from "./engine";
 
 // 브라우저에서 사용자 본인의 API 키로 Claude를 직접 부릅니다.
 // 키는 이 브라우저의 저장소에만 있고, Anthropic 서버 외에는 어디에도 보내지 않습니다.
@@ -28,7 +28,7 @@ export async function runWithApiKey(req: AiRequest, settings: Settings, opts: Ru
     const stream = client.beta.messages.stream(
       {
         model: settings.model,
-        max_tokens: 16000,
+        max_tokens: outputBudget(req.user),
         system: req.system,
         messages: [{ role: "user", content: req.user }],
         output_config: { effort: settings.effort },

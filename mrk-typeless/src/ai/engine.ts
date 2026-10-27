@@ -10,6 +10,15 @@ export interface RunOptions {
   fresh?: boolean;
 }
 
+/**
+ * 정리 결과의 출력 한도. 짧은 글은 16,000토큰, 녹음 파일처럼 긴 원문은 길이에 맞춰 64,000까지 늘립니다
+ * (Claude Opus·Sonnet·Haiku 5.5는 스트리밍으로 128K까지, Gemini는 65,536까지 받습니다).
+ * 1시간 강의를 '자동 정리'하면 원문만큼 긴 글이 나오므로 16,000으로는 중간에 잘렸습니다.
+ */
+export function outputBudget(text: string): number {
+  return Math.min(64000, Math.max(16000, Math.ceil(text.length * 1.5)));
+}
+
 export class EngineError extends Error {
   constructor(
     public code: "cancelled" | "unavailable" | "refused" | "failed",

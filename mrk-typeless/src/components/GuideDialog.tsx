@@ -142,6 +142,23 @@ export function GuideDialog({ open, onClose }: Props) {
                 </li>
               </ul>
             </div>
+            {!__ARTIFACT__ && (
+              <div className="gbox">
+                <p className="gbox__title">녹음해 둔 파일도 글로 바꿀 수 있어요</p>
+                <ul>
+                  <li>
+                    마이크 아래 <b>녹음 파일 올리기</b>를 누르거나, 파일을 이 화면에 끌어다 놓으세요. 휴대폰 녹음(m4a)·강의 녹음(mp3·wav)·
+                    영상(mp4)을 받습니다.
+                  </li>
+                  <li>
+                    글로 바뀐 내용이 <b>받아쓴 원문</b>에 들어가고, 고른 <b>글의 형식</b>(강의 원고·상담 노트·보고서 등)으로 바로 정리합니다.
+                  </li>
+                  <li>
+                    Gemini 키 하나로 됩니다. 1시간이 넘는 녹음도 20분씩 나눠 받아쓰고, 다 쓴 녹음 파일은 Google 서버에서 바로 지웁니다.
+                  </li>
+                </ul>
+              </div>
+            )}
           </section>
 
           <section id="guide-ai" className="gsec">

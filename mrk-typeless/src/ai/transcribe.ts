@@ -101,7 +101,7 @@ export function sttFailure(provider: "elevenlabs" | "openai", status: number, bo
   return new SttError(`받아쓰기 중 오류가 났습니다 (${status})${serverSaid}. 다시 말해 주세요.`);
 }
 
-interface TranscribeOptions {
+export interface TranscribeOptions {
   provider: SttProvider;
   apiKey: string;
   /** 예: "ko-KR" */
@@ -111,7 +111,7 @@ interface TranscribeOptions {
   signal?: AbortSignal;
 }
 
-const LANG_NAMES: Record<string, string> = { ko: "한국어", en: "영어", ja: "일본어", zh: "중국어" };
+export const LANG_NAMES: Record<string, string> = { ko: "한국어", en: "영어", ja: "일본어", zh: "중국어" };
 
 /** 녹음 형식을 Gemini가 받는 MIME로 맞춥니다. "audio/webm;codecs=opus"의 꼬리를 떼고, Safari의 audio/mp4는 m4a로 보냅니다. */
 export function geminiMime(type: string): string {
