@@ -48,6 +48,7 @@ class Tray:
             pystray.Menu.SEPARATOR,
             # 아이콘을 왼쪽 클릭하면 사용 방법이 열립니다.
             pystray.MenuItem("사용 방법", self._action(app.open_help), default=True),
+            pystray.MenuItem("녹음 파일 받아쓰기…", self._action(app.open_file_job)),
             pystray.MenuItem("설정…", self._action(app.open_settings)),
             pystray.MenuItem("글 형식", pystray.Menu(*(self._mode_item(m) for m in MODES))),
             pystray.MenuItem("사전 고치기 (메모장)", self._action(app.open_dictionary)),

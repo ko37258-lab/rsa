@@ -44,7 +44,8 @@ export const STT_PROVIDERS: { id: SttProvider; label: string; keyHint: string; k
  * 받아쓰기 실패의 종류. key·credit·blocked·permission은 이 서비스로는 다시 해도 안 되는 경우라
  * Gemini 키가 있으면 Gemini로 바로 넘겨 받아씁니다(useRecorder).
  */
-export type SttFailureKind = "key" | "credit" | "blocked" | "permission" | "busy" | "other";
+/** quota: Gemini 하루 한도처럼 기다려도 오늘은 풀리지 않는 한도 */
+export type SttFailureKind = "key" | "credit" | "blocked" | "permission" | "busy" | "quota" | "other";
 
 export class SttError extends Error {
   constructor(

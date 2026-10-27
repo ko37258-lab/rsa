@@ -28,9 +28,12 @@ export const INLINE_MAX_BYTES = 14 * 1024 * 1024;
 const CHUNK_BYTES = 8 * 1024 * 1024;
 /** 한 번에 받아쓰는 길이. 20분 말은 대개 6~8천 자라 출력 한도에 넉넉합니다. */
 export const SEGMENT_SECONDS = 20 * 60;
-/** OpenAI 받아쓰기 한도: 파일 25MB, 길이 1,500초(25분) */
+/**
+ * OpenAI 받아쓰기 한도: 파일 25MB. gpt-4o-transcribe는 한 번에 2,000토큰까지만 돌려주므로
+ * 10분이 넘는 녹음은 뒷부분이 잘립니다 (길이 한도 1,500초보다 먼저 걸림).
+ */
 const OPENAI_MAX_BYTES = 25 * 1024 * 1024;
-const OPENAI_MAX_SECONDS = 1500;
+const OPENAI_MAX_SECONDS = 600;
 /** 서버가 바쁠 때 다시 해 보는 횟수와, 이보다 오래 기다리라고 하면 기다리지 않는 한도 */
 const MAX_TRIES = 3;
 const MAX_RETRY_WAIT_MS = 60_000;
@@ -68,6 +71,8 @@ export interface FileTranscript {
   switchForGood?: boolean;
   /** 받아쓰지 못하고 [표시]만 남긴 구간 수 */
   missed?: number;
+  /** 키·하루 한도 문제로 중간에서 멈췄으면 그 이유 */
+  stopped?: string;
 }
 
 const EXT_MIME: Record<string, string> = {
@@ -90,11 +95,19 @@ const EXT_MIME: Record<string, string> = {
 
 const MIME_ALIAS: Record<string, string> = {
   "video/quicktime": "video/mov",
+  "video/x-m4v": "video/mp4",
   "audio/x-flac": "audio/flac",
   "audio/x-aac": "audio/aac",
   "audio/aacp": "audio/aac",
+  "audio/vnd.dlna.adts": "audio/aac", // Windows의 Chrome·Edge가 .aac에 붙이는 이름
   "audio/x-aiff": "audio/aiff",
 };
+
+/** Gemini 문서에 적힌 녹음·영상 형식 */
+const GEMINI_MIME = new Set([
+  "audio/wav", "audio/mp3", "audio/aiff", "audio/aac", "audio/ogg", "audio/flac", "audio/m4a", "audio/webm",
+  "video/mp4", "video/mpeg", "video/mov", "video/avi", "video/x-flv", "video/mpg", "video/webm", "video/wmv", "video/3gpp",
+]);
 
 /** 파일 형식을 Gemini가 받는 MIME으로 맞춥니다. 브라우저가 형식을 비워 두는 경우(m4a 등)는 확장자로 봅니다. */
 export function fileMime(name: string, type: string): string | null {
@@ -103,11 +116,11 @@ export function fileMime(name: string, type: string): string | null {
   if (base === "audio/mpeg" || base === "audio/mp3") return "audio/mp3";
   if (base === "audio/x-wav" || base === "audio/wave" || base === "audio/vnd.wave") return "audio/wav";
   // Gemini 문서에 적힌 이름으로 맞춥니다 (아이폰 영상은 video/quicktime으로 옵니다).
-  const alias = MIME_ALIAS[base];
-  if (alias) return alias;
-  if (base.startsWith("audio/") || base.startsWith("video/")) return base;
+  const known = MIME_ALIAS[base] ?? base;
+  if (GEMINI_MIME.has(known)) return known;
+  // 브라우저·운영체제마다 다른 이름(audio/vnd.… 등)은 확장자로 다시 봅니다.
   const ext = name.toLowerCase().split(".").pop() ?? "";
-  return EXT_MIME[ext] ?? null;
+  return EXT_MIME[ext] ?? (base.startsWith("audio/") || base.startsWith("video/") ? base : null);
 }
 
 /** 'mm:ss' (한 시간이 넘으면 분이 60을 넘습니다. Gemini 문서의 타임스탬프 형식) */
@@ -200,17 +213,24 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-/** 429 응답이 알려 준 기다릴 시간(RetryInfo의 "30s"나 Retry-After). 없으면 null. */
-async function retryDelayMs(res: Response): Promise<number | null> {
+/**
+ * 바쁘다는 응답(429 등)이 알려 준 것: 기다릴 시간(RetryInfo의 "30s"나 Retry-After)과 하루 한도인지.
+ * 하루 한도(무료 등급의 …PerDay…)는 30초쯤 기다리라고 하지만 기다려도 오늘은 풀리지 않습니다.
+ */
+async function retryInfo(res: Response): Promise<{ delayMs: number | null; daily: boolean }> {
+  let delayMs: number | null = null;
+  let daily = false;
   const header = Number(res.headers.get("retry-after"));
-  if (header > 0) return header * 1000;
+  if (header > 0) delayMs = header * 1000;
   try {
-    const body = (await res.clone().json()) as { error?: { details?: { retryDelay?: string }[] } };
+    const body = (await res.clone().json()) as { error?: { message?: string; details?: { retryDelay?: string }[] } };
     const sec = parseFloat(body.error?.details?.find((d) => d.retryDelay)?.retryDelay ?? "");
-    return sec > 0 ? sec * 1000 : null;
+    if (delayMs === null && sec > 0) delayMs = sec * 1000;
+    daily = /per ?day|daily/i.test(`${body.error?.message ?? ""} ${JSON.stringify(body.error?.details ?? [])}`);
   } catch {
-    return null;
+    // 본문이 JSON이 아니면 헤더만 봅니다.
   }
+  return { delayMs, daily };
 }
 
 function isAbort(e: unknown): boolean {
@@ -222,11 +242,25 @@ function connectionError(e: unknown): never {
   throw new SttError("받아쓰기 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.");
 }
 
-async function geminiFail(res: Response): Promise<never> {
+async function geminiFail(res: Response, daily = false): Promise<never> {
   const f = await readFailure(res);
   if (/mime|unsupported|invalid argument.*(audio|file)/i.test(f.message) && f.status === 400)
     throw new SttError("이 파일 형식은 받아쓸 수 없습니다. m4a·mp3·wav·mp4 같은 녹음·영상 파일을 올려 주세요.");
-  throw new SttError(failureMessage(f, "받아쓰기"));
+  // 키·권한·하루 한도 문제는 다음 구간에서도 똑같이 막히므로 표시해 둡니다 (구간 받아쓰기를 거기서 멈춤).
+  const kind =
+    f.status === 401 || f.status === 403 || f.status === 404 || /API_KEY/.test(f.reason)
+      ? "key"
+      : f.status === 429 && daily
+        ? "quota"
+        : f.status === 429 || f.status >= 500
+          ? "busy"
+          : "other";
+  throw new SttError(failureMessage(f, "받아쓰기"), kind);
+}
+
+/** 이 이유로 실패한 구간 뒤로는 받아써 봐야 똑같이 막힙니다. */
+function stopsEverything(e: unknown): boolean {
+  return e instanceof SttError && (e.kind === "key" || e.kind === "quota");
 }
 
 interface UploadedFile {
@@ -264,16 +298,19 @@ export async function uploadToGemini(file: Blob, mimeType: string, displayName: 
   let offset = 0;
   let last: Response | null = null;
   let failures = 0;
+  let finalized = false;
   opts.onProgress?.({ stage: "upload", done: 0, total: file.size });
-  while (offset < file.size) {
+  while (!finalized) {
     checkAbort(opts.signal);
     const end = Math.min(file.size, offset + CHUNK_BYTES);
+    // 서버가 다 받았다고 했는데 마무리가 안 됐으면, 빈 'finalize'로 마무리만 합니다.
+    const command = offset >= file.size ? "finalize" : end >= file.size ? "upload, finalize" : "upload";
     let res: Response | null = null;
     try {
       res = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "x-goog-upload-command": end >= file.size ? "upload, finalize" : "upload", "x-goog-upload-offset": String(offset) },
-        body: file.slice(offset, end),
+        headers: { "x-goog-upload-command": command, "x-goog-upload-offset": String(offset) },
+        body: command === "finalize" ? undefined : file.slice(offset, end),
         signal: opts.signal,
       });
     } catch (e) {
@@ -283,6 +320,7 @@ export async function uploadToGemini(file: Blob, mimeType: string, displayName: 
       last = res;
       offset = end;
       failures = 0;
+      finalized = end >= file.size;
       opts.onProgress?.({ stage: "upload", done: offset, total: file.size });
       continue;
     }
@@ -295,30 +333,41 @@ export async function uploadToGemini(file: Blob, mimeType: string, displayName: 
     if (q?.headers.get("x-goog-upload-status") === "final") {
       last = q;
       offset = file.size;
+      finalized = true;
     } else {
       const got = q?.headers.get("x-goog-upload-size-received");
       if (got && /^\d+$/.test(got) && Number(got) <= file.size) offset = Number(got);
     }
   }
-  const body = (await last!.json()) as { file?: { name?: string; uri?: string; mimeType?: string; state?: string } };
-  let info = body.file;
+  let info: { name?: string; uri?: string; mimeType?: string; state?: string } | undefined;
+  try {
+    info = ((await last?.json()) as { file?: typeof info } | undefined)?.file;
+  } catch {
+    info = undefined;
+  }
   if (!info?.name || !info.uri) throw new SttError("Gemini에 파일을 올렸지만 결과를 읽지 못했습니다. 다시 올려 주세요.");
 
   // 올린 파일은 잠깐 'PROCESSING'이었다가 'ACTIVE'가 됩니다. 기다리다 멈추거나 실패하면 올린 녹음을 바로 지웁니다.
   opts.onProgress?.({ stage: "prepare", done: 0, total: 1 });
   try {
+    let misses = 0; // 잇달아 실패한 확인 (잠깐 끊기거나 바쁜 것은 몇 번 넘깁니다)
     for (let i = 0; info.state && info.state !== "ACTIVE"; i++) {
       if (info.state === "FAILED") throw new SttError("Gemini가 이 파일을 읽지 못했습니다. 다른 형식(mp3·m4a·wav)으로 올려 주세요.");
       if (i > 120) throw new SttError("Gemini가 파일을 준비하는 데 너무 오래 걸립니다. 잠시 뒤 다시 올려 주세요.");
-      await sleep(2000, opts.signal);
-      let res: Response;
+      await sleep(2000 * (misses + 1), opts.signal);
+      let res: Response | null = null;
       try {
         res = await fetch(`${API_ROOT}/v1beta/${info.name}`, { headers: { "x-goog-api-key": key }, signal: opts.signal });
       } catch (e) {
-        connectionError(e);
+        if (isAbort(e) || misses >= 3) connectionError(e);
       }
-      if (!res.ok) await geminiFail(res);
-      info = { ...info, ...((await res.json()) as typeof info) };
+      if (res?.ok) {
+        misses = 0;
+        info = { ...info, ...((await res.json()) as typeof info) };
+        continue;
+      }
+      if (res && (!RETRY_STATUS.has(res.status) || misses >= 3)) await geminiFail(res);
+      misses += 1;
     }
   } catch (e) {
     void deleteGeminiFile(info.name!, key);
@@ -380,11 +429,11 @@ async function generate(part: object, prompt: string, opts: FileTranscribeOption
       if (isBlocked(data)) throw new SttError("Gemini가 이 녹음을 받아쓰지 않았습니다.");
       return { text: textOf(data).trim(), truncated: isTruncated(data) };
     }
-    if (res && (!RETRY_STATUS.has(res.status) || attempt >= MAX_TRIES)) await geminiFail(res);
-    const asked = res ? await retryDelayMs(res) : null;
-    // 하루 한도처럼 오래 기다리라는 답이면 기다리지 않고 바로 알립니다.
-    if (res && asked !== null && asked > MAX_RETRY_WAIT_MS) await geminiFail(res);
-    await sleep(asked ?? 2000 * 2 ** (attempt - 1), opts.signal);
+    const info = res ? await retryInfo(res) : { delayMs: null, daily: false };
+    if (res && (!RETRY_STATUS.has(res.status) || attempt >= MAX_TRIES)) await geminiFail(res, info.daily);
+    // 하루 한도이거나 오래 기다리라는 답이면 기다리지 않고 바로 알립니다.
+    if (res && (info.daily || (info.delayMs !== null && info.delayMs > MAX_RETRY_WAIT_MS))) await geminiFail(res, info.daily);
+    await sleep(info.delayMs ?? 2000 * 2 ** (attempt - 1), opts.signal);
   }
 }
 
@@ -392,6 +441,8 @@ export interface GeminiFileText {
   text: string;
   /** 받아쓰지 못하고 [표시]만 남긴 구간 수 */
   missed: number;
+  /** 키·하루 한도 문제로 중간에서 멈췄으면 그 이유 */
+  stopped?: string;
 }
 
 /** 잘린 받아쓰기는 버리지 않고 받은 데까지 쓰되, 어디가 빠졌는지 글 안에 표시합니다. */
@@ -427,6 +478,7 @@ export async function transcribeFileWithGemini(file: File, opts: FileTranscribeO
     }
     const pieces: string[] = [];
     let missed = 0;
+    let stopped: string | undefined;
     for (let i = 0; i < segments.length; i++) {
       opts.onProgress?.({ stage: "transcribe", done: i, total: segments.length });
       const [from, to] = segments[i];
@@ -445,14 +497,21 @@ export async function transcribeFileWithGemini(file: File, opts: FileTranscribeO
         pieces.push(withCut(p, `${where} 구간`));
         if (p.truncated) missed += 1;
       } catch (e) {
-        // 첫 구간부터 안 되면(키·한도 문제 등) 그대로 알리고, 중간에 한 구간만 안 되면 표시를 남기고 이어 갑니다.
+        // 첫 구간부터 안 되면 그대로 알리고, 중간에 한 구간만 안 되면 표시를 남기고 이어 갑니다.
+        // 키·하루 한도 문제는 뒤 구간도 똑같이 막히므로 거기서 멈추고, 받은 데까지만 돌려줍니다.
         if (isAbort(e) || i === 0) throw e;
+        if (stopsEverything(e)) {
+          pieces.push(`[${clock(from)} 이후는 받아쓰지 못했습니다]`);
+          missed += segments.length - i;
+          stopped = (e as SttError).message;
+          break;
+        }
         pieces.push(`[${where} 구간은 받아쓰지 못했습니다]`);
         missed += 1;
       }
     }
     opts.onProgress?.({ stage: "transcribe", done: segments.length, total: segments.length });
-    return { text: pieces.filter(Boolean).join("\n\n"), missed };
+    return { text: pieces.filter(Boolean).join("\n\n"), missed, stopped };
   } finally {
     void deleteGeminiFile(uploaded.name, opts.apiKey);
   }
@@ -466,13 +525,13 @@ export async function transcribeAudioFile(file: File, opts: FileTranscribeOption
   const geminiKey = opts.geminiKey?.trim();
   const viaGemini = async (from?: SttProvider, reason?: string, switchForGood = false): Promise<FileTranscript> => {
     const out = await transcribeFileWithGemini(file, { ...opts, provider: "gemini", apiKey: from ? geminiKey! : opts.apiKey });
-    return { text: out.text, missed: out.missed, switchedFrom: from, reason, switchForGood };
+    return { text: out.text, missed: out.missed, stopped: out.stopped, switchedFrom: from, reason, switchForGood };
   };
   if (opts.provider === "gemini") return viaGemini();
 
   if (opts.provider === "openai" && (file.size > OPENAI_MAX_BYTES || (opts.durationSec ?? 0) > OPENAI_MAX_SECONDS)) {
     const reason =
-      file.size > OPENAI_MAX_BYTES ? "OpenAI 받아쓰기는 25MB까지만 받습니다" : "OpenAI 받아쓰기는 25분까지만 받습니다";
+      file.size > OPENAI_MAX_BYTES ? "OpenAI 받아쓰기는 25MB까지만 받습니다" : "OpenAI 받아쓰기는 10분이 넘는 녹음을 끝까지 받아쓰지 못합니다";
     if (geminiKey) return viaGemini("openai", reason);
     throw new SttError(`${reason}. 설정에서 받아쓰기 서비스를 Gemini로 바꾸면 2GB까지 긴 녹음도 올릴 수 있습니다.`);
   }

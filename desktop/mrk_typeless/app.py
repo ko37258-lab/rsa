@@ -67,6 +67,7 @@ class App:
         # 받아쓰기를 Gemini로 넘겨 받아썼을 때, 결과를 붙여넣은 뒤 함께 보여 줄 안내
         self._stt_note = ""
         self.newer_version: str | None = None  # 켤 때 확인한 새 버전 (없으면 None)
+        self.file_job = None  # 녹음 파일 받아쓰기 (filejob.FileJob, 한 번에 하나)
         self.tray = Tray(self)
 
     # ---------- 화면(tk) 스레드로 일 넘기기 ----------
@@ -363,6 +364,37 @@ class App:
             log.exception("기록 저장 실패")
 
     # ---------- 메뉴 동작 (tk 스레드) ----------
+    def open_file_job(self) -> None:
+        """트레이 메뉴 '녹음 파일 받아쓰기…': 녹음·영상 파일을 골라 받아쓰고 정리합니다.
+        말하기 단축키와 따로 돌아가므로, 받아쓰는 동안에도 Win+H로 말할 수 있습니다."""
+        from .filejob import FileJob
+        from .filestt import file_mime
+        from .ui import ask_media_file
+
+        job = self.file_job
+        if job is not None and job.running:
+            job.window.focus()
+            self.overlay.show_info("녹음 파일을 받아쓰는 중입니다", "끝나면 이 창에 결과가 나옵니다", 3)
+            return
+        if not stt_key(self.cfg):
+            self.overlay.show_error("받아쓰기 키가 없습니다. 설정 창에서 Gemini 키를 넣어 주세요.")
+            self.open_settings()
+            return
+        path = ask_media_file(self.root, self.cfg.get("last_media_dir") or None)
+        if not path:
+            return
+        if not file_mime(path):
+            self.overlay.show_error("녹음·영상 파일만 받아쓸 수 있습니다 (m4a·mp3·wav·mp4 등).")
+            return
+        self.cfg["last_media_dir"] = os.path.dirname(path)
+        save_config(self.cfg)
+        try:
+            self.file_job = FileJob(self, path)
+        except OSError as e:
+            self.overlay.show_error(f"파일을 열지 못했습니다: {e}")
+            return
+        self.file_job.start()
+
     def set_mode(self, mode_id: str) -> None:
         self.cfg["mode"] = mode_id
         save_config(self.cfg)
@@ -544,6 +576,8 @@ def _self_test(out_path: str) -> int:
         ("anthropic", lambda: __import__("anthropic").__version__),
         ("anthropic client", lambda: __import__("anthropic").Anthropic(api_key="sk-test").beta.messages and "ok"),
         ("gemini", lambda: __import__("mrk_typeless.gemini", fromlist=["build_body"]).build_body([{"text": "t"}], "gemini-3.8-flash", "low") and "ok"),
+        ("녹음 파일", lambda: __import__("mrk_typeless.filestt", fromlist=["file_mime"]).file_mime("강의.m4a")),
+        ("파일 고르기 창", lambda: __import__("tkinter.filedialog", fromlist=["askopenfilename"]).askopenfilename and "ok"),
         ("requests", lambda: __import__("requests").__version__),
         ("CA 인증서", _check_ca_bundle),
         ("keyboard", lambda: __import__("keyboard") and "ok"),

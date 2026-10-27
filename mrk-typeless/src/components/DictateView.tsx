@@ -93,6 +93,8 @@ export function DictateView({
   const exampleRef = useRef(isExample);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const originalRef = useRef(original);
+  originalRef.current = original;
   const ai = useAiRun();
   // 지금 보이는 정리 글을 만든 엔진 (비교에서 다른 쪽을 고르면 바뀝니다)
   const [resultEngine, setResultEngine] = useState<EngineId>(engine);
@@ -249,7 +251,7 @@ export function DictateView({
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (fileAbortRef.current || speech.listening || ai.busy) return;
+      if (fileAbortRef.current || speech.listening || speech.transcribing || ai.busy) return;
       setFileError(null);
       setFileNotice(null);
       const provider = sttProviderFor(settings);
@@ -291,14 +293,22 @@ export function DictateView({
         }
         if (out.missed)
           notes.push(`${out.missed}곳은 받아쓰지 못해 원문에 [표시]를 남겼습니다. 그 부분만 다시 올리거나 직접 채워 주세요.`);
+        if (out.stopped) notes.push(`뒷부분은 받아쓰지 못했습니다: ${out.stopped}`);
         const text = sanitizeDictation(out.text).trim();
         if (!text) {
           setFileError("이 녹음에서 말소리를 찾지 못했습니다. 다른 파일을 올려 주세요.");
+          setFileNotice(notes.join(" ") || null); // Gemini로 넘긴 일은 알려 둡니다
           return;
         }
         // 첫 화면의 예시 결과가 남아 받아쓴 녹음의 정리 결과처럼 보이지 않게 지웁니다.
-        if (leaveExample()) ai.show("");
-        updateRaw(text);
+        const wasExample = leaveExample();
+        if (wasExample) ai.show("");
+        // 아직 정리하지 않은 글이 원문 칸에 있으면 지우지 않고 그 뒤에 이어 붙입니다 (마이크 받아쓰기처럼).
+        const before = wasExample ? "" : rawRef.current.trim();
+        const keep = before !== "" && before !== originalRef.current.trim();
+        if (keep) notes.push("원문 칸에 있던 글 뒤에 이어 붙였습니다.");
+        setFileError(null);
+        updateRaw(keep ? `${before}\n\n${text}` : text);
         spokenRef.current = durationSec ? Math.round(durationSec * 1000) : undefined;
         fileAbortRef.current = null;
         setFileJob(null);
@@ -314,7 +324,7 @@ export function DictateView({
         setFileJob((j) => (fileAbortRef.current ? j : null));
       }
     },
-    [ai, dictionary.terms, leaveExample, onSettings, settings, speech.listening, updateRaw],
+    [ai, dictionary.terms, leaveExample, onSettings, settings, speech.listening, speech.transcribing, updateRaw],
   );
 
   const cancelFile = useCallback(() => {
@@ -326,10 +336,13 @@ export function DictateView({
 
   // 화면 어디에든 녹음 파일을 끌어다 놓으면 받아씁니다. 받아쓰기 칸 밖에 놓쳐도 브라우저가 파일을 열어
   // 이 화면(받아쓴 글)을 떠나지 않게 막습니다.
+  // 다른 탭(음성 편집 등)에 놓친 파일도 막아 둡니다: 받아쓰는 도중 페이지가 바뀌면 작업이 사라집니다.
   const handleFileRef = useRef(handleFile);
   handleFileRef.current = handleFile;
+  const dropRef = useRef({ active, busy: false });
+  dropRef.current = { active, busy: !!fileJob || ai.busy || speech.listening || speech.transcribing };
   useEffect(() => {
-    if (__ARTIFACT__ || !active) return;
+    if (__ARTIFACT__) return;
     const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types?.includes("Files");
     const over = (e: DragEvent) => {
       if (hasFiles(e)) e.preventDefault();
@@ -337,9 +350,18 @@ export function DictateView({
     const drop = (e: DragEvent) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
+      const { active, busy } = dropRef.current;
+      if (!active) return;
       const f = e.dataTransfer?.files?.[0];
-      if (f && fileMime(f.name, f.type)) void handleFileRef.current(f);
-      else setFileError("녹음·영상 파일만 올릴 수 있습니다 (m4a·mp3·wav·mp4 등).");
+      if (!f || !fileMime(f.name, f.type)) {
+        setFileError("녹음·영상 파일만 올릴 수 있습니다 (m4a·mp3·wav·mp4 등).");
+        return;
+      }
+      if (busy) {
+        setFileNotice("지금 받아쓰거나 정리하는 중입니다. 끝난 뒤 다시 올려 주세요.");
+        return;
+      }
+      void handleFileRef.current(f);
     };
     window.addEventListener("dragover", over);
     window.addEventListener("drop", drop);
@@ -347,7 +369,19 @@ export function DictateView({
       window.removeEventListener("dragover", over);
       window.removeEventListener("drop", drop);
     };
-  }, [active]);
+  }, []);
+
+  // 받아쓰는 동안 창을 닫거나 새로 고치려 하면 한 번 묻습니다.
+  const jobRunning = !!fileJob;
+  useEffect(() => {
+    if (!jobRunning) return;
+    const ask = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [jobRunning]);
 
   // 비교에서 고른 글로 바꾸고, 방금 기록도 그 글로 고칩니다 (같은 원문이면 기록이 덮어써집니다).
   const adopt = useCallback(
@@ -418,7 +452,11 @@ export function DictateView({
       if (!active || document.querySelector("dialog[open]")) return;
       // 녹음 파일을 받아쓰는 동안에는 Esc(멈추기)만 받습니다. Space로 마이크가 켜지거나 Ctrl+Enter로 옛 원문이 정리되지 않게.
       if (fileAbortRef.current) {
-        if (e.key === "Escape") cancelFile();
+        if (e.key === "Escape") {
+          // 정리가 돌고 있으면 그것부터 멈추고, 아니면 녹음 파일 받아쓰기를 멈춥니다.
+          if (ai.busy) ai.cancel();
+          else cancelFile();
+        }
         return;
       }
       if (e.key === "Escape") {
@@ -523,7 +561,7 @@ export function DictateView({
                 type="button"
                 className="btn btn--ghost stage__file"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={!!fileJob || speech.listening || ai.busy}
+                disabled={!!fileJob || speech.listening || speech.transcribing || ai.busy}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 16V4m0 0-4 4m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
@@ -627,7 +665,7 @@ export function DictateView({
               >
                 지우기
               </button>
-              <button type="button" className="btn btn--primary" onClick={() => void polish(false, spokenRef.current)} disabled={!raw.trim() || ai.busy}>
+              <button type="button" className="btn btn--primary" onClick={() => void polish(false, spokenRef.current)} disabled={!raw.trim() || ai.busy || !!fileJob}>
                 정리하기
                 <kbd>{MOD_KEY} ↵</kbd>
               </button>
@@ -727,12 +765,12 @@ export function DictateView({
         }
         actions={
           <>
-            {!isExample && engine !== "local" && (
+            {!isExample && engine !== "local" && !fileJob && (
               <button type="button" className="btn btn--ghost" onClick={() => void polish(true, spokenRef.current)}>
                 다시 정리
               </button>
             )}
-            {!isExample && !__ARTIFACT__ && original && (
+            {!isExample && !__ARTIFACT__ && original && !fileJob && (
               <button
                 type="button"
                 className="btn btn--ghost btn--compare"

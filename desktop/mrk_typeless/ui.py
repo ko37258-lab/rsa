@@ -480,3 +480,259 @@ class HelpWindow:
         y = max(20, (win.winfo_screenheight() - win.winfo_reqheight()) // 3)
         win.geometry(f"+{x}+{y}")
         win.focus_force()
+
+
+# ---------- 녹음 파일 받아쓰기 ----------
+
+def ask_media_file(root, initial_dir: str | None = None) -> str:
+    """녹음·영상 파일 고르기 창. 고르지 않으면 빈 문자열."""
+    from tkinter import filedialog
+
+    from .filestt import FILE_TYPES
+
+    # 트레이 메뉴에서 열면 고르기 창이 다른 창 뒤에 숨지 않게, 맨 위에 있는 보이지 않는 창을 부모로 둡니다.
+    holder = tk.Toplevel(root)
+    holder.withdraw()
+    holder.attributes("-topmost", True)
+    try:
+        path = filedialog.askopenfilename(
+            parent=holder,
+            title="받아쓸 녹음·영상 파일 고르기",
+            initialdir=initial_dir or None,
+            filetypes=[("녹음·영상 파일", FILE_TYPES), ("모든 파일", "*.*")],
+        )
+    finally:
+        holder.destroy()
+    return path if isinstance(path, str) else ""
+
+
+class FileJobWindow:
+    """녹음 파일 받아쓰기 창: 진행 상황(올리는 중 %, 몇 번째 구간) → 결과(정리된 글·받아쓴 원문).
+    결과는 고쳐 쓸 수 있고, 복사·파일로 저장·다른 형식으로 다시 정리할 수 있습니다.
+    다른 일을 하는 동안 앞으로 튀어나오지 않도록 맨 위 창(topmost)으로 두지 않습니다."""
+
+    BG = "#ffffff"
+    INK = "#0d131b"
+    TEXT = "#495057"
+    MUTED = "#868e96"
+    PRIMARY = "#4c40d9"
+    WARN_BG = "#fff4e6"
+    ERROR = "#c92a2a"
+
+    def __init__(self, root, title, meta, modes, mode, on_cancel, on_close, on_mode, on_repolish, on_retry, on_copy, on_save):
+        self.modes = modes
+        self._on_close = on_close
+        self._on_copy, self._on_save, self._on_repolish = on_copy, on_save, on_repolish
+        self._flash_job = None
+        self.title = title
+        win = self.win = tk.Toplevel(root)
+        win.title(f"녹음 파일 받아쓰기 · {title}")
+        win.configure(bg=self.BG)
+        win.minsize(520, 260)
+        self._compact = True  # 진행 중에는 작게, 결과가 나오면 글을 읽기 좋게 키웁니다
+        win.protocol("WM_DELETE_WINDOW", self._close)
+        style = ttk.Style(win)
+        style.configure("Job.TLabel", font=(FONT, 10), background=self.BG)
+        style.configure("Job.TButton", font=(FONT, 10))
+        style.configure("Job.TNotebook", background=self.BG)
+        style.configure("Job.TNotebook.Tab", font=(FONT, 10), padding=(12, 4))
+
+        body = self.body = tk.Frame(win, bg=self.BG, padx=20, pady=16)
+        body.pack(fill="both", expand=True)
+
+        # 머리: 파일 이름 · 크기·길이
+        tk.Label(body, text=title, font=(FONT, 13, "bold"), fg=self.INK, bg=self.BG, anchor="w", justify="left", wraplength=480).pack(fill="x")
+        self.meta = tk.Label(body, text=meta, font=(FONT, 9), fg=self.MUTED, bg=self.BG, anchor="w")
+        self.meta.pack(fill="x", pady=(2, 10))
+
+        # 정리할 형식 (받아쓰는 도중에 바꿔도 끝난 뒤 그 형식으로 정리합니다)
+        row = tk.Frame(body, bg=self.BG)
+        row.pack(fill="x")
+        tk.Label(row, text="정리할 형식", font=(FONT, 10), fg=self.INK, bg=self.BG).pack(side="left")
+        self.mode_var = tk.StringVar(value=_label_of(modes, mode))
+        self.mode_box = ttk.Combobox(row, textvariable=self.mode_var, values=[label for _, label in modes], state="readonly", width=14, font=(FONT, 10))
+        self.mode_box.pack(side="left", padx=(8, 0))
+        self.mode_box.bind("<<ComboboxSelected>>", lambda _e: on_mode(self._mode_id()))
+        self.repolish_btn = ttk.Button(row, text="이 형식으로 다시 정리", style="Job.TButton", command=lambda: on_repolish(self._mode_id()))
+
+        # 진행 상황
+        self.progress = tk.Frame(body, bg=self.BG)
+        self.status = tk.Label(self.progress, text="", font=(FONT, 10, "bold"), fg=self.INK, bg=self.BG, anchor="w", justify="left", wraplength=480)
+        self.status.pack(fill="x")
+        self.bar = ttk.Progressbar(self.progress, mode="indeterminate", maximum=100)
+        self.bar.pack(fill="x", pady=(8, 6))
+        self.hint = tk.Label(self.progress, text="", font=(FONT, 9), fg=self.TEXT, bg=self.BG, anchor="w", justify="left", wraplength=480)
+        self.hint.pack(fill="x")
+        self.cancel_btn = ttk.Button(self.progress, text="멈추기", style="Job.TButton", command=on_cancel)
+        self.cancel_btn.pack(anchor="e", pady=(8, 0))
+
+        # 결과
+        self.result = tk.Frame(body, bg=self.BG)
+        self.notice = tk.Label(self.result, text="", font=(FONT, 9), fg=self.INK, bg=self.WARN_BG, anchor="w", justify="left", wraplength=480, padx=10, pady=6)
+        self.tabs = ttk.Notebook(self.result, style="Job.TNotebook")
+        self.polished_text = self._text_tab("정리된 글")
+        self.raw_text = self._text_tab("받아쓴 원문")
+        self.tabs.pack(fill="both", expand=True, pady=(6, 0))
+        self.retry_btn = ttk.Button(self.result, text="다시 해 보기", style="Job.TButton", command=on_retry)
+
+        # 아래 버튼, 그 위에 복사·저장 결과 한 줄
+        self.buttons = tk.Frame(body, bg=self.BG)
+        self.buttons.pack(side="bottom", fill="x", pady=(8, 0))
+        self.flash_label = tk.Label(body, text="", font=(FONT, 9), fg=self.PRIMARY, bg=self.BG, anchor="w", justify="left", wraplength=480)
+        self.flash_label.pack(side="bottom", fill="x", pady=(8, 0))
+        ttk.Button(self.buttons, text="닫기", style="Job.TButton", command=self._close).pack(side="right")
+        self.save_btn = ttk.Button(self.buttons, text="파일로 저장…", style="Job.TButton", command=self._save)
+        self.save_btn.pack(side="right", padx=(0, 6))
+        self.copy_btn = ttk.Button(self.buttons, text="복사", style="Job.TButton", command=self._copy)
+        self.copy_btn.pack(side="right", padx=(0, 6))
+        self._actions(False)
+
+        win.update_idletasks()
+        x = (win.winfo_screenwidth() - 620) // 2
+        y = max(20, (win.winfo_screenheight() - 600) // 3)
+        win.geometry(f"620x320+{x}+{y}")
+        win.lift()
+        win.focus_force()
+
+    def _text_tab(self, label: str) -> tk.Text:
+        frame = tk.Frame(self.tabs, bg=self.BG)
+        text = tk.Text(frame, font=(FONT, 10), wrap="word", relief="flat", padx=10, pady=8, undo=True, bg="#f8f9fa", fg=self.INK)
+        scroll = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        text.pack(side="left", fill="both", expand=True)
+        self.tabs.add(frame, text=label)
+        return text
+
+    def _mode_id(self) -> str:
+        return _key_of(self.modes, self.mode_var.get())
+
+    def _alive(self) -> bool:
+        try:
+            return bool(self.win.winfo_exists())
+        except tk.TclError:
+            return False
+
+    def _actions(self, enabled: bool) -> None:
+        for b in (self.copy_btn, self.save_btn, self.repolish_btn):
+            b.state(["!disabled"] if enabled else ["disabled"])
+
+    @staticmethod
+    def _fill(box: tk.Text, text: str) -> None:
+        box.delete("1.0", "end")
+        box.insert("1.0", text)
+        box.edit_reset()
+
+    def _current(self) -> tuple[str, str]:
+        """(지금 보이는 탭의 글, 탭 이름)"""
+        raw = self.tabs.index(self.tabs.select()) == 1
+        box = self.raw_text if raw else self.polished_text
+        return box.get("1.0", "end").strip(), "원문" if raw else self.mode_var.get()
+
+    def _copy(self) -> None:
+        text, _ = self._current()
+        if text:
+            self._on_copy(text)
+
+    def _save(self) -> None:
+        from tkinter import filedialog
+
+        text, what = self._current()
+        if not text:
+            return
+        stem = self.title.rsplit(".", 1)[0]
+        target = filedialog.asksaveasfilename(
+            parent=self.win,
+            title="글을 파일로 저장",
+            initialfile=f"{stem} - {what}.txt",
+            defaultextension=".txt",
+            filetypes=[("텍스트 파일", "*.txt"), ("모든 파일", "*.*")],
+        )
+        if isinstance(target, str) and target:
+            self._on_save(target, text)
+
+    def _close(self) -> None:
+        if self._on_close():
+            self.win.destroy()
+
+    # ---- 작업이 부르는 메서드 (화면 스레드) ----
+    def set_meta(self, meta: str) -> None:
+        if self._alive():
+            self.meta.configure(text=meta)
+
+    def set_working(self, label: str, ratio: float | None, hint: str | None = None) -> None:
+        if not self._alive():
+            return
+        self.result.pack_forget()
+        self.repolish_btn.pack_forget()
+        self.progress.pack(fill="x", pady=(14, 0))
+        self.status.configure(text=label, fg=self.INK)
+        if hint is not None:
+            self.hint.configure(text=hint)
+        if ratio is None:
+            if str(self.bar.cget("mode")) != "indeterminate":
+                self.bar.configure(mode="indeterminate")
+            self.bar.start(12)
+        else:
+            self.bar.stop()
+            self.bar.configure(mode="determinate", value=max(2.0, ratio * 100))
+        self.cancel_btn.state(["!disabled"])
+        self._actions(False)
+
+    def show_result(self, polished: str, raw: str, mode_label: str, notes: list[str]) -> None:
+        if not self._alive():
+            return
+        self.bar.stop()
+        self.progress.pack_forget()
+        self.retry_btn.pack_forget()
+        self.mode_var.set(mode_label)
+        self.repolish_btn.pack(side="left", padx=(8, 0))
+        self.result.pack(fill="both", expand=True, pady=(12, 0))
+        self.notice.pack_forget()
+        self.tabs.pack_forget()
+        if notes:
+            self.notice.configure(text="\n".join(notes), fg=self.INK, bg=self.WARN_BG)
+            self.notice.pack(fill="x")
+        self.tabs.pack(fill="both", expand=True, pady=(6, 0))
+        self._fill(self.polished_text, polished)
+        self._fill(self.raw_text, raw)
+        self.tabs.tab(0, text=f"정리된 글 · {mode_label}", state="normal" if polished else "disabled")
+        self.tabs.select(0 if polished else 1)
+        self._actions(True)
+        if self._compact:
+            self._compact = False
+            self.win.geometry(f"620x600+{self.win.winfo_x()}+{self.win.winfo_y()}")
+        # 받아쓰는 동안 다른 창을 쓰고 있었을 수 있으니, 포커스는 빼앗지 않고 앞으로만 올립니다.
+        self.win.lift()
+
+    def show_failure(self, message: str, can_retry: bool = True) -> None:
+        if not self._alive():
+            return
+        self.bar.stop()
+        self.progress.pack_forget()
+        self.repolish_btn.pack_forget()
+        self.result.pack(fill="both", expand=True, pady=(12, 0))
+        self.notice.configure(text=message, fg=self.ERROR, bg="#fff5f5")
+        self.notice.pack(fill="x")
+        self.tabs.pack_forget()
+        if can_retry:
+            self.retry_btn.pack(anchor="w", pady=(10, 0))
+        self._actions(False)
+
+    def flash(self, message: str, error: bool = False) -> None:
+        """복사·저장 결과를 아래에 잠깐 보여 줍니다."""
+        if not self._alive():
+            return
+        if self._flash_job:
+            self.win.after_cancel(self._flash_job)
+        self.flash_label.configure(text=message, fg=self.ERROR if error else self.PRIMARY)
+        self._flash_job = self.win.after(6000, lambda: self._alive() and self.flash_label.configure(text=""))
+
+    def confirm(self, question: str) -> bool:
+        return bool(messagebox.askyesno("녹음 파일 받아쓰기", question, parent=self.win))
+
+    def focus(self) -> None:
+        if self._alive():
+            self.win.deiconify()
+            self.win.lift()
+            self.win.focus_force()

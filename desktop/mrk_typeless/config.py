@@ -39,6 +39,8 @@ DEFAULTS = {
     "win_h": True,
     # 받아쓴 글과 정리한 글을 history.jsonl에 남길지
     "save_history": True,
+    # 녹음 파일 받아쓰기에서 마지막으로 파일을 고른 폴더
+    "last_media_dir": "",
 }
 
 # 기록 파일이 이보다 커지면 오래된 줄부터 지웁니다.

@@ -66,13 +66,25 @@ def stt_failure(provider: str, status: int, body) -> SttError:
     return SttError(f"받아쓰기 중 오류가 났습니다 ({status}){server_said}. 다시 말해 주세요.")
 
 
-def transcribe(wav: bytes, provider: str, api_key: str, lang: str = "ko", hints: list[str] | None = None) -> str:
+def transcribe(
+    wav: bytes,
+    provider: str,
+    api_key: str,
+    lang: str = "ko",
+    hints: list[str] | None = None,
+    *,
+    filename: str = "speech.wav",
+    mime: str = "audio/wav",
+    timeout: float = 60,
+) -> str:
+    """녹음을 받아씁니다. 녹음 파일(m4a·mp3 등)을 ElevenLabs·OpenAI로 보낼 때는 파일 이름·형식과
+    넉넉한 대기 시간을 함께 넘깁니다 (filestt.py)."""
     if not api_key.strip():
         raise SttError("받아쓰기 API 키가 없습니다. 트레이 아이콘 → 설정에서 넣어 주세요.")
     if provider == "gemini":
         return _transcribe_gemini(wav, api_key, lang, hints or [])
 
-    files = {"file": ("speech.wav", wav, "audio/wav")}
+    files = {"file": (filename, wav, mime)}
     if provider == "openai":
         url = "https://api.openai.com/v1/audio/transcriptions"
         headers = {"Authorization": f"Bearer {api_key.strip()}"}
@@ -83,7 +95,7 @@ def transcribe(wav: bytes, provider: str, api_key: str, lang: str = "ko", hints:
         data = {"model_id": "scribe_v2", "language_code": lang, "tag_audio_events": "false"}
 
     try:
-        res = requests.post(url, headers=headers, data=data, files=files, timeout=60)
+        res = requests.post(url, headers=headers, data=data, files=files, timeout=timeout)
     except requests.RequestException as e:
         raise SttError("받아쓰기 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.") from e
 
