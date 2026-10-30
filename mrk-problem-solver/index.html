@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr. K의 문제 바로 해설 — 문제만 넣으면 현행 법령으로 정답이 나옵니다</title>
+<meta name="description" content="법령 문제를 사진이나 텍스트로 넣으면, 법제처 현행 조문과 대법원 판례를 실시간 대조해 정답과 선지별 해설을 보여드립니다.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#ffffff; --tile:#f5f5f7; --tile2:#e8e8ed;
+  --ink:#1d1d1f; --muted:#6e6e73; --line:#d2d2d7;
+  --blue:#0071e3; --blue-dark:#0060c0; --blue-soft:#eaf2fc;
+  --ok:#0d8030; --ok-soft:#e6f4ea; --dark:#161617;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Pretendard Variable',Pretendard,-apple-system,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px}
+
+/* ── header ─────────────────────────── */
+header{position:sticky;top:0;z-index:90;background:rgba(255,255,255,.72);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(0,0,0,.08)}
+.hd{display:flex;align-items:center;height:60px;gap:28px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16.5px}
+.logo .mk{background:var(--ink);color:#fff;border-radius:9px;padding:4px 10px;font-size:13.5px;letter-spacing:.5px}
+nav{display:flex;gap:24px;font-size:14px;font-weight:600;color:var(--muted)}
+nav a:hover{color:var(--ink)}
+.hd .cta{margin-left:auto;background:var(--blue);color:#fff;border:none;border-radius:980px;padding:9px 22px;font-size:14px;font-weight:600;transition:.15s}
+.hd .cta:hover{background:var(--blue-dark)}
+@media(max-width:760px){nav{display:none}}
+
+/* ── hero ───────────────────────────── */
+.hero{position:relative;padding:96px 0 110px;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-220px;right:-180px;width:720px;height:720px;border-radius:50%;
+  background:radial-gradient(circle,rgba(0,113,227,.14),transparent 65%);pointer-events:none}
+.hero .wrap{display:grid;grid-template-columns:1.02fr .98fr;gap:48px;align-items:center}
+.hero .kicker{font-size:13.5px;font-weight:700;letter-spacing:.08em;color:var(--blue);margin-bottom:16px}
+.hero h1{font-size:clamp(36px,4.8vw,58px);font-weight:800;letter-spacing:-.025em;line-height:1.14;text-wrap:balance}
+.hero h1 em{font-style:normal;color:var(--blue)}
+.hero .sub{margin-top:22px;font-size:clamp(16px,1.8vw,19px);font-weight:500;color:var(--muted);max-width:26em}
+.hero .btns{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap}
+.btn-primary{display:inline-flex;align-items:center;gap:8px;background:var(--blue);color:#fff;border:none;border-radius:980px;padding:16px 34px;font-size:16.5px;font-weight:700;transition:.15s}
+.btn-primary:hover{background:var(--blue-dark);transform:translateY(-1px)}
+.btn-sub{display:inline-flex;align-items:center;gap:9px;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:980px;padding:16px 28px;font-size:15.5px;font-weight:600;transition:.15s}
+.btn-sub:hover{background:var(--tile)}
+.btn-sub .tri{width:11px;height:13px;background:var(--blue);clip-path:polygon(0 0,100% 50%,0 100%)}
+.hero .trust{margin-top:26px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.hero .trust .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+
+/* 입체 스테이지 */
+.stage{position:relative;perspective:1400px;min-height:560px}
+.shot-main{position:relative;z-index:2;width:min(340px,78%);margin:0 auto;border-radius:22px;overflow:hidden;
+  background:#fff;border:1px solid var(--line);
+  box-shadow:0 40px 80px -24px rgba(29,29,31,.35), 0 12px 28px rgba(29,29,31,.12);
+  transform:rotateY(-14deg) rotateX(5deg) rotateZ(1deg);transition:transform .25s ease-out;will-change:transform}
+.shot-main img{width:100%}
+.float-card{position:absolute;z-index:3;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border:1px solid rgba(0,0,0,.07);
+  border-radius:16px;box-shadow:0 18px 44px -12px rgba(29,29,31,.28);padding:14px 18px;animation:bob 5.2s ease-in-out infinite}
+.float-card.answer{top:6%;right:2%;display:flex;align-items:center;gap:12px;animation-delay:-1.2s}
+.float-card.answer .num{width:42px;height:42px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px}
+.float-card.answer .t b{display:block;font-size:14.5px}
+.float-card.answer .t small{font-size:12px;color:var(--muted)}
+.float-card.verified{bottom:26%;left:-2%;display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:700;color:var(--ok);animation-delay:-3s}
+.float-card.verified .chk{width:22px;height:22px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:flex;align-items:center;justify-content:center;font-size:12px}
+.float-card.radar{bottom:-3%;right:6%;padding:0;width:210px;overflow:hidden;animation-delay:-2s}
+.float-card.radar img{width:100%}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-13px)}}
+@media(max-width:900px){
+  .hero .wrap{grid-template-columns:1fr;gap:56px}
+  .stage{min-height:480px}
+  .float-card.verified{left:4%}
+}
+@media(prefers-reduced-motion:reduce){.float-card{animation:none}}
+
+/* ── 공통 섹션 ───────────────────────── */
+section.block{padding:96px 0}
+.sec-kicker{font-size:13.5px;font-weight:700;letter-spacing:.08em;color:var(--blue);margin-bottom:12px}
+.sec-title{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-.02em;line-height:1.22;text-wrap:balance}
+.sec-sub{margin-top:14px;font-size:16.5px;color:var(--muted);max-width:36em}
+.center{text-align:center}
+.center .sec-sub{margin-left:auto;margin-right:auto}
+
+/* reveal */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:none}
+
+/* ── 3단계 ──────────────────────────── */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:52px}
+.step{background:var(--tile);border-radius:22px;padding:26px 26px 0;overflow:hidden;transition:transform .25s ease,box-shadow .25s ease}
+.step:hover{transform:translateY(-6px);box-shadow:0 24px 48px -20px rgba(29,29,31,.22)}
+.step .no{font-size:13px;font-weight:800;color:var(--blue);letter-spacing:.06em}
+.step h3{font-size:20px;font-weight:800;margin-top:6px;letter-spacing:-.01em}
+.step p{font-size:14.5px;color:var(--muted);margin-top:8px;min-height:66px}
+.step .pic{margin-top:18px;border-radius:14px 14px 0 0;overflow:hidden;border:1px solid var(--line);border-bottom:none;box-shadow:0 -2px 20px rgba(29,29,31,.06)}
+@media(max-width:860px){.steps{grid-template-columns:1fr}.step p{min-height:0}}
+
+/* ── 신뢰(다크) ─────────────────────── */
+.trustband{background:var(--dark);color:#f5f5f7;border-radius:32px;overflow:hidden}
+.trustband .inner{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;padding:76px 64px}
+.trustband .sec-title{color:#fff}
+.trustband .sec-sub{color:#a1a1a6}
+.law-quote{background:#1f1f21;border:1px solid #3a3a3c;border-radius:20px;padding:28px 30px;position:relative}
+.law-quote .badge{display:inline-flex;align-items:center;gap:7px;background:rgba(48,209,88,.16);color:#30d158;font-size:12.5px;font-weight:700;border-radius:980px;padding:5px 14px;margin-bottom:16px}
+.law-quote h4{font-size:15.5px;color:#fff;margin-bottom:10px}
+.law-quote p{font-size:14px;color:#c7c7cc;line-height:1.75}
+.law-quote .src{margin-top:16px;font-size:12.5px;color:#8e8e93}
+.trust-points{display:flex;flex-direction:column;gap:0;margin-top:34px}
+.trust-points div{display:flex;gap:14px;padding:15px 2px;border-top:1px solid #2c2c2e;font-size:15px;color:#e5e5ea}
+.trust-points div:first-child{border-top:none}
+.trust-points b{color:#fff}
+.trust-points .n{color:#48484a;font-weight:800;font-variant-numeric:tabular-nums}
+@media(max-width:860px){.trustband .inner{grid-template-columns:1fr;padding:52px 30px;gap:40px}}
+
+/* ── 기능 벤토 ──────────────────────── */
+.bento{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:52px}
+.bcard{background:var(--tile);border-radius:20px;padding:26px}
+.bcard h4{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.bcard p{font-size:14px;color:var(--muted);margin-top:8px}
+.bcard .tag{display:inline-block;font-size:12px;font-weight:700;color:var(--blue);background:var(--blue-soft);border-radius:980px;padding:3px 12px;margin-bottom:14px}
+@media(max-width:860px){.bento{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.bento{grid-template-columns:1fr}}
+
+/* ── 영상 ───────────────────────────── */
+.video-sec{background:var(--tile)}
+.vframe{position:relative;width:min(320px,80%);margin:52px auto 0;border-radius:26px;overflow:hidden;cursor:pointer;
+  box-shadow:0 34px 70px -22px rgba(29,29,31,.4);transition:transform .25s ease}
+.vframe:hover{transform:scale(1.025)}
+.vframe img{width:100%}
+.vframe .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.18)}
+.vframe .play span{width:76px;height:76px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.vframe .play span::after{content:'';margin-left:5px;width:24px;height:28px;background:var(--blue);clip-path:polygon(0 0,100% 50%,0 100%)}
+
+/* ── CTA 밴드 ───────────────────────── */
+.ctaband{background:linear-gradient(135deg,#0071e3,#0a84ff);border-radius:32px;color:#fff;text-align:center;padding:78px 30px}
+.ctaband h2{font-size:clamp(28px,3.6vw,44px);font-weight:800;letter-spacing:-.02em}
+.ctaband p{margin-top:12px;font-size:16.5px;opacity:.9}
+.ctaband .btn-white{display:inline-block;margin-top:32px;background:#fff;color:var(--blue);border-radius:980px;padding:16px 40px;font-size:17px;font-weight:800;transition:.15s}
+.ctaband .btn-white:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(0,0,0,.22)}
+
+/* ── 영상 모달 ──────────────────────── */
+.vmodal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:150;align-items:center;justify-content:center;padding:20px}
+.vmodal.show{display:flex}
+.vmodal video{max-height:88vh;max-width:min(92vw,480px);border-radius:18px;background:#000}
+.vmodal .vclose{position:absolute;top:18px;right:22px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:19px;width:44px;height:44px;border-radius:50%}
+.vmodal .vclose:hover{background:rgba(255,255,255,.32)}
+
+footer{padding:44px 0 60px;border-top:1px solid var(--line);font-size:12.5px;color:#86868b;line-height:1.9}
+footer .frow{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header><div class="wrap hd">
+  <a class="logo" href="./"><span class="mk">Mr.K</span> 문제 바로 해설</a>
+  <nav>
+    <a href="#how">사용 방법</a>
+    <a href="#trust">해설 근거</a>
+    <a href="#features">기능</a>
+    <a href="#video">영상</a>
+  </nav>
+  <button class="cta" onclick="location.href='app.html'">시작하기</button>
+</div></header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <p class="kicker">MR.K 문제 바로 해설</p>
+      <h1>문제만 넣어주세요.<br><em>정답은 다 나옵니다.</em></h1>
+      <p class="sub">사진 한 장, 텍스트 한 줄이면 충분합니다. 법제처 현행 조문과 대법원 판례를 실시간으로 대조해, 보기 하나하나의 이유까지 해설해 드립니다.</p>
+      <div class="btns">
+        <button class="btn-primary" onclick="location.href='app.html'">무료로 시작하기 →</button>
+        <button class="btn-sub" onclick="openVideo()"><span class="tri"></span> 사용법 보기 (1분)</button>
+      </div>
+      <p class="trust"><span class="dot"></span> 법제처 국가법령정보센터 실시간 연동 · 내 API 키로 안전하게</p>
+    </div>
+    <div class="stage" id="stage">
+      <div class="shot-main" id="shotMain"><img src="img/sc_result.png" alt="선지별 해설 결과 화면"></div>
+      <div class="float-card answer">
+        <span class="num">3</span>
+        <span class="t"><b>정답 도출</b><small>발문 유형 자동 판별</small></span>
+      </div>
+      <div class="float-card verified"><span class="chk">✓</span> 법령 원문 확인</div>
+      <div class="float-card radar"><img src="img/sc_radar.png" alt="레이더 풀이 진행 화면"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3단계 -->
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="center reveal">
+      <p class="sec-kicker">HOW IT WORKS</p>
+      <h2 class="sec-title">넣고, 누르고, 확인하면 끝.</h2>
+      <p class="sec-sub">복잡한 설정 없이 세 단계면 해설이 도착합니다.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <p class="no">STEP 1</p>
+        <h3>문제 넣기</h3>
+        <p>교재를 사진으로 찍거나, 화면 캡처를 붙여넣거나, 텍스트로 입력하세요. PDF·한글(HWPX)도 올릴 수 있고, 한 장에 여러 문제가 있어도 자동으로 나눠 풉니다.</p>
+        <div class="pic"><img src="img/sc_input.png" alt="문제 입력 화면"></div>
+      </div>
+      <div class="step reveal" style="transition-delay:.12s">
+        <p class="no">STEP 2</p>
+        <h3>레이더 풀이</h3>
+        <p>해설 받기를 누르면 레이더가 돌면서 문제 인식, 법령 조회, 판례 대조, 해설 작성 — 지금 무엇을 하고 있는지 실시간으로 보여줍니다.</p>
+        <div class="pic"><img src="img/sc_radar.png" alt="레이더 풀이 화면"></div>
+      </div>
+      <div class="step reveal" style="transition-delay:.24s">
+        <p class="no">STEP 3</p>
+        <h3>선지별 해설 확인</h3>
+        <p>정답 번호와 함께 보기마다 옳음·틀림 판정, 그 이유, 그리고 근거 조문 원문이 붙습니다. 한 번 푼 문제는 저장되어 무료로 다시 봅니다.</p>
+        <div class="pic"><img src="img/sc_history.png" alt="풀이 기록 화면"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 신뢰 -->
+<section class="block" id="trust" style="padding-top:0">
+  <div class="wrap">
+    <div class="trustband reveal">
+      <div class="inner">
+        <div>
+          <p class="sec-kicker" style="color:#409cff">WHY TRUST</p>
+          <h2 class="sec-title">정답의 근거는 AI의 기억이 아니라,<br>법제처 원문입니다.</h2>
+          <div class="trust-points">
+            <div><span class="n">01</span><span><b>현행 조문 실시간 조회</b> — 해설이 인용하는 조문은 그 순간 법제처에서 받아온 원문입니다.</span></div>
+            <div><span class="n">02</span><span><b>대법원 판례 인용</b> — 판례가 쟁점인 보기는 판시사항·판결요지로 검증합니다.</span></div>
+            <div><span class="n">03</span><span><b>검증 배지로 투명하게</b> — 원문으로 확인된 근거와 그렇지 않은 근거를 구분해 표시합니다.</span></div>
+          </div>
+        </div>
+        <div class="law-quote">
+          <span class="badge">● 법령 원문 확인</span>
+          <h4>건축법 제83조(옹벽 등의 공작물에의 준용) 제1항</h4>
+          <p>"대지를 조성하기 위한 옹벽, 굴뚝, 광고탑, 고가수조, 지하 대피호, 그 밖에 이와 유사한 것으로서 대통령령으로 정하는 공작물을 축조하려는 자는 … 특별자치시장·특별자치도지사 또는 시장·군수·구청장에게 신고하여야 한다."</p>
+          <p class="src">법제처 국가법령정보센터 · 현행 (시행 2026. 2. 27.) — 해설 생성 시점에 실시간 조회된 원문 예시</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 기능 -->
+<section class="block" id="features" style="padding-top:8px">
+  <div class="wrap">
+    <div class="center reveal">
+      <p class="sec-kicker">FEATURES</p>
+      <h2 class="sec-title">수험생에게 필요한 것만, 전부.</h2>
+    </div>
+    <div class="bento">
+      <div class="bcard reveal"><span class="tag">입력</span><h4>사진 한 장에 1~4문제</h4><p>여러 문제가 담긴 사진도 자동으로 나눠 인식하고 각각 해설합니다.</p></div>
+      <div class="bcard reveal" style="transition-delay:.06s"><span class="tag">입력</span><h4>PDF · 한글(HWPX)</h4><p>PDF는 페이지를 자동으로 이미지로 바꾸고, 한글 파일은 텍스트를 추출합니다.</p></div>
+      <div class="bcard reveal" style="transition-delay:.12s"><span class="tag">보안</span><h4>내 API 키로 사용</h4><p>키는 내 브라우저에만 저장되고 선택한 AI 회사로만 전송됩니다. 서버에 남지 않습니다.</p></div>
+      <div class="bcard reveal"><span class="tag">선택</span><h4>Claude · Gemini · GPT</h4><p>모델을 골라 쓰고, 문제당 예상 비용과 퀄리티 가이드를 미리 확인합니다.</p></div>
+      <div class="bcard reveal" style="transition-delay:.06s"><span class="tag">투명</span><h4>비용 실시간 표시</h4><p>풀이가 끝날 때마다 토큰 사용량과 대략적인 비용이 원 단위로 표시됩니다.</p></div>
+      <div class="bcard reveal" style="transition-delay:.12s"><span class="tag">복습</span><h4>풀이 기록, 다시 보면 무료</h4><p>푼 문제는 자동 저장됩니다. 다시 볼 때는 API 호출 없이 무료입니다.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 영상 -->
+<section class="block video-sec" id="video">
+  <div class="wrap center">
+    <div class="reveal">
+      <p class="sec-kicker">1분 영상</p>
+      <h2 class="sec-title">눈으로 먼저 확인하세요.</h2>
+      <p class="sec-sub">입력부터 해설까지, 실제 화면 그대로 담았습니다.</p>
+    </div>
+    <div class="vframe reveal" onclick="openVideo()">
+      <img src="img/intro_bg.jpg" alt="사용법 영상 미리보기">
+      <div class="play"><span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="block">
+  <div class="wrap">
+    <div class="ctaband reveal">
+      <h2>지금, 막히는 문제 하나 넣어보세요.</h2>
+      <p>설치 없이 브라우저에서 바로. 첫 문제로 확인해 보세요.</p>
+      <a class="btn-white" href="app.html">문제 넣으러 가기 →</a>
+    </div>
+  </div>
+</section>
+
+<!-- 사용법 영상 모달 -->
+<div class="vmodal" id="vmodal" onclick="if(event.target===this)closeVideo()">
+  <button class="vclose" onclick="closeVideo()" aria-label="닫기">✕</button>
+  <video id="howtoPlayer" src="howto.mp4" controls playsinline preload="metadata"></video>
+</div>
+
+<footer><div class="wrap">
+  <div class="frow">
+    <div><b style="color:var(--ink)">Mr. K의 문제 바로 해설</b> (BETA)<br>해설 근거는 법제처 국가법령정보센터 현행 법령·대법원 판례에서 실시간 조회합니다.</div>
+    <div>본 해설은 학습 보조 자료입니다.<br>시험 직전에는 반드시 원문(law.go.kr)을 확인하세요.</div>
+  </div>
+</div></footer>
+
+<script>
+// 스크롤 리빌
+const io = new IntersectionObserver(es=>{
+  es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+},{threshold:.14});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+// 히어로 3D 틸트 (마우스 따라 기울기)
+const stage = document.getElementById('stage');
+const shot = document.getElementById('shotMain');
+if(stage && matchMedia('(pointer:fine)').matches){
+  stage.addEventListener('mousemove', e=>{
+    const r = stage.getBoundingClientRect();
+    const px = (e.clientX - r.left)/r.width - .5;
+    const py = (e.clientY - r.top)/r.height - .5;
+    shot.style.transform = `rotateY(${-14 + px*10}deg) rotateX(${5 - py*8}deg) rotateZ(1deg)`;
+  });
+  stage.addEventListener('mouseleave', ()=>{ shot.style.transform=''; });
+}
+
+// 사용법 영상 모달
+function openVideo(){
+  document.getElementById('vmodal').classList.add('show');
+  const v = document.getElementById('howtoPlayer');
+  v.currentTime = 0; v.muted = false;
+  v.play().catch(()=>{});
+}
+function closeVideo(){
+  document.getElementById('vmodal').classList.remove('show');
+  document.getElementById('howtoPlayer').pause();
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeVideo(); });
+</script>
+</body>
+</html>
