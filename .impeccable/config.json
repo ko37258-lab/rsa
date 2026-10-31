@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "mrk-problem-solver/api/law-plus.js"
+        ],
+        "createdAt": "2026-10-31T00:16:47.242Z",
+        "reason": "Claude: false positive — L126 is a JS regex that strips <img> tags from law.go.kr API text, not rendered markup"
+      },
+      {
+        "rule": "marquee",
+        "value": "*",
+        "files": [
+          "mrk-problem-solver/index.html"
+        ],
+        "createdAt": "2026-10-31T00:16:47.307Z",
+        "reason": "Claude: sanctioned exception — user asked for a motion-graphics homepage (메인이 모션그래픽 사용해서 움직임이 있는 홈페이지); the source ticker is part of that requested motion and stops under prefers-reduced-motion"
+      }
+    ]
+  }
+}

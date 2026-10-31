@@ -35,11 +35,6 @@ nav a:hover{color:var(--ink)}
 
 /* ── hero ───────────────────────────── */
 .hero{position:relative;padding:84px 0 96px;overflow:hidden}
-.hero .bg-grid{position:absolute;inset:0;pointer-events:none;
-  background-image:linear-gradient(rgba(0,113,227,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(0,113,227,.06) 1px,transparent 1px);
-  background-size:44px 44px;mask-image:radial-gradient(ellipse 70% 60% at 70% 40%,#000 30%,transparent 75%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 70% 40%,#000 30%,transparent 75%);
-  animation:gridpan 18s linear infinite}
-@keyframes gridpan{to{background-position:44px 44px,44px 44px}}
 .hero .wrap{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
 .hero .kicker{font-size:13.5px;font-weight:700;letter-spacing:.08em;color:var(--blue);margin-bottom:16px}
 .hero h1{font-size:clamp(36px,4.8vw,58px);font-weight:800;letter-spacing:-.025em;line-height:1.16}
@@ -239,9 +234,7 @@ section.block{padding:96px 0}
 .vframe .play span::after{content:'';margin-left:5px;width:24px;height:28px;background:var(--blue);clip-path:polygon(0 0,100% 50%,0 100%)}
 
 /* ── CTA 밴드 ───────────────────────── */
-.ctaband{position:relative;overflow:hidden;background:linear-gradient(135deg,#0071e3,#0a84ff);border-radius:32px;color:#fff;text-align:center;padding:78px 30px}
-.ctaband::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px);background-size:40px 40px;animation:gridpan 14s linear infinite;pointer-events:none}
-.ctaband > *{position:relative}
+.ctaband{background:linear-gradient(135deg,#0071e3,#0a84ff);border-radius:32px;color:#fff;text-align:center;padding:78px 30px}
 .ctaband h2{font-size:clamp(28px,3.6vw,44px);font-weight:800;letter-spacing:-.02em}
 .ctaband p{margin-top:12px;font-size:16.5px;opacity:.9}
 .ctaband .btn-white{display:inline-block;margin-top:32px;background:#fff;color:var(--blue);border-radius:980px;padding:16px 40px;font-size:17px;font-weight:800;transition:.15s}
@@ -280,7 +273,6 @@ footer .frow{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 
 <!-- HERO -->
 <section class="hero">
-  <div class="bg-grid"></div>
   <div class="wrap">
     <div>
       <p class="kicker fade-up">MR.K 문제 바로 해설</p>
