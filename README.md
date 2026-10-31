@@ -144,6 +144,31 @@ threads_bot/
   cli.py          명령줄 인터페이스
 ```
 
+---
+
+## 웹사이트 클로너 (`website-cloner/`)
+
+[JCodesMore/ai-website-cloner-template](https://github.com/JCodesMore/ai-website-cloner-template)(MIT)을
+`website-cloner/` 폴더에 설치해 두었습니다. URL을 주면 AI 에이전트가 해당 웹사이트를
+Next.js 16 + Tailwind v4 + shadcn/ui 프로젝트로 다시 만들어 줍니다.
+
+```bash
+cd website-cloner
+npm ci          # 의존성 설치 (처음 한 번)
+npm run dev     # 개발 서버 (http://localhost:3000)
+npm run check   # lint + 타입검사 + 빌드
+```
+
+Claude Code에서 웹사이트 복제:
+
+```text
+/clone-website https://example.com
+```
+
+- 저장소 루트에서 열어도, `website-cloner/` 폴더에서 열어도 `/clone-website`가 동작합니다.
+- 템플릿 권장 Node.js 버전은 24 이상입니다(22에서도 빌드 확인됨).
+- 본인 소유 사이트 이전·학습 용도로만 사용하세요. 피싱·사칭, 타인 디자인·로고 도용, 이용약관 위반 용도는 금지입니다.
+
 ## 보안 주의
 
 - `.env`, `state.json`, `rules.json`은 `.gitignore`에 포함되어 **커밋되지 않습니다**.
