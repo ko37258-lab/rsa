@@ -1,0 +1,53 @@
+/* 원본 CSS(7269b4a1f8dfdd5f.css)에서 뽑은 색상 토큰 그대로 */
+:root {
+  --ink: #0f1a17;
+  --muted: #55625e;
+  --soft: #9db3ab;
+  --line: #dfe7e3;
+  --bg: #f3f6f5;
+  --alt: #e8efec;
+  --card: #fff;
+  --dark: #07120f;
+  --dark2: #0d211c;
+  --brand: #16634a;
+  --lime: #c8ff3e;
+  --lime-soft: #f6ffd9;
+  --kakao: #fee500;
+  --red: #ff2d2d;
+  --radius: 14px;
+  --font: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+}
+a { color: inherit; }
+button, input, textarea, select { font: inherit; color: inherit; }
+
+/* ── 상단 실험실 바 (원본에는 없는, 이 클론만의 탭) ── */
+.labbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 16px;
+  background: #0a0f0d; color: #cfd8d4;
+  border-bottom: 1px solid #1d2a25;
+  font-size: 13px;
+}
+.labbar b { color: var(--lime); margin-right: 10px; letter-spacing: -0.01em; }
+.labbar a {
+  text-decoration: none; padding: 6px 12px; border-radius: 999px;
+  color: #cfd8d4;
+}
+.labbar a:hover { background: #16211d; }
+.labbar a.on { background: var(--lime); color: #111; font-weight: 700; }
+.labbar .labsp { flex: 1; }
+.labbar label { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.labbar input[type='checkbox'] { accent-color: var(--lime); }
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
