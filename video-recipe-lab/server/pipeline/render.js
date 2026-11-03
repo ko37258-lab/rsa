@@ -21,7 +21,7 @@ export async function renderSceneClip({ dir, index, image, audio, duration, scen
     await fs.writeFile(path.join(dir, tf), scene.onScreenText);
     const y = scene.visualType === 'motion' ? '(h-th)/2-h*0.06' : 'h*0.10';
     chain.push(
-      `drawtext=expansion=none:fontfile=${font}:textfile=${tf}:fontsize=${Math.round(H / 9)}:fontcolor=0xc8ff3e:borderw=6:bordercolor=black:x=(w-tw)/2:y=${y}:alpha='min(1,t/0.4)'`,
+      `drawtext=expansion=none:fontfile=${font}:textfile=${tf}:fontsize=${Math.round(H / 9)}:fontcolor=0xffd23f:borderw=6:bordercolor=black:x=(w-tw)/2:y=${y}:alpha='min(1,t/0.4)'`,
     );
   }
   chain.push('format=yuv420p');

@@ -35,7 +35,7 @@ async function api(path, body) {
   return j;
 }
 
-export default function Studio() {
+export default function Studio({ member = false }) {
   const [status, setStatus] = useState(null);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({ url: '', topic: '', transcript: '', showPaste: false });
@@ -146,8 +146,12 @@ export default function Studio() {
       <div className="wrap">
         <header className="stHead">
           <div>
-            <h1>영상 생성 스튜디오</h1>
-            <p>원본 프로그램(Windows 설치형)이 하는 일을 React + Node 로 다시 만든 것. 단계마다 무슨 일이 일어나는지 보이게 했습니다.</p>
+            <h1>K-영상제작기</h1>
+            <p>
+              {member
+                ? '잘된 유튜브 영상 주소 하나로 성공 공식을 분석하고, 제목·썸네일·대본·그림·목소리·자막을 붙인 영상까지 만듭니다.'
+                : '잘된 유튜브 영상 주소 하나로 성공 공식을 분석하고, 제목·썸네일·대본·그림·목소리·자막을 붙인 영상까지 만듭니다. (영상레시피 AI 해부 → MR.K 버전)'}
+            </p>
           </div>
           <div className="pills">
             {status?.offline ? (
@@ -157,7 +161,7 @@ export default function Studio() {
                 {liveBad ? (
                   <span className="pill bad">{liveName} 키 오류</span>
                 ) : (
-                  <span className={`pill ${live ? 'ok' : ''}`}>분석·대본 {live ? liveName : '데모'}</span>
+                  <span className={`pill ${live ? 'ok' : ''}`}>분석·대본 {live ? liveName : '체험'}</span>
                 )}
                 {status.providers.openai && status.keyHealth?.openai === false ? (
                   <span className="pill bad">OpenAI 키 오류</span>
@@ -183,7 +187,7 @@ export default function Studio() {
         {status && !status.offline && !live && !keysOpen && (
           <div className="demoNote">
             <span>
-              지금은 <b>데모 모드</b>입니다. 넣은 영상을 진짜로 분석하려면 Claude 키나 <b>Gemini 키(무료로 시작 가능)</b>를 등록하세요.
+              지금은 <b>체험 모드</b>입니다. 넣은 영상을 진짜로 분석하려면 Claude 키나 <b>Gemini 키(무료로 시작 가능)</b>를 등록하세요.
             </span>
             <button onClick={() => setKeysOpen(true)}>키 등록하기 →</button>
           </div>
@@ -268,16 +272,16 @@ export default function Studio() {
             )}
             <div className="row">
               <button className="primary" disabled={busy || (!form.url && !form.transcript)} onClick={() => analyze(false)}>
-                {busy ? '분석 중…' : live ? '분석하기 →' : '분석하기 (데모) →'}
+                {busy ? '분석 중…' : live ? '분석하기 →' : '분석하기 (체험) →'}
               </button>
               <button className="ghost" disabled={busy} onClick={() => analyze(true)}>
-                키 없이 데모로 해보기
+                키 없이 체험해 보기
               </button>
             </div>
             <p className="hint">
               {live
                 ? `${liveName} 가 대본을 읽고 "왜 잘됐는지" 해부한 뒤 같은 공식으로 제목·썸네일을 기획합니다.`
-                : 'Claude 나 Gemini 키가 없어서 데모 모드입니다. 영상 정보(제목·채널)는 실제로 가져오고, 분석 결과는 준비된 예시를 씁니다.'}
+                : 'Claude 나 Gemini 키가 없어서 체험 모드입니다. 영상 정보(제목·채널)는 실제로 가져오고, 분석 결과는 준비된 예시를 씁니다.'}
             </p>
           </section>
         )}
@@ -289,7 +293,7 @@ export default function Studio() {
               <div className="src">
                 {an.meta?.thumbnail && <img src={an.meta.thumbnail} alt="" />}
                 <div>
-                  <span className="kicker">벤치마킹 원본 {an.demo && '· 데모 분석'}</span>
+                  <span className="kicker">벤치마킹 원본 {an.demo && '· 체험용 예시 분석'}</span>
                   <b>{an.meta?.title || '(제목 없음)'}</b>
                   <small>
                     {an.meta?.author} · 대본 {an.transcript?.text?.length?.toLocaleString()}자 ({an.transcript?.source})
@@ -354,7 +358,7 @@ export default function Studio() {
                   </select>
                 </label>
                 <label className="fld">
-                  <span>길이 {an.demo && <em>(데모는 약 1분 고정)</em>}</span>
+                  <span>길이 {an.demo && <em>(체험은 약 1분 고정)</em>}</span>
                   <select value={pick.minutes} onChange={(e) => setPick({ ...pick, minutes: Number(e.target.value) })} disabled={an.demo}>
                     {[1, 3, 5, 8, 10].map((m) => <option key={m} value={m}>약 {m}분</option>)}
                   </select>
@@ -427,6 +431,7 @@ export default function Studio() {
                 <a href={job.result.thumbnail} download>썸네일 JPG</a>
                 <a href={job.result.srt} download>SRT 자막</a>
                 <a href={job.result.script} download>대본 JSON</a>
+                <button onClick={() => api(`/api/jobs/${job.id}/open-folder`, {}).catch((e) => setErr(e.message))}>📂 결과 폴더 열기</button>
               </div>
             </div>
             <h2>장면 컷</h2>

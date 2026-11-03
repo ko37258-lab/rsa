@@ -24,6 +24,8 @@ export const config = {
   height: Number(process.env.VIDEO_HEIGHT || 720),
   fps: Number(process.env.VIDEO_FPS || 30),
   fontFile: process.env.FONT_FILE || '',
+  // member = 회원용 「K-영상제작기」 화면만 (경쟁사 해부 탭 숨김), lab = 대표님용 전체
+  appMode: process.env.APP_MODE === 'member' ? 'member' : 'lab',
 };
 
 export function providers() {
@@ -74,7 +76,7 @@ export function saveKeys(values) {
 // (.env 의 ELEVENLABS_VOICES="이름:voiceId,이름:voiceId" 로 직접 추가도 가능)
 export function voices() {
   const p = providers();
-  const list = [{ id: 'silent', provider: 'none', label: '무음 · 자막만 (데모)', desc: 'API 키 없이 렌더 테스트용' }];
+  const list = [{ id: 'silent', provider: 'none', label: '무음 · 자막만 (체험)', desc: '목소리 없이 자막만' }];
   if (p.elevenlabs) {
     const seen = new Set();
     for (const v of elevenVoiceCache()) {

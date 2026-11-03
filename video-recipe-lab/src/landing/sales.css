@@ -1,5 +1,10 @@
 /* 원본 sales.module.css 의 클래스 이름(sales_hero, sales_proofs, sales_gift …)을 그대로 살려 다시 짠 스타일 */
-.sp { padding-bottom: 90px; }
+.sp {
+  /* 이 탭은 원본을 그대로 재현하는 곳이라 원본 색을 유지한다 (MR.K-VR 색과 분리) */
+  --ink: #0f1a17; --muted: #55625e; --soft: #9db3ab; --line: #dfe7e3; --bg: #f3f6f5; --alt: #e8efec; --card: #fff;
+  --dark: #07120f; --dark2: #0d211c; --brand: #16634a; --lime: #c8ff3e; --lime-soft: #f6ffd9; --red: #ff2d2d; --radius: 14px;
+  padding-bottom: 90px; background: var(--bg); color: var(--ink);
+}
 .sp h1, .sp h2, .sp p { margin: 0; }
 .sp mark { background: none; color: inherit; }
 

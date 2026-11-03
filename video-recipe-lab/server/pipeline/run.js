@@ -51,7 +51,7 @@ export async function runPipeline(job, input) {
     script = await writeScript({ analysis: input.analysis, title: input.title, topic: input.topic, minutes: input.minutes });
   } else {
     script = { ...demoScript, title: input.title || demoScript.title };
-    job.log('데모 모드: 미리 준비된 대본을 사용합니다');
+    job.log('체험 모드: 미리 준비된 예시 대본을 사용합니다');
   }
   await fs.writeFile(path.join(dir, 'script.json'), JSON.stringify(script, null, 2));
   job.step('script', 'done', `${script.scenes.length}개 장면`);

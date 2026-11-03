@@ -1,20 +1,23 @@
-/* 원본 CSS(7269b4a1f8dfdd5f.css)에서 뽑은 색상 토큰 그대로 */
+/* MR.K-VR — ko372.com 기본 테마(Greige & Clay)와 같은 색·글꼴 */
 :root {
-  --ink: #0f1a17;
-  --muted: #55625e;
-  --soft: #9db3ab;
-  --line: #dfe7e3;
-  --bg: #f3f6f5;
-  --alt: #e8efec;
-  --card: #fff;
-  --dark: #07120f;
-  --dark2: #0d211c;
-  --brand: #16634a;
-  --lime: #c8ff3e;
-  --lime-soft: #f6ffd9;
+  --ink: #211c17;          /* 글자 */
+  --muted: #5f574b;
+  --soft: #9a9082;
+  --line: #e3dacb;
+  --bg: #f3efe6;           /* 크림 바탕 */
+  --alt: #ece6db;
+  --paper: #ece3d4;
+  --card: #fbf8f2;
+  --dark: #1b1b1f;         /* 짙은 띠 */
+  --dark2: #2a241e;
+  --accent: #c0573a;       /* 클레이 강조색 */
+  --accent-soft: #f6e5db;
+  --accent-deep: #8e3a22;
+  --on-accent: #ffffff;
+  --brand: var(--accent);
   --kakao: #fee500;
-  --red: #ff2d2d;
-  --radius: 14px;
+  --red: #e0273a;
+  --radius: 18px;
   --font: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 
@@ -35,19 +38,21 @@ button, input, textarea, select { font: inherit; color: inherit; }
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 8px 16px;
-  background: #0a0f0d; color: #cfd8d4;
-  border-bottom: 1px solid #1d2a25;
+  background: var(--dark); color: #d9d2c5;
+  border-bottom: 1px solid #2c2722;
   font-size: 13px;
 }
-.labbar b { color: var(--lime); margin-right: 10px; letter-spacing: -0.01em; }
+.labbar b { color: #f0a58a; margin-right: 10px; letter-spacing: -0.01em; font-weight: 900; }
+.labbar b small { color: #d9d2c5; font-weight: 700; margin-left: 6px; font-size: 12px; }
 .labbar a {
   text-decoration: none; padding: 6px 12px; border-radius: 999px;
-  color: #cfd8d4;
+  color: #d9d2c5;
 }
-.labbar a:hover { background: #16211d; }
-.labbar a.on { background: var(--lime); color: #111; font-weight: 700; }
+.labbar a:hover { background: #2c2722; }
+.labbar a.on { background: var(--accent); color: var(--on-accent); font-weight: 800; }
 .labbar .labsp { flex: 1; }
+.labbar .labNote { color: #a59c8e; font-size: 12px; }
 .labbar label { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
-.labbar input[type='checkbox'] { accent-color: var(--lime); }
+.labbar input[type='checkbox'] { accent-color: var(--accent); }
 
 .wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }

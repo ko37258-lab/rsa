@@ -1,5 +1,6 @@
 // 영상 생성 API 서버 (Express). 프런트(Vite/React)는 /api 로 이 서버를 부른다.
 import express from 'express';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config, keyHealth, keyStatus, OUTPUT_DIR, providers, ROOT, saveKeys, voices } from './config.js';
@@ -19,7 +20,7 @@ fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 app.use('/output', express.static(OUTPUT_DIR));
 
 app.get('/api/status', (_req, res) => {
-  res.json({ providers: providers(), voices: voices(), ffmpeg: checkFfmpeg(), font: resolveFont(), model: config.claudeModel, keys: keyStatus(), keyHealth });
+  res.json({ providers: providers(), voices: voices(), ffmpeg: checkFfmpeg(), font: resolveFont(), model: config.claudeModel, keys: keyStatus(), keyHealth, appMode: config.appMode });
 });
 
 // 화면에서 API 키 등록 → .env 에 저장하고 바로 연결 확인 (요금 안 나가는 조회만 함)
@@ -108,6 +109,27 @@ app.get('/api/jobs/:id', (req, res) => {
   res.json(job.snapshot());
 });
 
+// 완성 영상이 든 폴더를 탐색기로 열기 (이 PC 에서만 접속되므로 안전)
+app.post('/api/jobs/:id/open-folder', (req, res) => {
+  const id = req.params.id;
+  if (!/^[\w-]+$/.test(id)) return res.status(400).json({ error: '잘못된 작업 번호' });
+  const dir = path.join(OUTPUT_DIR, id);
+  if (!fs.existsSync(dir)) return res.status(404).json({ error: '폴더를 찾지 못했습니다.' });
+  const cmd = process.platform === 'win32' ? 'explorer' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+  const child = spawn(cmd, [dir], { detached: true, stdio: 'ignore' });
+  let answered = false;
+  child.on('error', (e) => {
+    // 탐색기 명령이 없는 환경 — 서버는 죽지 않고 경로만 알려 준다
+    if (!answered) res.status(500).json({ error: `폴더를 열지 못했습니다. 직접 여세요: ${dir}`, dir });
+    answered = true;
+  });
+  child.on('spawn', () => {
+    if (!answered) res.json({ ok: true, dir });
+    answered = true;
+    child.unref();
+  });
+});
+
 app.get('/api/jobs/:id/events', (req, res) => {
   const job = getJob(req.params.id);
   if (!job) return res.status(404).end();
@@ -137,8 +159,8 @@ if (providers().elevenlabs) {
 
 const server = app.listen(config.port, config.host, () => {
   const p = providers();
-  console.log(`\n🎬 Video Recipe Lab API → http://localhost:${config.port}`);
-  const textName = p.text === 'claude' ? 'Claude' : p.text === 'gemini' ? 'Gemini' : 'OFF(데모)';
+  console.log(`\n🎬 MR.K-VR · K-영상제작기 → 브라우저에서 http://localhost:5173 (API ${config.port})`);
+  const textName = p.text === 'claude' ? 'Claude' : p.text === 'gemini' ? 'Gemini' : 'OFF(체험 모드)';
   console.log(`   분석·대본 AI: ${textName} · OpenAI(그림/음성): ${p.openai ? 'ON' : 'OFF'} · ElevenLabs: ${p.elevenlabs ? 'ON' : 'OFF'}`);
   console.log(`   ffmpeg: ${checkFfmpeg() ? 'OK' : '없음 — 렌더 불가'} · 한글 폰트: ${resolveFont() ?? '못 찾음'}\n`);
 });

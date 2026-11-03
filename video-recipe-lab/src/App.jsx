@@ -4,16 +4,16 @@ import Studio from './studio/Studio.jsx';
 import Teardown from './teardown/Teardown.jsx';
 
 const TABS = [
-  { hash: '#/landing', label: '① 랜딩페이지 클론' },
-  { hash: '#/studio', label: '② 영상 생성 스튜디오' },
-  { hash: '#/teardown', label: '③ 해부 리포트' },
+  { hash: '#/studio', label: 'K-영상제작기' },
+  { hash: '#/landing', label: '원본 랜딩 해부' },
+  { hash: '#/teardown', label: '해부 리포트' },
 ];
 
 function useHash() {
-  const [hash, setHash] = useState(window.location.hash || '#/landing');
+  const [hash, setHash] = useState(window.location.hash || '#/studio');
   useEffect(() => {
     const on = () => {
-      setHash(window.location.hash || '#/landing');
+      setHash(window.location.hash || '#/studio');
       window.scrollTo(0, 0);
     };
     window.addEventListener('hashchange', on);
@@ -25,11 +25,39 @@ function useHash() {
 export default function App() {
   const hash = useHash();
   const [xray, setXray] = useState(true);
+  const [mode, setMode] = useState(null); // 'member' | 'lab'
+
+  useEffect(() => {
+    fetch('/api/status')
+      .then((r) => r.json())
+      .then((s) => setMode(s.appMode || 'lab'))
+      .catch(() => setMode('lab'));
+  }, []);
+
+  useEffect(() => {
+    document.title = 'MR.K-VR · K-영상제작기';
+  }, [mode]);
+
+  if (mode === null) return null;
+
+  // 회원용: K-영상제작기 화면만
+  if (mode === 'member') {
+    return (
+      <>
+        <nav className="labbar">
+          <b>MR.K-VR<small>K-영상제작기</small></b>
+          <span className="labsp" />
+          <span className="labNote">고상철 · ko372.com 도구함</span>
+        </nav>
+        <Studio member />
+      </>
+    );
+  }
 
   return (
     <>
       <nav className="labbar">
-        <b>Video Recipe Lab</b>
+        <b>MR.K-VR</b>
         {TABS.map((t) => (
           <a key={t.hash} href={t.hash} className={hash.startsWith(t.hash) ? 'on' : ''}>
             {t.label}
@@ -42,7 +70,7 @@ export default function App() {
           </label>
         )}
       </nav>
-      {hash.startsWith('#/studio') ? <Studio /> : hash.startsWith('#/teardown') ? <Teardown /> : <SalesPage xray={xray} />}
+      {hash.startsWith('#/landing') ? <SalesPage xray={xray} /> : hash.startsWith('#/teardown') ? <Teardown /> : <Studio />}
     </>
   );
 }
