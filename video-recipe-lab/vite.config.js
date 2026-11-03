@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    strictPort: true, // 5173 이 이미 쓰이고 있으면 다른 번호로 몰래 바꾸지 말고 멈춘다 (이미 실행 중이라는 뜻)
     proxy: { '/api': api, '/output': api },
   },
 });

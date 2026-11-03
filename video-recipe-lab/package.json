@@ -5,12 +5,13 @@
   "type": "module",
   "description": "영상레시피 AI(videorecipeai.com) 해부용 React 클론 — 랜딩페이지 구조 + 영상 자동 생성 파이프라인",
   "scripts": {
-    "dev": "concurrently -n web,api -c green,cyan \"vite\" \"node --watch server/index.js\"",
+    "dev": "node scripts/precheck.js && concurrently --kill-others-on-fail -n web,api -c green,cyan \"vite\" \"node server/index.js\"",
     "web": "vite",
     "server": "node server/index.js",
     "build": "vite build",
     "start": "npm run build && node server/index.js",
-    "demo:render": "node server/cli-demo.js"
+    "demo:render": "node server/cli-demo.js",
+    "dev:watch": "concurrently -n web,api -c green,cyan \"vite\" \"node --watch server/index.js\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",

@@ -110,9 +110,16 @@ if (fs.existsSync(dist)) {
   app.get(/^(?!\/(api|output)\/).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
 
-app.listen(config.port, config.host, () => {
+const server = app.listen(config.port, config.host, () => {
   const p = providers();
   console.log(`\n🎬 Video Recipe Lab API → http://localhost:${config.port}`);
   console.log(`   Claude: ${p.claude ? 'ON' : 'OFF(데모)'} · OpenAI(그림/음성): ${p.openai ? 'ON' : 'OFF'} · ElevenLabs: ${p.elevenlabs ? 'ON' : 'OFF'}`);
   console.log(`   ffmpeg: ${checkFfmpeg() ? 'OK' : '없음 — 렌더 불가'} · 한글 폰트: ${resolveFont() ?? '못 찾음'}\n`);
+});
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error(`\n⚠️  프로그램이 이미 다른 검은 창에서 실행 중입니다 (포트 ${config.port}).`);
+    console.error('    이 창과 예전 검은 창을 모두 닫은 뒤, 한 번만 다시 실행하세요.\n');
+  } else console.error(e);
+  process.exit(1);
 });
