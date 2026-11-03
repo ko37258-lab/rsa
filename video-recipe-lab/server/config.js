@@ -1,6 +1,7 @@
 // 환경설정 · 어떤 AI 공급자를 쓸 수 있는지 판단한다.
 // 키가 하나도 없어도 "데모 모드"로 파이프라인 전체(대본→음성→자막→컷→썸네일→MP4)가 돈다.
 import 'dotenv/config';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +13,8 @@ const has = (k) => Boolean(process.env[k] && process.env[k].trim());
 
 export const config = {
   port: Number(process.env.PORT || 8787),
+  // 내 PC 에서만 접속되게 (같은 와이파이의 다른 기기가 API 키로 영상을 만들지 못하게)
+  host: process.env.HOST || '127.0.0.1',
   claudeModel: process.env.CLAUDE_MODEL || 'claude-opus-5-5',
   openaiImageModel: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
   openaiTtsModel: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
@@ -29,6 +32,33 @@ export function providers() {
     openai: !forceDemo && has('OPENAI_API_KEY'),
     elevenlabs: !forceDemo && has('ELEVENLABS_API_KEY'),
   };
+}
+
+// ── 화면에서 입력한 API 키를 .env 에 저장 ──────────────────────
+export const KEY_NAMES = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY'];
+
+// 마지막 연결 확인 결과 (화면 배지에 '키 오류' 표시용)
+export const keyHealth = {};
+
+const mask = (v) => (v ? `${v.slice(0, 7)}…${v.slice(-4)}` : null);
+export function keyStatus() {
+  return Object.fromEntries(KEY_NAMES.map((k) => [k, mask(process.env[k]?.trim())]));
+}
+
+/** values: { ANTHROPIC_API_KEY?: string, ... } — 빈 문자열이면 지운다, undefined 면 그대로 둔다 */
+export function saveKeys(values) {
+  const envPath = path.join(ROOT, '.env');
+  const examplePath = path.join(ROOT, '.env.example');
+  let text = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : fs.existsSync(examplePath) ? fs.readFileSync(examplePath, 'utf8') : '';
+  for (const k of KEY_NAMES) {
+    if (values[k] === undefined) continue;
+    const v = String(values[k]).trim().replace(/[\r\n]/g, '');
+    const re = new RegExp(`^#?\\s*${k}=.*$`, 'm');
+    text = re.test(text) ? text.replace(re, `${k}=${v}`) : `${text.replace(/\s*$/, '\n')}${k}=${v}\n`;
+    if (v) process.env[k] = v;
+    else delete process.env[k];
+  }
+  fs.writeFileSync(envPath, text);
 }
 
 // 목소리 목록. ElevenLabs 목소리는 .env 의 ELEVENLABS_VOICES="이름:voiceId,이름:voiceId" 로 등록

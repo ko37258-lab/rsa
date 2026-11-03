@@ -1,6 +1,7 @@
 // 작업 대기열 — "기다리기" 화면이 SSE 로 진행상황을 받아간다
 import { EventEmitter } from 'node:events';
 import crypto from 'node:crypto';
+import { friendlyError } from './pipeline/claude.js';
 import { runPipeline, STEPS } from './pipeline/run.js';
 
 const jobs = new Map();
@@ -48,7 +49,7 @@ export function startJob(input) {
       const running = job.steps.find((s) => s.status === 'running');
       if (running) running.status = 'error';
       job.status = 'error';
-      job.error = String(err.message || err);
+      job.error = friendlyError(err);
       job.emit('update', job.snapshot());
     });
   return job;

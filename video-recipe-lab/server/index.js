@@ -2,11 +2,12 @@
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
-import { config, OUTPUT_DIR, providers, ROOT, voices } from './config.js';
+import { config, keyHealth, keyStatus, OUTPUT_DIR, providers, ROOT, saveKeys, voices } from './config.js';
 import { getJob, startJob } from './jobs.js';
-import { analyzeBenchmark } from './pipeline/claude.js';
+import { analyzeBenchmark, friendlyError, resetClient, verifyClaude } from './pipeline/claude.js';
 import { demoAnalysis, demoTranscript } from './pipeline/demo.js';
 import { checkFfmpeg, resolveFont } from './pipeline/ffmpeg.js';
+import { verifyOpenAI } from './pipeline/images.js';
 import { fetchMeta, fetchTranscript, parseVideoId } from './pipeline/youtube.js';
 
 const app = express();
@@ -15,7 +16,27 @@ fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 app.use('/output', express.static(OUTPUT_DIR));
 
 app.get('/api/status', (_req, res) => {
-  res.json({ providers: providers(), voices: voices(), ffmpeg: checkFfmpeg(), font: resolveFont(), model: config.claudeModel });
+  res.json({ providers: providers(), voices: voices(), ffmpeg: checkFfmpeg(), font: resolveFont(), model: config.claudeModel, keys: keyStatus(), keyHealth });
+});
+
+// 화면에서 API 키 등록 → .env 에 저장하고 바로 연결 확인 (요금 안 나가는 조회만 함)
+app.post('/api/keys', async (req, res) => {
+  const b = req.body || {};
+  const values = {};
+  if (typeof b.anthropic === 'string') values.ANTHROPIC_API_KEY = b.anthropic;
+  if (typeof b.openai === 'string') values.OPENAI_API_KEY = b.openai;
+  try {
+    saveKeys(values);
+  } catch (e) {
+    return res.status(500).json({ error: `설정 파일 저장 실패: ${e.message}` });
+  }
+  resetClient();
+  const check = {};
+  if (process.env.ANTHROPIC_API_KEY) check.anthropic = await verifyClaude();
+  if (process.env.OPENAI_API_KEY) check.openai = await verifyOpenAI();
+  keyHealth.anthropic = check.anthropic?.ok;
+  keyHealth.openai = check.openai?.ok;
+  res.json({ keys: keyStatus(), providers: providers(), check });
 });
 
 // ① 잘된 영상 주소 넣기 → 분석 + 제목/썸네일 후보
@@ -47,7 +68,7 @@ app.post('/api/analyze', async (req, res) => {
     res.json({ mode: 'live', meta, transcript, analysis });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: String(e.message || e) });
+    res.status(500).json({ error: friendlyError(e) });
   }
 });
 
@@ -89,7 +110,7 @@ if (fs.existsSync(dist)) {
   app.get(/^(?!\/(api|output)\/).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
 
-app.listen(config.port, () => {
+app.listen(config.port, config.host, () => {
   const p = providers();
   console.log(`\n🎬 Video Recipe Lab API → http://localhost:${config.port}`);
   console.log(`   Claude: ${p.claude ? 'ON' : 'OFF(데모)'} · OpenAI(그림/음성): ${p.openai ? 'ON' : 'OFF'} · ElevenLabs: ${p.elevenlabs ? 'ON' : 'OFF'}`);

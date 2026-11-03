@@ -58,9 +58,10 @@ export async function runPipeline(job, input) {
 
   // 2) TTS — 실제 길이를 재야 자막·컷 길이가 맞는다
   job.step('tts', 'running');
+  const voiceState = { off: false };
   let finished = 0;
   const durations = await pool(script.scenes, 3, async (sc, i) => {
-    const d = await synthesize(sc.narration, input.voice || 'silent', path.join(dir, `voice_${String(i).padStart(3, '0')}.mp3`));
+    const d = await synthesize(sc.narration, input.voice || 'silent', path.join(dir, `voice_${String(i).padStart(3, '0')}.mp3`), voiceState);
     job.step('tts', 'running', `${++finished}/${script.scenes.length}`);
     return d + 0.25; // 장면 사이 숨 고르기
   });
@@ -70,7 +71,8 @@ export async function runPipeline(job, input) {
     t += durations[i];
     return item;
   });
-  job.step('tts', 'done', `총 ${t.toFixed(1)}초`);
+  if (voiceState.error) job.log(`목소리 생성 실패 → 무음으로 대체했습니다: ${voiceState.error.slice(0, 160)}`);
+  job.step('tts', 'done', `총 ${t.toFixed(1)}초${voiceState.error ? ' (무음 대체)' : ''}`);
 
   // 3) 자막
   job.step('srt', 'running');
@@ -79,13 +81,16 @@ export async function runPipeline(job, input) {
 
   // 4) 장면 그림
   job.step('visuals', 'running');
+  const aiState = { off: false };
   finished = 0;
   const images = await pool(timeline, 2, async (sc) => {
-    const r = await makeSceneImage({ dir, index: sc.index, scene: sc, font });
+    const r = await makeSceneImage({ dir, index: sc.index, scene: sc, font, ai: aiState });
     job.step('visuals', 'running', `${++finished}/${timeline.length}`);
     return r;
   });
-  job.step('visuals', 'done', images[0]?.source === 'openai' ? 'AI 이미지' : '대체 카드 (OPENAI_API_KEY 없음)');
+  const aiCount = images.filter((r) => r.source === 'openai').length;
+  if (aiState.error) job.log(`AI 그림 생성 실패 → 대체 카드로 만들었습니다: ${aiState.error.slice(0, 160)}`);
+  job.step('visuals', 'done', aiCount ? `AI 그림 ${aiCount}장${aiCount < images.length ? ` + 대체 ${images.length - aiCount}장` : ''}` : aiState.error ? '대체 카드 (AI 그림 실패)' : '대체 카드 (OpenAI 키 없음)');
 
   // 5) 썸네일
   job.step('thumbnail', 'running');
@@ -96,6 +101,7 @@ export async function runPipeline(job, input) {
     line2: input.thumbnail?.line2,
     imagePrompt: input.thumbnail?.imageConcept,
     font,
+    ai: aiState,
   });
   job.step('thumbnail', 'done');
 

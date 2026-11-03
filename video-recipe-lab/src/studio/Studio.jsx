@@ -22,11 +22,43 @@ export default function Studio() {
   const [an, setAn] = useState(null); // 분석 결과
   const [pick, setPick] = useState({ title: '', thumb: 0, voice: 'silent', minutes: 1 });
   const [job, setJob] = useState(null);
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [keyForm, setKeyForm] = useState({ anthropic: '', openai: '' });
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyResult, setKeyResult] = useState(null);
   const videoRef = useRef(null);
 
+  const loadStatus = () =>
+    api('/api/status')
+      .then((s) => {
+        setStatus(s);
+        // OpenAI 목소리를 쓸 수 있으면 기본 목소리를 무음 대신 남성 내레이터로
+        const firstReal = s.voices?.find((v) => v.id !== 'silent');
+        setPick((p) => (p.voice === 'silent' && firstReal ? { ...p, voice: firstReal.id } : p));
+      })
+      .catch(() => setStatus({ offline: true }));
+
   useEffect(() => {
-    api('/api/status').then(setStatus).catch(() => setStatus({ offline: true }));
+    loadStatus();
   }, []);
+
+  async function saveKeys() {
+    setKeyBusy(true);
+    setKeyResult(null);
+    try {
+      const body = {};
+      if (keyForm.anthropic.trim()) body.anthropic = keyForm.anthropic.trim();
+      if (keyForm.openai.trim()) body.openai = keyForm.openai.trim();
+      const r = await api('/api/keys', body);
+      setKeyResult(r.check);
+      setKeyForm({ anthropic: '', openai: '' });
+      await loadStatus();
+    } catch (e) {
+      setKeyResult({ error: { ok: false, msg: e.message } });
+    } finally {
+      setKeyBusy(false);
+    }
+  }
 
   const live = status?.providers?.claude;
 
@@ -90,16 +122,70 @@ export default function Studio() {
               <span className="pill bad">API 서버 꺼짐 — npm run dev 로 실행</span>
             ) : status ? (
               <>
-                <span className={`pill ${live ? 'ok' : ''}`}>Claude {live ? 'ON' : '데모'}</span>
-                <span className={`pill ${status.providers.openai ? 'ok' : ''}`}>그림·음성 {status.providers.openai ? 'OpenAI' : '대체'}</span>
+                {live && status.keyHealth?.anthropic === false ? (
+                  <span className="pill bad">Claude 키 오류</span>
+                ) : (
+                  <span className={`pill ${live ? 'ok' : ''}`}>Claude {live ? 'ON' : '데모'}</span>
+                )}
+                {status.providers.openai && status.keyHealth?.openai === false ? (
+                  <span className="pill bad">OpenAI 키 오류</span>
+                ) : (
+                  <span className={`pill ${status.providers.openai ? 'ok' : ''}`}>그림·음성 {status.providers.openai ? 'OpenAI' : '대체'}</span>
+                )}
                 <span className={`pill ${status.providers.elevenlabs ? 'ok' : ''}`}>ElevenLabs {status.providers.elevenlabs ? 'ON' : 'OFF'}</span>
                 <span className={`pill ${status.ffmpeg ? 'ok' : 'bad'}`}>ffmpeg {status.ffmpeg ? 'OK' : '없음'}</span>
               </>
             ) : (
               <span className="pill">상태 확인 중…</span>
             )}
+            {status && !status.offline && (
+              <button className="keyBtn" onClick={() => setKeysOpen(!keysOpen)}>🔑 API 키 등록</button>
+            )}
           </div>
         </header>
+
+        {status && !status.offline && !live && !keysOpen && (
+          <div className="demoNote">
+            <span>
+              지금은 <b>데모 모드</b>입니다. 넣은 영상을 진짜로 분석하고 AI 그림·목소리를 넣으려면 API 키를 등록하세요.
+            </span>
+            <button onClick={() => setKeysOpen(true)}>키 등록하기 →</button>
+          </div>
+        )}
+
+        {keysOpen && (
+          <section className="panel keys">
+            <h2>API 키 등록</h2>
+            <p className="hint" style={{ marginTop: 0 }}>
+              키는 이 PC 의 설정 파일(.env)에만 저장됩니다. 저장할 때 키가 맞는지 확인하는데, 이 확인에는 요금이 나가지 않습니다.
+            </p>
+            <div className="keyRow">
+              <div className="keyHead">
+                <b>Claude 키</b> <em>필수 · 영상 분석·제목·대본</em>
+                <span className={`kst ${status.keys?.ANTHROPIC_API_KEY ? 'on' : ''}`}>{status.keys?.ANTHROPIC_API_KEY ? `등록됨 ${status.keys.ANTHROPIC_API_KEY}` : '미등록'}</span>
+              </div>
+              <input type="password" autoComplete="off" placeholder="sk-ant-로 시작하는 키를 붙여넣으세요" value={keyForm.anthropic} onChange={(e) => setKeyForm({ ...keyForm, anthropic: e.target.value })} />
+              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">키 발급받으러 가기 ↗</a>
+              {keyResult?.anthropic && <p className={`kres ${keyResult.anthropic.ok ? 'ok' : 'bad'}`}>{keyResult.anthropic.ok ? '✅' : '❌'} {keyResult.anthropic.msg}</p>}
+            </div>
+            <div className="keyRow">
+              <div className="keyHead">
+                <b>OpenAI 키</b> <em>선택 · 장면 그림·내레이션 목소리</em>
+                <span className={`kst ${status.keys?.OPENAI_API_KEY ? 'on' : ''}`}>{status.keys?.OPENAI_API_KEY ? `등록됨 ${status.keys.OPENAI_API_KEY}` : '미등록'}</span>
+              </div>
+              <input type="password" autoComplete="off" placeholder="sk-로 시작하는 키를 붙여넣으세요" value={keyForm.openai} onChange={(e) => setKeyForm({ ...keyForm, openai: e.target.value })} />
+              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">키 발급받으러 가기 ↗</a>
+              {keyResult?.openai && <p className={`kres ${keyResult.openai.ok ? 'ok' : 'bad'}`}>{keyResult.openai.ok ? '✅' : '❌'} {keyResult.openai.msg}</p>}
+            </div>
+            {keyResult?.error && <p className="kres bad">❌ {keyResult.error.msg}</p>}
+            <div className="row">
+              <button className="primary" disabled={keyBusy || (!keyForm.anthropic.trim() && !keyForm.openai.trim())} onClick={saveKeys}>
+                {keyBusy ? '확인 중…' : '저장하고 연결 확인'}
+              </button>
+              <button className="ghost" onClick={() => setKeysOpen(false)}>닫기</button>
+            </div>
+          </section>
+        )}
 
         <ol className="steps">
           {STEP_NAMES.map((n, i) => (
@@ -126,6 +212,12 @@ export default function Studio() {
             <button className="linkish" onClick={() => setForm({ ...form, showPaste: !form.showPaste })}>
               {form.showPaste ? '▾' : '▸'} 자막을 못 가져오면: 대본 직접 붙여넣기
             </button>
+            {form.showPaste && (
+              <p className="hint howto">
+                자막을 못 가져왔을 때: 유튜브에서 그 영상을 열고 설명란의 <b>…더보기</b> → <b>스크립트 표시</b>를 누르세요. 오른쪽에 나오는 대본을
+                마우스로 처음부터 끝까지 끌어서 복사(Ctrl+C)한 뒤 아래 칸에 붙여넣기(Ctrl+V) 하면 됩니다.
+              </p>
+            )}
             {form.showPaste && (
               <textarea rows={7} placeholder="원본 영상 대본(자막)을 붙여넣으세요" value={form.transcript} onChange={(e) => setForm({ ...form, transcript: e.target.value })} />
             )}
@@ -227,6 +319,11 @@ export default function Studio() {
                 <button className="ghost" onClick={() => setStep(0)}>← 다시 넣기</button>
                 <button className="primary" disabled={!pick.title} onClick={make}>영상 만들기 →</button>
               </div>
+              {!an.demo && (
+                <p className="hint">
+                  실제 AI 로 만듭니다. 등록한 키의 계정에 사용료가 나갑니다 (1분 영상 기준 대략 수백 원~1천 원, 그림 장수에 따라 달라짐).
+                </p>
+              )}
             </section>
           </>
         )}

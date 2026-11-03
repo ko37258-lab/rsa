@@ -62,13 +62,13 @@ export async function concatAndBurn({ dir, clips, srtFile }) {
 }
 
 // 썸네일: 배경 그림 + 아래쪽 어둡게 + 두 줄 큰 글씨(흰색 / 강조색) — 정보채널 썸네일 공식
-export async function composeThumbnail({ dir, background, line1, line2, font, imagePrompt }) {
+export async function composeThumbnail({ dir, background, line1, line2, font, imagePrompt, ai }) {
   let bg = background;
   if (providers().openai && imagePrompt) {
     try {
       // 썸네일 전용 배경을 따로 뽑는다. 실패하면 첫 장면 그림을 쓴다
-      const r = await makeSceneImage({ dir, index: 999, scene: { imagePrompt, onScreenText: '', visualType: 'ai_image' }, font });
-      bg = r.file;
+      const r = await makeSceneImage({ dir, index: 999, scene: { imagePrompt, onScreenText: '', visualType: 'ai_image' }, font, ai });
+      if (r.source === 'openai') bg = r.file;
     } catch {
       /* 장면 그림으로 대체 */
     }

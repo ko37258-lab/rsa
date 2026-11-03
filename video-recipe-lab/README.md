@@ -65,13 +65,18 @@ npm run dev
 npm run demo:render
 ```
 
-### 키를 넣으면 (.env)
+### API 키 등록 (화면에서)
+스튜디오 오른쪽 위 **🔑 API 키 등록**을 누르고, 키를 붙여넣은 뒤 **저장하고 연결 확인**을 누르면 됩니다. 키는 이 PC의 `.env` 파일에만 저장되고, 연결 확인은 요금이 나가지 않는 조회(모델 정보)로만 합니다.
 
-| 키 | 하는 일 |
-|---|---|
-| `ANTHROPIC_API_KEY` | Claude(claude-opus-5-5)가 벤치마킹 분석, 제목·썸네일 기획, 대본·장면 설계를 합니다 |
-| `OPENAI_API_KEY` | 장면 그림(gpt-image-1)과 TTS 목소리(gpt-4o-mini-tts)를 만듭니다 |
-| `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICES` | ElevenLabs 목소리를 씁니다. 목소리는 `이름:voiceId,이름:voiceId` 형식으로 넣습니다 |
+| 키 | 하는 일 | 발급 |
+|---|---|---|
+| Claude (`ANTHROPIC_API_KEY`) | 벤치마킹 분석, 제목·썸네일 기획, 대본·장면 설계 (claude-opus-5-5) | console.anthropic.com → Settings → API Keys |
+| OpenAI (`OPENAI_API_KEY`) | 장면 그림(gpt-image-1), 내레이션 목소리(gpt-4o-mini-tts) | platform.openai.com → API keys |
+| ElevenLabs (`ELEVENLABS_API_KEY` + `ELEVENLABS_VOICES`) | ElevenLabs 목소리. `.env`에 직접 `이름:voiceId,이름:voiceId` 형식으로 넣습니다 | elevenlabs.io |
+
+AI 그림이나 목소리 생성이 실패하면(키 오류, 결제 미등록, OpenAI 조직 인증 필요 등) 작업을 멈추지 않고 대체 카드와 무음으로 끝까지 만듭니다. 실패 사유는 "기다리기" 화면에 표시됩니다.
+
+유튜브 자막을 못 가져오는 영상도 있습니다(자막 없음, 유튜브 차단 등). 그때는 화면 안내대로 유튜브의 **…더보기 → 스크립트 표시**에서 대본을 복사해 붙여넣으면 됩니다.
 
 Claude 호출에는 서버 측 거절 대비(`fallbacks: "default"`)를 켜 두었습니다. 안전 분류기가 요청을 거절하면 Anthropic 서버가 다른 모델로 자동 재시도합니다. 끄려면 `server/pipeline/claude.js`의 `betas`와 `fallbacks` 두 줄을 지우세요.
 

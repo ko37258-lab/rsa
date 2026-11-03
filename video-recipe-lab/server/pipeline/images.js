@@ -68,14 +68,35 @@ export async function placeholderCard({ dir, outName, text, visualType, font }) 
   return `${outName}.png`;
 }
 
-/** 장면 그림 파일명(작업 폴더 기준)을 돌려준다 */
-export async function makeSceneImage({ dir, index, scene, font }) {
+/**
+ * 장면 그림 파일명(작업 폴더 기준)을 돌려준다.
+ * ai: { off: boolean, error?: string } — 한 작업 안에서 공유. AI 그림이 한 번 실패하면 나머지는 대체 카드로.
+ */
+export async function makeSceneImage({ dir, index, scene, font, ai = { off: false } }) {
   const outName = `scene_${String(index).padStart(3, '0')}`;
-  if (providers().openai) {
+  if (providers().openai && !ai.off) {
     const file = `${outName}.png`;
-    await openaiImage(scene.imagePrompt, path.join(dir, file));
-    return { file, source: 'openai' };
+    try {
+      await openaiImage(scene.imagePrompt, path.join(dir, file));
+      return { file, source: 'openai' };
+    } catch (e) {
+      ai.off = true;
+      ai.error ??= String(e.message || e);
+    }
   }
   const file = await placeholderCard({ dir, outName, text: scene.onScreenText, visualType: scene.visualType, font });
   return { file, source: 'placeholder' };
+}
+
+// 키 확인: 모델 목록 조회는 요금이 나가지 않는다
+export async function verifyOpenAI() {
+  try {
+    const r = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } });
+    if (r.ok) return { ok: true, msg: '연결됨 (그림·목소리 사용 가능)' };
+    if (r.status === 401) return { ok: false, msg: '키가 올바르지 않습니다. 복사할 때 앞뒤가 잘리지 않았는지 확인하세요.' };
+    if (r.status === 429) return { ok: false, msg: '사용 한도 초과 또는 결제 미등록입니다. OpenAI 결제(Billing) 페이지를 확인하세요.' };
+    return { ok: false, msg: `OpenAI 응답 오류 (${r.status})` };
+  } catch {
+    return { ok: false, msg: '인터넷 연결을 확인하세요 (OpenAI 서버에 연결 실패).' };
+  }
 }

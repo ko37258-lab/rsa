@@ -39,10 +39,21 @@ async function silent(seconds, outFile) {
   await ffmpeg(['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-t', seconds.toFixed(2), '-c:a', 'libmp3lame', '-b:a', '128k', outFile]);
 }
 
-/** @returns {Promise<number>} 오디오 길이(초) */
-export async function synthesize(text, voiceId, outFile) {
-  if (voiceId.startsWith('openai:')) await openaiTts(text, voiceId.slice(7), outFile);
-  else if (voiceId.startsWith('eleven:')) await elevenTts(text, voiceId.slice(7), outFile);
-  else await silent(estimateSeconds(text), outFile);
+/**
+ * @param state { off: boolean, error?: string } — 한 작업 안에서 공유. 목소리가 한 번 실패하면 나머지는 무음으로.
+ * @returns {Promise<number>} 오디오 길이(초)
+ */
+export async function synthesize(text, voiceId, outFile, state = { off: false }) {
+  if (voiceId !== 'silent' && !state.off) {
+    try {
+      if (voiceId.startsWith('openai:')) await openaiTts(text, voiceId.slice(7), outFile);
+      else if (voiceId.startsWith('eleven:')) await elevenTts(text, voiceId.slice(7), outFile);
+      return probeDuration(outFile);
+    } catch (e) {
+      state.off = true;
+      state.error ??= String(e.message || e);
+    }
+  }
+  await silent(estimateSeconds(text), outFile);
   return probeDuration(outFile);
 }
