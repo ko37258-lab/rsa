@@ -45,12 +45,12 @@ if errorlevel 1 goto fail
 
 echo.
 echo  ------------------------------------------
-echo   Browser will open: http://localhost:5173
+echo   Browser opens when ready: http://localhost:5173
 echo   Keep THIS window open while using the app.
 echo   Close this window to stop.
 echo  ------------------------------------------
 echo.
-start "" /min powershell -NoProfile -Command "Start-Sleep 8; Start-Process 'http://localhost:5173'"
+start "" /min powershell -NoProfile -Command "for($i=0;$i -lt 180;$i++){ try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 'http://localhost:5173' | Out-Null; Start-Process 'http://localhost:5173'; break } catch { Start-Sleep 1 } }"
 call npm.cmd run dev
 goto end
 
