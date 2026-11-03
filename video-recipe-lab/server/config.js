@@ -4,6 +4,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { categoryLabel, elevenVoiceCache } from './pipeline/eleven.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(here, '..');
@@ -27,15 +28,23 @@ export const config = {
 
 export function providers() {
   const forceDemo = process.env.DEMO_MODE === '1';
+  const claude = !forceDemo && (has('ANTHROPIC_API_KEY') || has('ANTHROPIC_AUTH_TOKEN') || process.env.USE_CLAUDE === '1');
+  const gemini = !forceDemo && has('GEMINI_API_KEY');
+  // 분석·대본을 맡을 AI: 화면에서 고른 것(TEXT_AI) 우선, 없으면 Claude → Gemini 순
+  const pref = process.env.TEXT_AI;
+  const text = pref === 'gemini' && gemini ? 'gemini' : pref === 'claude' && claude ? 'claude' : claude ? 'claude' : gemini ? 'gemini' : null;
   return {
-    claude: !forceDemo && (has('ANTHROPIC_API_KEY') || has('ANTHROPIC_AUTH_TOKEN') || process.env.USE_CLAUDE === '1'),
+    claude,
+    gemini,
+    text,
     openai: !forceDemo && has('OPENAI_API_KEY'),
     elevenlabs: !forceDemo && has('ELEVENLABS_API_KEY'),
   };
 }
 
 // ── 화면에서 입력한 API 키를 .env 에 저장 ──────────────────────
-export const KEY_NAMES = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY'];
+export const KEY_NAMES = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY'];
+const SETTING_NAMES = ['TEXT_AI'];
 
 // 마지막 연결 확인 결과 (화면 배지에 '키 오류' 표시용)
 export const keyHealth = {};
@@ -45,12 +54,12 @@ export function keyStatus() {
   return Object.fromEntries(KEY_NAMES.map((k) => [k, mask(process.env[k]?.trim())]));
 }
 
-/** values: { ANTHROPIC_API_KEY?: string, ... } — 빈 문자열이면 지운다, undefined 면 그대로 둔다 */
+/** values: { ANTHROPIC_API_KEY?: string, TEXT_AI?: 'claude'|'gemini', ... } — 빈 문자열이면 지운다, undefined 면 그대로 둔다 */
 export function saveKeys(values) {
   const envPath = path.join(ROOT, '.env');
   const examplePath = path.join(ROOT, '.env.example');
   let text = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : fs.existsSync(examplePath) ? fs.readFileSync(examplePath, 'utf8') : '';
-  for (const k of KEY_NAMES) {
+  for (const k of [...KEY_NAMES, ...SETTING_NAMES]) {
     if (values[k] === undefined) continue;
     const v = String(values[k]).trim().replace(/[\r\n]/g, '');
     const re = new RegExp(`^#?\\s*${k}=.*$`, 'm');
@@ -61,22 +70,28 @@ export function saveKeys(values) {
   fs.writeFileSync(envPath, text);
 }
 
-// 목소리 목록. ElevenLabs 목소리는 .env 의 ELEVENLABS_VOICES="이름:voiceId,이름:voiceId" 로 등록
+// 목소리 목록. ElevenLabs 는 화면에서 키를 등록하면 내 계정 목소리를 자동으로 불러온다
+// (.env 의 ELEVENLABS_VOICES="이름:voiceId,이름:voiceId" 로 직접 추가도 가능)
 export function voices() {
   const p = providers();
   const list = [{ id: 'silent', provider: 'none', label: '무음 · 자막만 (데모)', desc: 'API 키 없이 렌더 테스트용' }];
+  if (p.elevenlabs) {
+    const seen = new Set();
+    for (const v of elevenVoiceCache()) {
+      seen.add(v.id);
+      list.push({ id: `eleven:${v.id}`, provider: 'elevenlabs', label: v.name, desc: `ElevenLabs · ${categoryLabel(v.category)}` });
+    }
+    const raw = process.env.ELEVENLABS_VOICES || '';
+    for (const pair of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
+      const [label, id] = pair.split(':');
+      if (id && !seen.has(id)) list.push({ id: `eleven:${id}`, provider: 'elevenlabs', label, desc: 'ElevenLabs' });
+    }
+  }
   if (p.openai) {
     for (const [v, label] of [
       ['onyx', '낮고 묵직한 남성'], ['ash', '차분한 남성'], ['echo', '또렷한 남성'],
       ['nova', '밝은 여성'], ['coral', '따뜻한 여성'], ['sage', '지적인 여성'],
     ]) list.push({ id: `openai:${v}`, provider: 'openai', label: `${label} (${v})`, desc: 'OpenAI TTS' });
-  }
-  if (p.elevenlabs) {
-    const raw = process.env.ELEVENLABS_VOICES || '';
-    for (const pair of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
-      const [label, id] = pair.split(':');
-      if (id) list.push({ id: `eleven:${id}`, provider: 'elevenlabs', label, desc: 'ElevenLabs' });
-    }
   }
   return list;
 }

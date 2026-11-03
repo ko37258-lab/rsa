@@ -71,8 +71,11 @@ npm run demo:render
 | 키 | 하는 일 | 발급 |
 |---|---|---|
 | Claude (`ANTHROPIC_API_KEY`) | 벤치마킹 분석, 제목·썸네일 기획, 대본·장면 설계 (claude-opus-5-5) | console.anthropic.com → Settings → API Keys |
+| Gemini (`GEMINI_API_KEY`) | Claude 대신 분석·대본. 무료 사용량이 있어 키 없이 시작하는 사람에게 맞음. 쓸 모델은 키로 조회해 자동 선택 | aistudio.google.com → Get API key |
 | OpenAI (`OPENAI_API_KEY`) | 장면 그림(gpt-image-1), 내레이션 목소리(gpt-4o-mini-tts) | platform.openai.com → API keys |
-| ElevenLabs (`ELEVENLABS_API_KEY` + `ELEVENLABS_VOICES`) | ElevenLabs 목소리. `.env`에 직접 `이름:voiceId,이름:voiceId` 형식으로 넣습니다 | elevenlabs.io |
+| ElevenLabs (`ELEVENLABS_API_KEY`) | 더 자연스러운 한국어 목소리, 내가 복제한 목소리. 키를 넣으면 목소리 목록을 자동으로 불러옴 | elevenlabs.io → 설정 → API Keys |
+
+분석·대본은 Claude와 Gemini 중 하나만 있으면 됩니다. 둘 다 등록하면 키 등록 화면에서 어느 쪽을 쓸지 고를 수 있습니다. 두 AI는 같은 규칙과 출력 형식(`server/pipeline/prompts.js`)을 씁니다.
 
 AI 그림이나 목소리 생성이 실패하면(키 오류, 결제 미등록, OpenAI 조직 인증 필요 등) 작업을 멈추지 않고 대체 카드와 무음으로 끝까지 만듭니다. 실패 사유는 "기다리기" 화면에 표시됩니다.
 
@@ -97,7 +100,11 @@ video-recipe-lab/
    ├─ index.js               /api/analyze, /api/jobs(+SSE 진행상황)
    └─ pipeline/
       ├─ youtube.js          유튜브 메타데이터·자막
-      ├─ claude.js           분석·제목·썸네일·대본 (구조화 출력)
+      ├─ prompts.js          분석·대본 규칙과 출력 형식 (Claude·Gemini 공통)
+      ├─ llm.js              분석·대본을 Claude / Gemini 중 어디로 보낼지 선택
+      ├─ claude.js           Claude 호출 (구조화 출력, 스트리밍)
+      ├─ gemini.js           Gemini 호출 (모델 자동 선택, JSON 스키마)
+      ├─ eleven.js           ElevenLabs 키 확인·목소리 목록
       ├─ tts.js              음성 (OpenAI / ElevenLabs / 무음)
       ├─ subtitles.js        SRT
       ├─ images.js           장면 그림 (OpenAI / 대체 카드)

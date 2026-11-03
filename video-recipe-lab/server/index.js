@@ -4,10 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config, keyHealth, keyStatus, OUTPUT_DIR, providers, ROOT, saveKeys, voices } from './config.js';
 import { getJob, startJob } from './jobs.js';
-import { analyzeBenchmark, friendlyError, resetClient, verifyClaude } from './pipeline/claude.js';
+import { friendlyError, resetClient, verifyClaude } from './pipeline/claude.js';
+import { resetGemini, verifyGemini } from './pipeline/gemini.js';
+import { analyzeBenchmark } from './pipeline/llm.js';
 import { demoAnalysis, demoTranscript } from './pipeline/demo.js';
 import { checkFfmpeg, resolveFont } from './pipeline/ffmpeg.js';
 import { verifyOpenAI } from './pipeline/images.js';
+import { loadElevenVoices, verifyEleven } from './pipeline/eleven.js';
 import { fetchMeta, fetchTranscript, parseVideoId } from './pipeline/youtube.js';
 
 const app = express();
@@ -25,18 +28,34 @@ app.post('/api/keys', async (req, res) => {
   const values = {};
   if (typeof b.anthropic === 'string') values.ANTHROPIC_API_KEY = b.anthropic;
   if (typeof b.openai === 'string') values.OPENAI_API_KEY = b.openai;
+  if (typeof b.elevenlabs === 'string') values.ELEVENLABS_API_KEY = b.elevenlabs;
+  if (typeof b.gemini === 'string') values.GEMINI_API_KEY = b.gemini;
+  if (b.textAI === 'claude' || b.textAI === 'gemini') values.TEXT_AI = b.textAI;
   try {
     saveKeys(values);
   } catch (e) {
     return res.status(500).json({ error: `설정 파일 저장 실패: ${e.message}` });
   }
   resetClient();
+  resetGemini();
   const check = {};
   if (process.env.ANTHROPIC_API_KEY) check.anthropic = await verifyClaude();
+  if (process.env.GEMINI_API_KEY) check.gemini = await verifyGemini();
   if (process.env.OPENAI_API_KEY) check.openai = await verifyOpenAI();
+  if (process.env.ELEVENLABS_API_KEY) check.elevenlabs = await verifyEleven();
   keyHealth.anthropic = check.anthropic?.ok;
+  keyHealth.gemini = check.gemini?.ok;
   keyHealth.openai = check.openai?.ok;
+  keyHealth.elevenlabs = check.elevenlabs?.ok;
   res.json({ keys: keyStatus(), providers: providers(), check });
+});
+
+// 분석·대본 AI 선택 (Claude / Gemini) — 키 확인 없이 설정만 바꾼다
+app.post('/api/settings', (req, res) => {
+  const v = req.body?.textAI;
+  if (v !== 'claude' && v !== 'gemini') return res.status(400).json({ error: 'claude 또는 gemini 중에서 골라 주세요.' });
+  saveKeys({ TEXT_AI: v });
+  res.json({ providers: providers() });
 });
 
 // ① 잘된 영상 주소 넣기 → 분석 + 제목/썸네일 후보
@@ -52,7 +71,7 @@ app.post('/api/analyze', async (req, res) => {
     if (t) transcript = { text: t.text, source: `youtube:${t.lang}` };
   }
 
-  const live = providers().claude && !demo;
+  const live = Boolean(providers().text) && !demo;
   if (!live) {
     return res.json({
       mode: 'demo', meta,
@@ -110,10 +129,17 @@ if (fs.existsSync(dist)) {
   app.get(/^(?!\/(api|output)\/).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
 
+if (providers().elevenlabs) {
+  loadElevenVoices().catch(() => {
+    keyHealth.elevenlabs = false;
+  });
+}
+
 const server = app.listen(config.port, config.host, () => {
   const p = providers();
   console.log(`\n🎬 Video Recipe Lab API → http://localhost:${config.port}`);
-  console.log(`   Claude: ${p.claude ? 'ON' : 'OFF(데모)'} · OpenAI(그림/음성): ${p.openai ? 'ON' : 'OFF'} · ElevenLabs: ${p.elevenlabs ? 'ON' : 'OFF'}`);
+  const textName = p.text === 'claude' ? 'Claude' : p.text === 'gemini' ? 'Gemini' : 'OFF(데모)';
+  console.log(`   분석·대본 AI: ${textName} · OpenAI(그림/음성): ${p.openai ? 'ON' : 'OFF'} · ElevenLabs: ${p.elevenlabs ? 'ON' : 'OFF'}`);
   console.log(`   ffmpeg: ${checkFfmpeg() ? 'OK' : '없음 — 렌더 불가'} · 한글 폰트: ${resolveFont() ?? '못 찾음'}\n`);
 });
 server.on('error', (e) => {

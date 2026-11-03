@@ -4,6 +4,28 @@ import Thumb from '../landing/Thumb.jsx';
 import './studio.css';
 
 const STEP_NAMES = ['잘된 영상 주소 넣기', '제목·썸네일·목소리 고르기', '기다리기', '완성 영상'];
+const KEY_GROUPS = [
+  {
+    title: '① 분석·대본 AI',
+    note: 'Claude 와 Gemini 중 하나만 있으면 됩니다. Claude 키가 없으면 Gemini 키(무료 사용량 있음)로 시작하세요.',
+    fields: [
+      { id: 'anthropic', env: 'ANTHROPIC_API_KEY', name: 'Claude 키', role: '영상 분석·제목·대본 (품질 우선)', placeholder: 'sk-ant- 로 시작하는 키를 붙여넣으세요', link: 'https://console.anthropic.com/settings/keys' },
+      { id: 'gemini', env: 'GEMINI_API_KEY', name: 'Gemini 키', role: 'Claude 대신 분석·대본 (무료로 시작 가능)', placeholder: 'AIza 로 시작하는 키를 붙여넣으세요', link: 'https://aistudio.google.com/apikey' },
+    ],
+  },
+  {
+    title: '② 그림·목소리 (선택)',
+    note: '없으면 그림은 단색 카드, 목소리는 무음(자막만)으로 만들어집니다.',
+    fields: [
+      { id: 'openai', env: 'OPENAI_API_KEY', name: 'OpenAI 키', role: '장면 AI 그림 + 내레이션 목소리', placeholder: 'sk- 로 시작하는 키를 붙여넣으세요', link: 'https://platform.openai.com/api-keys' },
+      { id: 'elevenlabs', env: 'ELEVENLABS_API_KEY', name: 'ElevenLabs 키', role: '더 자연스러운 한국어 목소리 · 내 목소리 복제', placeholder: 'sk_ 로 시작하는 키를 붙여넣으세요', link: 'https://elevenlabs.io/app/settings/api-keys' },
+    ],
+  },
+];
+const EMPTY_KEYS = { anthropic: '', gemini: '', openai: '', elevenlabs: '' };
+const AI_NAME = { claude: 'Claude', gemini: 'Gemini' };
+const HEALTH_KEY = { claude: 'anthropic', gemini: 'gemini' };
+
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 async function api(path, body) {
@@ -23,7 +45,7 @@ export default function Studio() {
   const [pick, setPick] = useState({ title: '', thumb: 0, voice: 'silent', minutes: 1 });
   const [job, setJob] = useState(null);
   const [keysOpen, setKeysOpen] = useState(false);
-  const [keyForm, setKeyForm] = useState({ anthropic: '', openai: '' });
+  const [keyForm, setKeyForm] = useState(EMPTY_KEYS);
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyResult, setKeyResult] = useState(null);
   const videoRef = useRef(null);
@@ -47,11 +69,10 @@ export default function Studio() {
     setKeyResult(null);
     try {
       const body = {};
-      if (keyForm.anthropic.trim()) body.anthropic = keyForm.anthropic.trim();
-      if (keyForm.openai.trim()) body.openai = keyForm.openai.trim();
+      for (const [k, v] of Object.entries(keyForm)) if (v.trim()) body[k] = v.trim();
       const r = await api('/api/keys', body);
       setKeyResult(r.check);
-      setKeyForm({ anthropic: '', openai: '' });
+      setKeyForm(EMPTY_KEYS);
       await loadStatus();
     } catch (e) {
       setKeyResult({ error: { ok: false, msg: e.message } });
@@ -60,7 +81,18 @@ export default function Studio() {
     }
   }
 
-  const live = status?.providers?.claude;
+  const live = status?.providers?.text; // 'claude' | 'gemini' | null
+  const liveName = AI_NAME[live];
+  const liveBad = live && status?.keyHealth?.[HEALTH_KEY[live]] === false;
+
+  async function chooseTextAI(v) {
+    try {
+      await api('/api/settings', { textAI: v });
+      await loadStatus();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
 
   async function analyze(demo = false) {
     setBusy(true);
@@ -122,17 +154,21 @@ export default function Studio() {
               <span className="pill bad">API 서버 꺼짐 — npm run dev 로 실행</span>
             ) : status ? (
               <>
-                {live && status.keyHealth?.anthropic === false ? (
-                  <span className="pill bad">Claude 키 오류</span>
+                {liveBad ? (
+                  <span className="pill bad">{liveName} 키 오류</span>
                 ) : (
-                  <span className={`pill ${live ? 'ok' : ''}`}>Claude {live ? 'ON' : '데모'}</span>
+                  <span className={`pill ${live ? 'ok' : ''}`}>분석·대본 {live ? liveName : '데모'}</span>
                 )}
                 {status.providers.openai && status.keyHealth?.openai === false ? (
                   <span className="pill bad">OpenAI 키 오류</span>
                 ) : (
                   <span className={`pill ${status.providers.openai ? 'ok' : ''}`}>그림·음성 {status.providers.openai ? 'OpenAI' : '대체'}</span>
                 )}
-                <span className={`pill ${status.providers.elevenlabs ? 'ok' : ''}`}>ElevenLabs {status.providers.elevenlabs ? 'ON' : 'OFF'}</span>
+                {status.providers.elevenlabs && status.keyHealth?.elevenlabs === false ? (
+                  <span className="pill bad">ElevenLabs 키 오류</span>
+                ) : (
+                  <span className={`pill ${status.providers.elevenlabs ? 'ok' : ''}`}>ElevenLabs {status.providers.elevenlabs ? 'ON' : 'OFF'}</span>
+                )}
                 <span className={`pill ${status.ffmpeg ? 'ok' : 'bad'}`}>ffmpeg {status.ffmpeg ? 'OK' : '없음'}</span>
               </>
             ) : (
@@ -147,7 +183,7 @@ export default function Studio() {
         {status && !status.offline && !live && !keysOpen && (
           <div className="demoNote">
             <span>
-              지금은 <b>데모 모드</b>입니다. 넣은 영상을 진짜로 분석하고 AI 그림·목소리를 넣으려면 API 키를 등록하세요.
+              지금은 <b>데모 모드</b>입니다. 넣은 영상을 진짜로 분석하려면 Claude 키나 <b>Gemini 키(무료로 시작 가능)</b>를 등록하세요.
             </span>
             <button onClick={() => setKeysOpen(true)}>키 등록하기 →</button>
           </div>
@@ -159,27 +195,36 @@ export default function Studio() {
             <p className="hint" style={{ marginTop: 0 }}>
               키는 이 PC 의 설정 파일(.env)에만 저장됩니다. 저장할 때 키가 맞는지 확인하는데, 이 확인에는 요금이 나가지 않습니다.
             </p>
-            <div className="keyRow">
-              <div className="keyHead">
-                <b>Claude 키</b> <em>필수 · 영상 분석·제목·대본</em>
-                <span className={`kst ${status.keys?.ANTHROPIC_API_KEY ? 'on' : ''}`}>{status.keys?.ANTHROPIC_API_KEY ? `등록됨 ${status.keys.ANTHROPIC_API_KEY}` : '미등록'}</span>
+            {KEY_GROUPS.map((g) => (
+              <div className="keyGroup" key={g.title}>
+                <h3>{g.title}</h3>
+                <p className="hint" style={{ marginTop: 0 }}>{g.note}</p>
+                {g.fields.map((f) => (
+                  <div className="keyRow" key={f.id}>
+                    <div className="keyHead">
+                      <b>{f.name}</b> <em>{f.role}</em>
+                      <span className={`kst ${status.keys?.[f.env] ? 'on' : ''}`}>{status.keys?.[f.env] ? `등록됨 ${status.keys[f.env]}` : '미등록'}</span>
+                    </div>
+                    <input type="password" autoComplete="off" placeholder={f.placeholder} value={keyForm[f.id]} onChange={(e) => setKeyForm({ ...keyForm, [f.id]: e.target.value })} />
+                    <a href={f.link} target="_blank" rel="noreferrer">키 발급받으러 가기 ↗</a>
+                    {keyResult?.[f.id] && <p className={`kres ${keyResult[f.id].ok ? 'ok' : 'bad'}`}>{keyResult[f.id].ok ? '✅' : '❌'} {keyResult[f.id].msg}</p>}
+                  </div>
+                ))}
+                {g.title.startsWith('①') && status.providers.claude && status.providers.gemini && (
+                  <div className="aiPick">
+                    <b>분석·대본은 어느 AI 로 만들까요?</b>
+                    {['claude', 'gemini'].map((v) => (
+                      <label key={v} className={live === v ? 'sel' : ''}>
+                        <input type="radio" name="textAI" checked={live === v} onChange={() => chooseTextAI(v)} /> {AI_NAME[v]}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
-              <input type="password" autoComplete="off" placeholder="sk-ant-로 시작하는 키를 붙여넣으세요" value={keyForm.anthropic} onChange={(e) => setKeyForm({ ...keyForm, anthropic: e.target.value })} />
-              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">키 발급받으러 가기 ↗</a>
-              {keyResult?.anthropic && <p className={`kres ${keyResult.anthropic.ok ? 'ok' : 'bad'}`}>{keyResult.anthropic.ok ? '✅' : '❌'} {keyResult.anthropic.msg}</p>}
-            </div>
-            <div className="keyRow">
-              <div className="keyHead">
-                <b>OpenAI 키</b> <em>선택 · 장면 그림·내레이션 목소리</em>
-                <span className={`kst ${status.keys?.OPENAI_API_KEY ? 'on' : ''}`}>{status.keys?.OPENAI_API_KEY ? `등록됨 ${status.keys.OPENAI_API_KEY}` : '미등록'}</span>
-              </div>
-              <input type="password" autoComplete="off" placeholder="sk-로 시작하는 키를 붙여넣으세요" value={keyForm.openai} onChange={(e) => setKeyForm({ ...keyForm, openai: e.target.value })} />
-              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">키 발급받으러 가기 ↗</a>
-              {keyResult?.openai && <p className={`kres ${keyResult.openai.ok ? 'ok' : 'bad'}`}>{keyResult.openai.ok ? '✅' : '❌'} {keyResult.openai.msg}</p>}
-            </div>
+            ))}
             {keyResult?.error && <p className="kres bad">❌ {keyResult.error.msg}</p>}
             <div className="row">
-              <button className="primary" disabled={keyBusy || (!keyForm.anthropic.trim() && !keyForm.openai.trim())} onClick={saveKeys}>
+              <button className="primary" disabled={keyBusy || !Object.values(keyForm).some((v) => v.trim())} onClick={saveKeys}>
                 {keyBusy ? '확인 중…' : '저장하고 연결 확인'}
               </button>
               <button className="ghost" onClick={() => setKeysOpen(false)}>닫기</button>
@@ -231,8 +276,8 @@ export default function Studio() {
             </div>
             <p className="hint">
               {live
-                ? 'Claude 가 대본을 읽고 "왜 잘됐는지" 해부한 뒤 같은 공식으로 제목·썸네일을 기획합니다.'
-                : 'ANTHROPIC_API_KEY 가 없어서 데모 모드입니다. 영상 정보(제목·채널)는 실제로 가져오고, 분석 결과는 준비된 예시를 씁니다.'}
+                ? `${liveName} 가 대본을 읽고 "왜 잘됐는지" 해부한 뒤 같은 공식으로 제목·썸네일을 기획합니다.`
+                : 'Claude 나 Gemini 키가 없어서 데모 모드입니다. 영상 정보(제목·채널)는 실제로 가져오고, 분석 결과는 준비된 예시를 씁니다.'}
             </p>
           </section>
         )}
@@ -321,7 +366,9 @@ export default function Studio() {
               </div>
               {!an.demo && (
                 <p className="hint">
-                  실제 AI 로 만듭니다. 등록한 키의 계정에 사용료가 나갑니다 (1분 영상 기준 대략 수백 원~1천 원, 그림 장수에 따라 달라짐).
+                  {live === 'gemini'
+                    ? '실제 AI 로 만듭니다. 대본은 Gemini 무료 사용량 안에서는 요금이 나가지 않고, 그림·목소리를 OpenAI·ElevenLabs 로 만들면 그쪽 요금이 나갑니다.'
+                    : '실제 AI 로 만듭니다. 등록한 키의 계정에 사용료가 나갑니다 (1분 영상 기준 대략 수백 원~1천 원, 그림 장수에 따라 달라짐).'}
                 </p>
               )}
             </section>

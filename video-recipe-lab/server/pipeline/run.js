@@ -3,7 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { OUTPUT_DIR, providers } from '../config.js';
-import { writeScript } from './claude.js';
+import { writeScript } from './llm.js';
 import { demoScript } from './demo.js';
 import { copyFontInto } from './ffmpeg.js';
 import { makeSceneImage, VISUAL_LABEL } from './images.js';
@@ -47,7 +47,7 @@ export async function runPipeline(job, input) {
   // 1) 대본
   job.step('script', 'running');
   let script;
-  if (providers().claude && !input.demo) {
+  if (providers().text && !input.demo) {
     script = await writeScript({ analysis: input.analysis, title: input.title, topic: input.topic, minutes: input.minutes });
   } else {
     script = { ...demoScript, title: input.title || demoScript.title };

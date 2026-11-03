@@ -15,10 +15,10 @@ const STACK = [
 ];
 
 const PIPE = [
-  ['채널·벤치마킹 영상 분석', '유튜브 주소 → 자막 수집 → LLM 이 후킹·구조·말투 해부', 'server/pipeline/youtube.js, claude.js (analyzeBenchmark)'],
-  ['제목·썸네일 기획', '같은 공식으로 새 제목 5개, 썸네일 문구 3안', 'claude.js (AnalysisSchema.titles / thumbnails)'],
-  ['대본 작성', '분석된 공식 + 새 주제 → 장면 단위 대본', 'claude.js (writeScript, ScriptSchema)'],
-  ['TTS 음성', '장면별 mp3, 실제 길이를 재서 타임라인 기준으로', 'tts.js (OpenAI · ElevenLabs · 무음)'],
+  ['채널·벤치마킹 영상 분석', '유튜브 주소 → 자막 수집 → LLM 이 후킹·구조·말투 해부', 'server/pipeline/youtube.js, llm.js → claude.js / gemini.js'],
+  ['제목·썸네일 기획', '같은 공식으로 새 제목 5개, 썸네일 문구 3안', 'prompts.js (AnalysisSchema.titles / thumbnails)'],
+  ['대본 작성', '분석된 공식 + 새 주제 → 장면 단위 대본', 'llm.js (writeScript), prompts.js (ScriptSchema)'],
+  ['TTS 음성', '장면별 mp3, 실제 길이를 재서 타임라인 기준으로', 'tts.js, eleven.js (OpenAI · ElevenLabs · 무음)'],
   ['SRT 자막', '22자 단위로 끊고 글자 수 비례로 시간 배분', 'subtitles.js'],
   ['장면 컷 설계', 'AI 그림 / 스톡 / 그래프 / 모션그래픽 유형별 그림', 'images.js'],
   ['썸네일 편집', '배경 + 흰 줄 + 노란 큰 줄, 아래쪽 어둡게', 'render.js (composeThumbnail)'],
