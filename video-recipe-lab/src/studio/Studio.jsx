@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import Thumb from '../landing/Thumb.jsx';
 import './studio.css';
 
+// 웹판(ko372.com/mrk-vr/app/)은 서버 없이 브라우저만으로 돈다(src/web). 설치판은 그대로다
+const WEB = import.meta.env.VITE_WEB === '1';
 const STEP_NAMES = ['잘된 영상 주소 넣기', '제목·썸네일·목소리 고르기', '기다리기', '완성 영상'];
 const KEY_GROUPS = [
   {
@@ -173,7 +175,11 @@ export default function Studio({ member = false }) {
                 ) : (
                   <span className={`pill ${status.providers.elevenlabs ? 'ok' : ''}`}>ElevenLabs {status.providers.elevenlabs ? 'ON' : 'OFF'}</span>
                 )}
-                <span className={`pill ${status.ffmpeg ? 'ok' : 'bad'}`}>ffmpeg {status.ffmpeg ? 'OK' : '없음'}</span>
+                {WEB ? (
+                  <span className={`pill ${status.ffmpeg ? 'ok' : 'bad'}`}>{status.ffmpeg ? '브라우저 OK' : '크롬·엣지 필요'}</span>
+                ) : (
+                  <span className={`pill ${status.ffmpeg ? 'ok' : 'bad'}`}>ffmpeg {status.ffmpeg ? 'OK' : '없음'}</span>
+                )}
               </>
             ) : (
               <span className="pill">상태 확인 중…</span>
@@ -197,7 +203,9 @@ export default function Studio({ member = false }) {
           <section className="panel keys">
             <h2>API 키 등록</h2>
             <p className="hint" style={{ marginTop: 0 }}>
-              키는 이 PC 의 설정 파일(.env)에만 저장됩니다. 저장할 때 키가 맞는지 확인하는데, 이 확인에는 요금이 나가지 않습니다.
+              {WEB
+                ? '키는 이 브라우저에만 저장되고, 각 AI 회사로 바로 보냅니다. 저희 서버로는 보내지 않습니다. 함께 쓰는 PC라면 다 쓴 뒤 「이 브라우저에서 키 지우기」를 눌러 주세요. 저장할 때 키가 맞는지 확인하는데, 이 확인에는 요금이 나가지 않습니다.'
+                : '키는 이 PC 의 설정 파일(.env)에만 저장됩니다. 저장할 때 키가 맞는지 확인하는데, 이 확인에는 요금이 나가지 않습니다.'}
             </p>
             {KEY_GROUPS.map((g) => (
               <div className="keyGroup" key={g.title}>
@@ -231,6 +239,11 @@ export default function Studio({ member = false }) {
               <button className="primary" disabled={keyBusy || !Object.values(keyForm).some((v) => v.trim())} onClick={saveKeys}>
                 {keyBusy ? '확인 중…' : '저장하고 연결 확인'}
               </button>
+              {WEB && (
+                <button className="ghost" onClick={() => { if (window.confirm('이 브라우저에 저장한 키를 모두 지울까요?')) api('/api/keys', { clearAll: true }).then(() => { setKeyResult(null); loadStatus(); }); }}>
+                  이 브라우저에서 키 지우기
+                </button>
+              )}
               <button className="ghost" onClick={() => setKeysOpen(false)}>닫기</button>
             </div>
           </section>
@@ -296,7 +309,7 @@ export default function Studio({ member = false }) {
                   <span className="kicker">벤치마킹 원본 {an.demo && '· 체험용 예시 분석'}</span>
                   <b>{an.meta?.title || '(제목 없음)'}</b>
                   <small>
-                    {an.meta?.author} · 대본 {an.transcript?.text?.length?.toLocaleString()}자 ({an.transcript?.source})
+                    {an.meta?.author} · {an.transcript?.source?.startsWith('Gemini') ? an.transcript.source : `대본 ${an.transcript?.text?.length?.toLocaleString()}자 (${an.transcript?.source})`}
                   </small>
                 </div>
               </div>
@@ -396,6 +409,7 @@ export default function Studio({ member = false }) {
                 </li>
               ))}
             </ul>
+            {WEB && job?.status !== 'error' && <p className="hint">영상은 이 브라우저 안에서 만들어집니다. 끝날 때까지 이 창을 닫거나 새로고침하지 마세요.</p>}
             {job?.logs?.map((l) => <p className="hint" key={l}>• {l}</p>)}
             {job?.error && (
               <>
@@ -427,11 +441,11 @@ export default function Studio({ member = false }) {
                 <figcaption>썸네일</figcaption>
               </figure>
               <div className="dl">
-                <a href={job.result.video} download>MP4 받기</a>
-                <a href={job.result.thumbnail} download>썸네일 JPG</a>
-                <a href={job.result.srt} download>SRT 자막</a>
-                <a href={job.result.script} download>대본 JSON</a>
-                <button onClick={() => api(`/api/jobs/${job.id}/open-folder`, {}).catch((e) => setErr(e.message))}>📂 결과 폴더 열기</button>
+                <a href={job.result.video} download={`${job.result.title}.mp4`}>MP4 받기</a>
+                <a href={job.result.thumbnail} download={`${job.result.title}_썸네일.jpg`}>썸네일 JPG</a>
+                <a href={job.result.srt} download={`${job.result.title}.srt`}>SRT 자막</a>
+                <a href={job.result.script} download={`${job.result.title}_대본.json`}>대본 JSON</a>
+                {WEB ? null : <button onClick={() => api(`/api/jobs/${job.id}/open-folder`, {}).catch((e) => setErr(e.message))}>📂 결과 폴더 열기</button>}
               </div>
             </div>
             <h2>장면 컷</h2>
