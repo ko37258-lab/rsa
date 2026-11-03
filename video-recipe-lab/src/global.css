@@ -1,0 +1,58 @@
+/* MR.K-VR — ko372.com 이 실제로 보여 주는 기본 테마(mac: 밝은 회색·흰 상자·파랑)와 같은 색·글꼴 */
+:root {
+  --ink: #1d1d1f;          /* 글자 */
+  --muted: #6e6e73;
+  --soft: #a1a1a6;
+  --line: #e3e3e8;
+  --bg: #f5f5f7;           /* 바탕 */
+  --alt: #ebebf0;
+  --paper: #f0f0f5;
+  --card: #ffffff;
+  --dark: #1d1d1f;         /* 짙은 띠 */
+  --dark2: #2c2c2e;
+  --accent: #0071e3;       /* 파랑 강조색 */
+  --accent-soft: #e8f1fc;
+  --accent-deep: #0058b0;
+  --on-accent: #ffffff;
+  --brand: var(--accent);
+  --kakao: #fee500;
+  --red: #e0273a;
+  --radius: 18px;
+  --font: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+}
+a { color: inherit; }
+button, input, textarea, select { font: inherit; color: inherit; }
+
+/* ── 상단 실험실 바 (원본에는 없는, 이 클론만의 탭) ── */
+.labbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--dark); color: #d2d2d7;
+  border-bottom: 1px solid #2c2c2e;
+  font-size: 13px;
+}
+.labbar b { color: #ffffff; margin-right: 10px; letter-spacing: -0.01em; font-weight: 900; }
+.labbar b small { color: #a1a1a6; font-weight: 700; margin-left: 6px; font-size: 12px; }
+.labbar a {
+  text-decoration: none; padding: 6px 12px; border-radius: 999px;
+  color: #d2d2d7;
+}
+.labbar a:hover { background: #2c2c2e; }
+.labbar a.on { background: var(--accent); color: var(--on-accent); font-weight: 800; }
+.labbar .labsp { flex: 1; }
+.labbar .labNote { color: #a1a1a6; font-size: 12px; }
+.labbar label { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.labbar input[type='checkbox'] { accent-color: var(--accent); }
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
