@@ -22,7 +22,7 @@ function Gate() {
   if (!open) {
     return (
       <p style={{ padding: 40, textAlign: 'center', lineHeight: 1.7 }}>
-        아직 열리지 않은 도구입니다. <a href="/mrk-vr/">안내 페이지로 돌아가기</a>
+        지금 준비 중인 도구입니다. <a href="/mrk-vr/index.html">안내 페이지로 돌아가기</a>
       </p>
     );
   }
