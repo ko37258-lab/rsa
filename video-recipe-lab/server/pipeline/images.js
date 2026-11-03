@@ -7,11 +7,11 @@ import { ffmpeg } from './ffmpeg.js';
 export const VISUAL_LABEL = { ai_image: 'AI 그림', stock: '스톡 영상', chart: '그래프', motion: '모션그래픽' };
 
 const PALETTE = {
-  // MR.K-VR 색 (ko372.com 클레이·차콜)
-  ai_image: ['0x1b1b1f', '0x6b2f1e'],
-  stock: ['0x1d2229', '0x3e4a5c'],
-  chart: ['0x211c17', '0x7a4a2a'],
-  motion: ['0x1b1b1f', '0x8e3a22'],
+  // MR.K-VR 색 (ko372.com 기본 테마: 차콜·파랑)
+  ai_image: ['0x1d1d1f', '0x0b3d7a'],
+  stock: ['0x1c1c1e', '0x3a4a5c'],
+  chart: ['0x1d1d1f', '0x24456b'],
+  motion: ['0x1d1d1f', '0x0058b0'],
 };
 
 async function openaiImage(prompt, outFile) {
@@ -50,7 +50,7 @@ export async function placeholderCard({ dir, outName, text, visualType, font }) 
       const lf = `${outName}.label.txt`;
       await fs.writeFile(path.join(dir, lf), `[대체 이미지] ${VISUAL_LABEL[visualType] || ''}`);
       filters.push(
-        `drawtext=expansion=none:fontfile=${font}:textfile=${lf}:fontsize=${Math.round(H / 30)}:fontcolor=0xf0a58a:x=${Math.round(W * 0.09)}:y=${Math.round(H * 0.09)}`,
+        `drawtext=expansion=none:fontfile=${font}:textfile=${lf}:fontsize=${Math.round(H / 30)}:fontcolor=0x6cb4ff:x=${Math.round(W * 0.09)}:y=${Math.round(H * 0.09)}`,
       );
     }
   }
@@ -59,7 +59,7 @@ export async function placeholderCard({ dir, outName, text, visualType, font }) 
     const base = Math.round(H * 0.86);
     [0.18, 0.32, 0.55, 0.8].forEach((r, i) => {
       const bh = Math.round(H * 0.5 * r);
-      filters.unshift(`drawbox=x=${Math.round(W * (0.12 + i * 0.2))}:y=${base - bh}:w=${Math.round(W * 0.11)}:h=${bh}:color=0xf0a58a@0.28:t=fill`);
+      filters.unshift(`drawbox=x=${Math.round(W * (0.12 + i * 0.2))}:y=${base - bh}:w=${Math.round(W * 0.11)}:h=${bh}:color=0x6cb4ff@0.28:t=fill`);
     });
   }
   const args = ['-f', 'lavfi', '-i', `gradients=s=${W}x${H}:c0=${c0}:c1=${c1}:x0=0:y0=0:x1=${W}:y1=${H}:nb_colors=2`, '-frames:v', '1'];
