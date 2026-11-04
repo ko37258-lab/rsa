@@ -8,3 +8,15 @@ public/voice.wav
 public/photo*.webp
 public/fonts/
 public/face.webm
+tts2/
+tts3/
+stills2/
+out_*.mp4
+public/voice2.wav
+public/chat.png
+public/result.mp4
+public/howto/
+thumbnail/*.png
+thumbnail/*.jpg
+thumbnail/*.otf
+thumbnail/*.webp
