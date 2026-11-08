@@ -1,3 +1,7 @@
+> **이 저장소의 프로젝트**
+> - [`k-blog-deco/`](k-blog-deco/) — **K 블로그 꾸미기**: 레퍼런스로 네이버 홈페이지형 블로그를 AI 로 만드는 웹 서비스 ([기획서](k-blog-deco/docs/PLAN.md))
+> - `threads_bot/` — 스레드(Threads) 자동화 봇 (아래 설명)
+
 # 스레드(Threads) 자동화 봇 🧵
 
 메타 **공식 Threads API**로 글 발행과 댓글 자동답글을 돌립니다.

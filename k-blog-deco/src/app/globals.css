@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* ── 디자인 렌더링용 한글 웹폰트 (npm 자체 호스팅, 글자 범위별 분할 로드) ── */
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+@import "@fontsource/noto-sans-kr/400.css";
+@import "@fontsource/noto-sans-kr/700.css";
+@import "@fontsource/noto-sans-kr/900.css";
+@import "@fontsource/gowun-dodum/400.css";
+@import "@fontsource/black-han-sans/400.css";
+@import "@fontsource/do-hyeon/400.css";
+@import "@fontsource/jua/400.css";
+@import "@fontsource/nanum-myeongjo/400.css";
+@import "@fontsource/nanum-myeongjo/700.css";
+@import "@fontsource/nanum-myeongjo/800.css";
+@import "@fontsource/gowun-batang/400.css";
+@import "@fontsource/gowun-batang/700.css";
+@import "@fontsource/noto-serif-kr/400.css";
+@import "@fontsource/noto-serif-kr/700.css";
+@import "@fontsource/noto-serif-kr/900.css";
+@import "@fontsource/nanum-pen-script/400.css";
+
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --color-paper: #f6f4ef;
+  --color-paper-2: #efece5;
+  --color-card: #ffffff;
+  --color-ink: #1a1a19;
+  --color-ink-2: #4a4843;
+  --color-ink-3: #8a867d;
+  --color-line: #e3dfd6;
+  --color-line-2: #d3cec3;
+  --color-accent: #e5532d;
+  --color-accent-ink: #b8401f;
+  --color-accent-soft: #fbe9e3;
+  --color-naver: #03c75a;
+  --color-ok: #1f8a4c;
+  --color-warn: #b7791f;
+  --color-danger: #c2410c;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+.checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #ece9e2 25%, transparent 25%),
+    linear-gradient(-45deg, #ece9e2 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ece9e2 75%),
+    linear-gradient(-45deg, transparent 75%, #ece9e2 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--color-line-2);
+  border-radius: 8px;
+}
