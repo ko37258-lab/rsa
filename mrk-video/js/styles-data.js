@@ -1,5 +1,11 @@
-// 쇼츠 스타일 데이터 — "잘 나가는 쇼츠 형식" 30가지를 스타일 모델로 담아 둔 파일입니다.
+// 쇼츠 스타일 데이터 — "잘 나가는 쇼츠 형식" 34가지(기본 30 + 광고용 4)를 스타일 모델로 담아 둔 파일입니다.
 // 사용자가 만든 장면(사진+자막)에 어떤 스타일이든 입혀 렌더링하고, 갤러리·"전부 만들기"·사례 화면이 이 배열을 그대로 읽습니다.
+// 화면의 스타일 수는 index.html 의 data-style-count 자리표시가 STYLES.length 로 채우므로 숫자를 따로 적지 않습니다.
+// 광고용 추천 스타일은 ad: true 와 adFor(용도 id: listing 매물 · brand 브랜드/가맹 · course 강의 · consult 상담 · proof 후기/성과 · event 행사)를 가집니다.
+//   → 스타일 패널의 "광고용 추천" 필터와 따라하기 사례(js/cases-data.js)가 읽습니다. VISUAL_KEYS 밖이라 프로젝트에 입혀지지는 않습니다.
+// 광고 업그레이드 어휘(엔진 js/shorts-render.js): photoIn(사진 등장) · photoFit(가로 사진 smart) · deco(빛 스윕·레터박스·보케·액자) · titleAnim(제목 등장)
+//   · extras(겹쳐 그리는 2차 장식: lower3 로워서드·stamp 도장·ribbon 리본) · fx:'ad'(기존 장식의 미세 움직임) · transition 'flash'/'push'.
+//   장면 필드 stamp(도장 글)·labelA/labelB(vs 좌우 라벨)도 샘플에 넣을 수 있습니다. 엔딩 CTA 버튼(ending.cta)·상호(brand)는 스타일이 아니라 사례가 프로젝트에 싣습니다.
 // music 은 js/music.js 의 MOODS id(배경 음악 분위기) 하나입니다: upbeat news calm lofi corporate drama quiz warning epic playful.
 // 형식과 어휘(template·captionAnim·overlay·transition·titleMode 등)는 docs/STYLE-SPEC.md 를 따릅니다.
 // 스타일을 추가하려면 이 배열에 항목을 하나 넣으면 됩니다. (id 는 영문 소문자-하이픈으로 고유하게, 색은 hex, 샘플 이미지는 js/samples.js 의 SAMPLES 키)
@@ -144,14 +150,16 @@ export const STYLE_DATA = [
     hook: '"방금 발표됐습니다" — 시간 압박형 속보 선언',
     beats: ['훅: 방금 발표된 사실', '무엇이 바뀌나', '누가 영향받나', '지금 할 일', '채널 안내'],
     visual: {
-      aspect: '9:16', template: 'full', captionAnim: 'none', captionStyle: 'plain', overlay: 'news', transition: 'none', motion: 'in', titleMode: 'band',
+      aspect: '9:16', template: 'full', captionAnim: 'none', captionStyle: 'plain', overlay: 'news', transition: 'flash', motion: 'in', titleMode: 'band',
       bandColor: '#0a0a0a', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#e0232e',
       font: '900', captionSize: 58, showProgress: false,
+      // 광고 업그레이드(2026-11): 첫 장면 띠가 아래서 올라오고 '속보' 칩이 깜빡임(fx), 뉴스 하드컷 + 플래시(transition), 빨간 색판 푸시인(photoIn), 공지 도장(D-3·오늘 오픈). 띠가 곧 로워서드라 lower3 없음(연락처는 fx 가 띠에 넣음), 행사 가로 사진은 smart
+      photoIn: 'push', photoFit: 'smart', fx: 'ad', extras: ['stamp'],
     },
     sample: {
       title: '[속보] *그린벨트*\n해제 발표',
       scenes: [
-        { caption: '방금 발표됐습니다\n*그린벨트* 해제', img: 's01-land-zoning', kind: 'hook', duration: 2.6 },
+        { caption: '방금 발표됐습니다\n*그린벨트* 해제', img: 's01-land-zoning', kind: 'hook', duration: 2.6, stamp: '오늘 발표' },
         { caption: '풀리는 땅은 *어디*일까요', img: 's05-apartment', duration: 3 },
         { caption: '해당 땅은 *용도지역*이 바뀝니다', img: 's03-permit-site', duration: 3 },
         { caption: '지금 확인할 건 *토지이용계획*', img: 's06-consultant-desk', duration: 3 },
@@ -160,6 +168,7 @@ export const STYLE_DATA = [
     },
     music: 'news',
     prompt: '속보형: 첫 장면은 "방금 발표/확정"으로 시작, 바뀐 것·영향받는 사람·지금 할 일 순서로 뉴스 앵커 말투. 추측은 "예정·검토"로 표시.',
+    ad: true, adFor: ['event', 'course'], // 광고용 추천 — 오픈·모집·세미나 '속보' 공지(시의성)
   },
 
   {
@@ -397,6 +406,8 @@ export const STYLE_DATA = [
       aspect: '9:16', template: 'dark', captionAnim: 'words', captionStyle: 'plain', overlay: 'counter', transition: 'fade', motion: 'none', titleMode: 'hook',
       bandColor: '#0d0f14', panelColor: '#1a1d26', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#00e5a0',
       font: '900', captionSize: 56, showProgress: true,
+      // 광고 업그레이드(2026-11): 숫자가 멈추며 자리 잡고 밑줄(fx), 썸네일 푸시인(photoIn), 검은 배경에 민트 보케가 천천히 흐름(deco). 제목은 hook 모드라 titleAnim 없음
+      photoIn: 'push', fx: 'ad', deco: ['bokeh'],
     },
     sample: {
       title: '*맹지* 탈출하면\n땅값이 이렇게',
@@ -410,6 +421,7 @@ export const STYLE_DATA = [
     },
     music: 'epic',
     prompt: '숫자형: 장면마다 핵심 숫자 하나(금액·면적·기간)를 자막 앞쪽에 두고 counter{from,to,suffix}로 제공. 숫자는 예시임을 전제로 단순하게, 마지막은 채널 안내.',
+    ad: true, adFor: ['brand', 'proof'], // 광고용 추천 — 100여 곳·28년 같은 숫자 신뢰(숫자는 확인된 것만)
   },
 
   {
@@ -487,22 +499,25 @@ export const STYLE_DATA = [
     hook: '현장 선언 — "이 땅, 직접 가봤습니다"',
     beats: ['훅: 직접 가봤습니다 (위치 핀)', '관찰 1 (진입로)', '관찰 2 (경계)', '관찰 3 (주변)', '구독 유도'],
     visual: {
-      aspect: '9:16', template: 'full', captionAnim: 'words', captionStyle: 'outline', overlay: 'pin', transition: 'slide', motion: 'auto', titleMode: 'hook',
+      aspect: '9:16', template: 'full', captionAnim: 'words', captionStyle: 'outline', overlay: 'pin', transition: 'flash', motion: 'auto', titleMode: 'hook',
       bandColor: '#111111', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#22c55e',
       font: '800', captionSize: 62, showProgress: true,
+      // 광고 업그레이드(2026-11): 핀이 떨어져 튀고(fx), 사진 위 빛 스윕(deco)과 플래시 컷(transition)으로 답사 브이로그 리듬. 조건 도장 + 상호 바, 드론·대지 가로 사진은 smart
+      photoFit: 'smart', fx: 'ad', deco: ['sweep'], extras: ['stamp', 'lower3'],
     },
     sample: {
       title: '이 땅 *직접*\n가봤습니다',
       scenes: [
-        { caption: '이 땅, 직접 *가봤습니다*', img: 'h01-hero-land', kind: 'hook', duration: 2.6, label: '경기 양평' },
+        { caption: '이 땅, 직접 *가봤습니다*', img: 'h01-hero-land', kind: 'hook', duration: 2.6, label: '경기 양평', stamp: '현장 답사' },
         { caption: '입구부터 *도로* 폭이 좁습니다', img: 's02-landlocked', duration: 3, label: '진입로' },
-        { caption: '경계 말뚝으로 *면적* 확인', img: 's01-land-zoning', duration: 3, label: '경계' },
+        { caption: '경계 말뚝으로 *면적* 확인', img: 's01-land-zoning', duration: 3, label: '경계', stamp: '경계 확인' },
         { caption: '옆 땅 *개발허가* 흔적 발견', img: 's03-permit-site', duration: 3, label: '옆 필지' },
         { caption: '답사 포인트 더 보려면 *구독*', img: null, kind: 'cta', duration: 2.6, label: 'MR.K' },
       ],
     },
     music: 'playful',
     prompt: '답사형: 첫 장면은 "직접 가봤습니다"와 지역명(label), 이후 장면마다 현장에서 본 것 하나를 관찰 문장으로, label에 장소·지점명을 넣는다.',
+    ad: true, adFor: ['listing', 'consult'], // 광고용 추천 — 위치 핀 + 현장감, 토지·대지 매물
   },
 
   {
@@ -582,19 +597,22 @@ export const STYLE_DATA = [
       aspect: '9:16', template: 'full', captionAnim: 'none', captionStyle: 'pill', overlay: 'price', transition: 'fade', motion: 'auto', titleMode: 'band',
       bandColor: '#1c1a17', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#1d1d1d', highlightColor: '#c9a227',
       font: '700', captionSize: 64, showProgress: false,
+      // 광고 업그레이드(2026-11): 금색 색판 뒤에서 사진이 밀려 들어오고(photoIn), 가격 태그가 톡 커지며(fx), 조건 도장 + 상호·연락처 바(extras). 가로 사진은 흐린 배경 위에 온전히(photoFit)
+      photoIn: 'push', photoFit: 'smart', fx: 'ad', extras: ['stamp', 'lower3'],
     },
     sample: {
       title: '*역세권* 신축 상가\n매물 소개',
       scenes: [
-        { caption: '이 가격에 이 *위치*?', img: 's04-city-commercial', kind: 'hook', duration: 2.6, tag: '3.2억' },
+        { caption: '이 가격에 이 *위치*?', img: 's04-city-commercial', kind: 'hook', duration: 2.6, tag: '3.2억', stamp: '신축' },
         { caption: '지하철역 도보 *5분*', img: 's04-city-commercial', duration: 3, tag: '역세권' },
         { caption: '전용 *12평*, 코너 자리', img: 'c04-listing-sub', duration: 3, tag: '코너' },
-        { caption: '월세 *150만원* 수익 가능', img: 'c03-listing-main', duration: 3, tag: '월 150' },
+        { caption: '월세 *150만원* 수익 가능', img: 'c03-listing-main', duration: 3, tag: '월 150', stamp: '즉시 입주' },
         { caption: '매물 문의는 *MR.K* 프로필', img: null, kind: 'cta', duration: 2.6, tag: '문의' },
       ],
     },
     music: 'lofi',
     prompt: '매물형: 장면마다 위치·교통·면적·용도지역·가격 중 하나만, tag에 가격·키워드를 짧게. 과장 표현(최고·무조건) 금지, 마지막은 문의 안내.',
+    ad: true, adFor: ['listing'], // 광고용 추천 — 가격 태그가 정체성, 매물 상자의 기본 짝
   },
 
   {
@@ -613,11 +631,13 @@ export const STYLE_DATA = [
       aspect: '9:16', template: 'card', captionAnim: 'pop', captionStyle: 'pill', overlay: 'dots', transition: 'zoom', motion: 'in', titleMode: 'band',
       bandColor: '#5b2bd9', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#1e1b4b', highlightColor: '#b4f03a',
       font: '900', captionSize: 66, showProgress: true,
+      // 광고 업그레이드(2026-11): 제목이 떠오르며 밑줄(titleAnim), 라임 색판 푸시인(photoIn), 현재 점이 커지는 진행(fx), 제안 도장(무료 상담) + 상호·연락처 바
+      photoIn: 'push', titleAnim: 'rise', fx: 'ad', extras: ['stamp', 'lower3'],
     },
     sample: {
       title: '땅 때문에\n*고민*이라면',
       scenes: [
-        { caption: '이런 고민 있으세요?\n*땅*이 안 팔려요', img: 's01-land-zoning', kind: 'hook', duration: 2.6 },
+        { caption: '이런 고민 있으세요?\n*땅*이 안 팔려요', img: 's01-land-zoning', kind: 'hook', duration: 2.6, stamp: '무료 상담' },
         { caption: '맹지라서, *허가*가 안 나서', img: 's02-landlocked', duration: 3 },
         { caption: '해결 방법은 분명히 *있습니다*', img: 's03-permit-site', duration: 3 },
         { caption: '28년 공법 전문가가 *직접* 봅니다', img: 's06-consultant-desk', duration: 3 },
@@ -626,6 +646,7 @@ export const STYLE_DATA = [
     },
     music: 'corporate',
     prompt: 'CTA형: 첫 장면은 "이런 고민 있으세요?" 공감 질문, 고민을 구체화한 뒤 해결 가능성과 전문가 근거를 짚고, 마지막 장면(kind: cta)은 상담·링크 안내 한 문장.',
+    ad: true, adFor: ['consult', 'brand', 'course', 'event'], // 광고용 추천 — 모든 광고의 CTA 마무리(합계 점수 1위)
   },
 
   // ───────── 21~30: 새 자막 모양(neon·shadow3d·marker·glass·tag·underline·gradient·bubble)과 등장(bounce·scale·slide·wave·flash)을 쓰는 형식 ─────────
@@ -646,20 +667,23 @@ export const STYLE_DATA = [
       aspect: '9:16', template: 'card', captionAnim: 'slide', captionStyle: 'shadow3d', overlay: 'vs', transition: 'wipe', motion: 'none', titleMode: 'band',
       bandColor: '#fff4e6', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#1f1a14', highlightColor: '#f97316', // 크림 배경 위 검은 글자 + 주황 3D 그림자
       font: '900', captionSize: 60, showProgress: true,
+      // 광고 업그레이드(2026-11): '후' 사진이 오른쪽에서 밀려 들어오고 전/후 라벨 칩(fx + 장면 labelA/labelB), 카드가 톡 튀어나오는 등장(photoIn), 빛 스윕(deco), 성과 도장. 크림 카드엔 바가 무거워 lower3 없음
+      photoIn: 'pop', fx: 'ad', deco: ['sweep'], extras: ['stamp'],
     },
     sample: {
       title: '맹지가 *건축 가능 땅*으로\n바뀌는 과정',
       scenes: [
-        { caption: '이 땅, *1년* 만에 이렇게 바뀌었습니다', img: 's02-landlocked', img2: 's03-permit-site', kind: 'hook', duration: 2.8 },
-        { caption: '전: 도로 없는 *맹지*, 매수자 0명', img: 's02-landlocked', img2: 's03-permit-site', duration: 3 },
-        { caption: '후: 진입로 확보 뒤 *허가* 완료', img: 's02-landlocked', img2: 's03-permit-site', duration: 3 },
+        { caption: '이 땅, *1년* 만에 이렇게 바뀌었습니다', img: 's02-landlocked', img2: 's03-permit-site', kind: 'hook', duration: 2.8, labelA: '전', labelB: '후' },
+        { caption: '전: 도로 없는 *맹지*, 매수자 0명', img: 's02-landlocked', img2: 's03-permit-site', duration: 3, labelA: '전', labelB: '후' },
+        { caption: '후: 진입로 확보 뒤 *허가* 완료', img: 's02-landlocked', img2: 's03-permit-site', duration: 3, labelA: '전', labelB: '후', stamp: '허가 완료' },
         { caption: '바꾼 건 *토지사용승낙서* 한 장', img: 's06-consultant-desk', duration: 3 },
-        { caption: '비용 3천만원, 땅값은 *3배*', img: 's01-land-zoning', img2: 'h01-hero-land', duration: 3 },
+        { caption: '비용 3천만원, 땅값은 *3배*', img: 's01-land-zoning', img2: 'h01-hero-land', duration: 3, labelA: '전', labelB: '후' },
         { caption: '내 땅도 바뀔지 *MR.K*에게 물어보세요', img: null, kind: 'cta', duration: 2.8 },
       ],
     },
     music: 'upbeat',
     prompt: '비포애프터형: 장면마다 img(전)·img2(후) 두 장을 짝지어 "전:"·"후:" 문장으로 대비, 이어서 무엇을 바꿨는지·비용과 결과를 한 줄씩. 수치는 예시임을 전제로, 마지막은 문의 안내.',
+    ad: true, adFor: ['proof', 'listing', 'consult'], // 광고용 추천 — 전/후 비교, 리모델링 매물·성과 증명
   },
 
   {
@@ -741,6 +765,8 @@ export const STYLE_DATA = [
       aspect: '9:16', template: 'split', captionAnim: 'scale', captionStyle: 'marker', overlay: 'counter', transition: 'slide', motion: 'in', titleMode: 'band',
       bandColor: '#0f172a', panelColor: '#eef2f7', textColor: '#ffffff', inkColor: '#1c1917', highlightColor: '#facc15', // 연회색 패널 위 노란 형광펜 띠 + 검은 글자
       font: '900', captionSize: 58, showProgress: true,
+      // 광고 업그레이드(2026-11): 숫자가 멈추며 자리 잡고 밑줄(fx), 검남색 색판 푸시인(photoIn), 사진 위 빛 스윕(deco), 결과 도장 + 상호 바. 상가 가로 사진은 smart
+      photoIn: 'push', photoFit: 'smart', fx: 'ad', deco: ['sweep'], extras: ['stamp', 'lower3'],
     },
     sample: {
       title: '경매 낙찰 *수익*\n계산해 보니',
@@ -749,12 +775,13 @@ export const STYLE_DATA = [
         { caption: '낙찰가 *2억 1천*만원', img: 's05-apartment', duration: 3, counter: { from: 0, to: 21000, suffix: '만원' } },
         { caption: '취득세·명도비 *1천 2백*만원', img: 's06-consultant-desk', duration: 3, counter: { from: 0, to: 1200, suffix: '만원' } },
         { caption: '시세는 *2억 8천*만원', img: 'c03-listing-main', duration: 3, counter: { from: 21000, to: 28000, suffix: '만원' } },
-        { caption: '남는 돈 *5천 8백*만원', img: null, duration: 3.2, counter: { from: 0, to: 5800, suffix: '만원' } },
+        { caption: '남는 돈 *5천 8백*만원', img: null, duration: 3.2, counter: { from: 0, to: 5800, suffix: '만원' }, stamp: '단순 계산' },
         { caption: '숫자로 보는 경매, *MR.K*', img: null, kind: 'cta', duration: 2.6 },
       ],
     },
     music: 'corporate',
     prompt: '계산형: 첫 장면은 "얼마 남았을까요?" 질문, 이어서 낙찰가·비용·시세·남는 돈 순서로 장면마다 숫자 하나를 자막 앞쪽에 두고 counter{from,to,suffix}로 제공. 숫자는 예시임을 전제로 단순하게, 세금·비용은 "대략"으로.',
+    ad: true, adFor: ['listing', 'consult', 'proof'], // 광고용 추천 — 숫자 카운트업 + 형광펜, 수익 계산 → 상담(수익 보장·확정 수익 표현 금지)
   },
 
   {
@@ -773,11 +800,13 @@ export const STYLE_DATA = [
       aspect: '9:16', template: 'full', captionAnim: 'slide', captionStyle: 'glass', overlay: 'steps', transition: 'slide', motion: 'auto', titleMode: 'band',
       bandColor: '#0f1b2d', panelColor: '#1e293b', textColor: '#ffffff', inkColor: '#0f172a', highlightColor: '#38bdf8',
       font: '800', captionSize: 60, showProgress: true,
+      // 광고 업그레이드(2026-11): 유리 패널 위를 지나는 빛(deco), STEP 점이 순서대로 채워짐(fx), 제목이 왼→오로 열리는 화면 녹화 인트로(titleAnim), 모집 도장 + 상호 바. AI 화면 캡처는 거의 가로라 photoFit smart 필수
+      photoFit: 'smart', titleAnim: 'mask', fx: 'ad', deco: ['sweep'], extras: ['stamp', 'lower3'],
     },
     sample: {
       title: '*토지이용계획*\nAI로 1분 분석',
       scenes: [
-        { caption: '토지이용계획, *AI*로 1분이면 읽습니다', img: 'h02-hero-studio', kind: 'hook', duration: 2.6 },
+        { caption: '토지이용계획, *AI*로 1분이면 읽습니다', img: 'h02-hero-studio', kind: 'hook', duration: 2.6, stamp: '1분 분석' },
         { caption: '1단계: 확인원 *사진*을 올립니다', img: 's06-consultant-desk', duration: 3 },
         { caption: '2단계: "이 땅에 *집* 지을 수 있어?"', img: 'h02-hero-studio', duration: 3 },
         { caption: '3단계: 용도지역·규제를 *한 줄*로 답함', img: 's01-land-zoning', duration: 3 },
@@ -787,6 +816,7 @@ export const STYLE_DATA = [
     },
     music: 'lofi',
     prompt: 'AI시연형: 첫 장면은 "AI로 N분" 시간 단축 선언, 이어서 "1단계:/2단계:/3단계:"로 화면에서 하는 행동을 한 문장씩(입력한 질문은 따옴표로), 마지막 전 장면에 반드시 "공식 자료로 재확인" 주의를 넣고 저장 유도.',
+    ad: true, adFor: ['course', 'brand'], // 광고용 추천 — 부동산 AI 과정 시연 + 프리미엄 톤
   },
 
   {
@@ -837,11 +867,13 @@ export const STYLE_DATA = [
       aspect: '9:16', template: 'blur', captionAnim: 'slide', captionStyle: 'gradient', overlay: 'quote', transition: 'fade', motion: 'out', titleMode: 'none',
       bandColor: '#1a1410', panelColor: '#2a211a', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#e8b04b',
       font: '800', captionSize: 64, showProgress: true,
+      // 광고 업그레이드(2026-11): 흐린 배경 위 사진이 원형으로 열리고(photoIn), 따옴표 팝 + 금색 밑줄(fx), 금색 보케(deco), '실제 사례' 도장. 제목 없음 + 오른쪽 아래 서명과 겹쳐 lower3 없음, blur 는 이미 contain 이라 photoFit 없음
+      photoIn: 'iris', fx: 'ad', deco: ['bokeh'], extras: ['stamp'],
     },
     sample: {
       title: '*유치권* 사건,\n실제 있었던 일',
       scenes: [
-        { caption: '실제 있었던 *경매* 사건입니다', img: 's05-apartment', kind: 'hook', duration: 2.6 },
+        { caption: '실제 있었던 *경매* 사건입니다', img: 's05-apartment', kind: 'hook', duration: 2.6, stamp: '실제 사례' },
         { caption: '시세 반값 아파트에 *단독* 입찰', img: 's05-apartment', duration: 3 },
         { caption: '현장에 붙은 *유치권* 신고 안내문', img: 'c04-listing-sub', duration: 3 },
         { caption: '공사대금 *1억*을 떠안게 됐죠', img: 'c03-listing-main', duration: 3 },
@@ -851,6 +883,7 @@ export const STYLE_DATA = [
     },
     music: 'drama',
     prompt: '사례형: "실제 있었던 일입니다"로 시작해 상황→놓친 것→결과→교훈 순서로 3인칭 재구성. 인물·지역은 익명 처리, 금액은 대략으로, 마지막은 구독 유도.',
+    ad: true, adFor: ['proof'], // 광고용 추천 — 수강생·고객 사례를 고급스럽게
   },
 
   {
@@ -869,6 +902,8 @@ export const STYLE_DATA = [
       aspect: '9:16', template: 'split', captionAnim: 'bounce', captionStyle: 'tag', overlay: 'pin', transition: 'slide', motion: 'auto', titleMode: 'band',
       bandColor: '#14532d', panelColor: '#f0fdf4', textColor: '#ffffff', inkColor: '#052e16', highlightColor: '#16a34a', // 연두 패널 위 어두운 칩 + 초록 강조 칩
       font: '800', captionSize: 56, showProgress: true,
+      // 광고 업그레이드(2026-11): 방마다 문을 여는 듯 사진이 왼→오 리빌(photoIn), 흰 액자 선(deco), 핀 드롭(fx), 패널 안 상호·연락처 바. 실내 가로 사진은 smart
+      photoIn: 'reveal', photoFit: 'smart', fx: 'ad', deco: ['frame'], extras: ['lower3'],
     },
     sample: {
       title: '낙찰 전 *임장*\n이렇게 봅니다',
@@ -883,6 +918,7 @@ export const STYLE_DATA = [
     },
     music: 'playful',
     prompt: '투어형: 첫 장면은 "같이 가 봅시다"와 지역명(label), 이후 장면마다 현장 포인트 하나를 확인 행동 문장으로, label에 지점명을 넣는다. 마지막은 저장 유도.',
+    ad: true, adFor: ['listing'], // 광고용 추천 — 공간별 핀 + 단어 칩, 아파트·상가 룸투어
   },
 
   {
@@ -945,5 +981,143 @@ export const STYLE_DATA = [
     },
     music: 'epic',
     prompt: '동기부여형: 사진 없이 문장만. 첫 장면은 단정적인 한 문장(15자 이내), 이어서 뒤집는 문장·근거·행동을 한 줄씩, 마지막은 여운 있는 문장. 모든 장면 20자 이내, 강조 단어 1개.',
+  },
+  // ───────── 31~34: 광고용 새 스타일(2026-11) — 로워서드·도장·리본·플래시 컷. template×captionAnim×overlay 조합이 앞 30개와 겹치지 않음(장식 lower3·stamp·ribbon 이 새 것) ─────────
+
+  {
+    id: 'brand-lower3',
+    name: '브랜드형 — 로워서드 바',
+    tagline: '사진 꽉 채운 화면 왼쪽 아래 상호·연락처 바, 3D 그림자 자막이 커지며 등장',
+    ref: {
+      format: '중개사무소·가맹 브랜딩 숏츠',
+      why: '상호와 연락처가 처음부터 끝까지 보이면 영상이 끝나기 전에 전화를 건다',
+      search: '공인중개사 사무소 홍보 쇼츠',
+    },
+    platforms: ['instagram', 'youtube', 'facebook', 'threads'],
+    hook: '숫자 신뢰 선언 — "28년 공법 강의, 가맹점 100여 곳"',
+    beats: ['훅: 숫자로 신뢰', '무엇을 돕나', '어떻게 다른가', '가맹·방문 혜택', '연락처 CTA'],
+    visual: {
+      aspect: '9:16', template: 'full', captionAnim: 'scale', captionStyle: 'shadow3d', overlay: 'lower3', transition: 'flash', motion: 'in', titleMode: 'band',
+      bandColor: '#0c1222', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#0c1222', highlightColor: '#ff7a1a', // 남색 위 흰 글자 + 주황 3D 그림자·바
+      font: '900', captionSize: 66, showProgress: true,
+      // 로워서드(상호·연락처 = p.brand, 없으면 channel)가 주 장식, 조건 도장은 2차 장식. 주황 색판 푸시인 + 빛 스윕 + 제목 떠오르기, 가로 사진은 smart
+      photoIn: 'push', photoFit: 'smart', titleAnim: 'rise', fx: 'ad', deco: ['sweep'], extras: ['stamp'],
+    },
+    sample: {
+      title: '*미스터홈즈* 가맹점\n모집합니다',
+      scenes: [
+        { caption: '28년 공법 강의,\n가맹점 *100여 곳*', img: 'o01-office-front', kind: 'hook', duration: 2.8, stamp: '가맹 모집' },
+        { caption: '매물 영상·광고를 *AI*로 함께 만듭니다', img: 'h02-hero-studio', duration: 3 },
+        { caption: '토지·공법 상담은 *본사*가 뒷받침', img: 's06-consultant-desk', duration: 3 },
+        { caption: '교육과 시스템을 *개업 첫날*부터', img: 'e01-seminar', duration: 3, stamp: '교육 지원' },
+        { caption: '가맹 상담은 *프로필 연락처*로', img: 'r01-contract', kind: 'cta', duration: 2.8 },
+      ],
+    },
+    music: 'corporate',
+    prompt: '브랜드형: 첫 장면은 숫자(연차·점포 수·수강생 수)로 신뢰를 세우고, 무엇을 돕는지·어떻게 다른지·혜택을 한 장면씩, 마지막은 연락 방법. 과장(최고·유일·보장) 금지, 숫자는 확인된 것만. 조건 한 단어는 stamp 에.',
+    ad: true, adFor: ['brand', 'consult'],
+  },
+
+  {
+    id: 'listing-cine',
+    name: '매물 시네마형 — 플래시 컷',
+    tagline: '검은 레터박스 바 사이로 사진이 밀고 들어오고, 컷마다 플래시와 조건 도장',
+    ref: {
+      format: '룸투어 시네마틱 숏츠',
+      why: '플래시 컷 리듬이 사진 한 장을 한 컷처럼 보이게 해 사진만 넣어도 영상처럼 느껴진다',
+      search: '신축 아파트 룸투어 쇼츠',
+    },
+    platforms: ['instagram', 'tiktok', 'youtube'],
+    hook: '첫 컷에 핵심 조건 도장 — "신축 · 남향 · 즉시입주"',
+    beats: ['훅: 외관 + 조건 도장', '거실', '주방', '안방', '욕실', '문의 CTA'],
+    visual: {
+      aspect: '9:16', template: 'full', captionAnim: 'pop', captionStyle: 'plain', overlay: 'stamp', transition: 'flash', motion: 'auto', titleMode: 'hook',
+      bandColor: '#0a0a0a', panelColor: '#161616', textColor: '#ffffff', inkColor: '#111111', highlightColor: '#4f8cff', // 검정 레터박스 + 파란 도장·플래시
+      font: '800', captionSize: 72, showProgress: false,
+      // 도장(scene.stamp)이 주 장식, 상호·연락처 바는 2차. 레터박스 바 + 빛 스윕, 파란 색판 푸시인, 실내 가로 사진은 smart. 제목은 hook 모드(첫 1.2초 전체 화면)
+      photoIn: 'push', photoFit: 'smart', fx: 'ad', deco: ['bars', 'sweep'], extras: ['lower3'],
+    },
+    sample: {
+      title: '*신축* 아파트\n34평 남향',
+      scenes: [
+        { caption: '이 집, *3초*만 보세요', img: 'a01-apt-exterior', kind: 'hook', duration: 2.4, stamp: '신축' },
+        { caption: '거실 *남향* 통창', img: 'a02-apt-living', duration: 2.6, stamp: '남향' },
+        { caption: '*ㄷ자* 주방, 식탁 자리 넉넉', img: 'a03-apt-kitchen', duration: 2.6 },
+        { caption: '안방 *드레스룸* 별도', img: 'a04-apt-bedroom', duration: 2.6 },
+        { caption: '욕실 *2개*, 건식 세면대', img: 'a05-apt-bath', duration: 2.6, stamp: '올수리' },
+        { caption: '문의는 *설명란 연락처*로', img: null, kind: 'cta', duration: 2.6 },
+      ],
+    },
+    music: 'epic',
+    prompt: '매물 시네마형: 장면마다 공간 하나(외관·거실·주방·안방·욕실)와 장점 한 가지를 15자 안팎으로, stamp 에 조건 한 단어(신축·남향·올수리·즉시입주). 과장 금지, 마지막은 문의 안내.',
+    ad: true, adFor: ['listing'],
+  },
+
+  {
+    id: 'event-ribbon',
+    name: '행사안내형 — 리본 D-day',
+    tagline: '위 사진 오른쪽 위 대각선 리본에 D-day, 아래 연분홍 패널에 밑줄 자막으로 일정',
+    ref: {
+      format: '세미나·오픈·개강 안내 숏츠',
+      why: '화면에 계속 붙어 있는 D-day 리본이 "지금 신청"을 재촉한다',
+      search: '부동산 세미나 안내 쇼츠',
+    },
+    platforms: ['instagram', 'facebook', 'youtube', 'threads'],
+    hook: '날짜 선언 — "11월 20일, 딱 하루 엽니다"',
+    beats: ['훅: 날짜+행사명', '누구를 위한 자리', '무엇을 배우나', '장소·시간', '신청 방법 CTA'],
+    visual: {
+      aspect: '9:16', template: 'split', captionAnim: 'words', captionStyle: 'underline', overlay: 'ribbon', transition: 'slide', motion: 'in', titleMode: 'band',
+      bandColor: '#111827', panelColor: '#fff1f2', textColor: '#ffffff', inkColor: '#111827', highlightColor: '#e11d48', // 연분홍 패널 위 검남 글자 + 장미색 밑줄·리본
+      font: '800', captionSize: 60, showProgress: true,
+      // 리본(scene.tag — D-7·모집중·선착순)이 주 장식, 패널 안 상호·연락처 바는 2차. 사진 왼→오 리빌 + 흰 액자 선, 제목은 왼→오로 열림, 행사 가로 사진은 smart
+      photoIn: 'reveal', photoFit: 'smart', titleAnim: 'mask', fx: 'ad', deco: ['frame'], extras: ['lower3'],
+    },
+    sample: {
+      title: '부동산 AI *자동화 4기*\n설명회',
+      scenes: [
+        { caption: '11월 20일, *딱 하루* 엽니다', img: 'e01-seminar', kind: 'hook', duration: 2.6, tag: 'D-7' },
+        { caption: '매물 영상을 직접 만들고 싶은 *중개사*', img: 'o01-office-front', duration: 3, tag: 'D-7' },
+        { caption: '사진 넣고 1분이면 *쇼츠* 완성', img: 'h02-hero-studio', duration: 3, tag: '모집중' },
+        { caption: '저녁 7시, *줌* 온라인 진행', img: 's06-consultant-desk', duration: 3, tag: '온라인' },
+        { caption: '신청은 *프로필 링크*, 선착순 30명', img: null, kind: 'cta', duration: 2.8, tag: '선착순' },
+      ],
+    },
+    music: 'upbeat',
+    prompt: '행사안내형: 첫 장면은 날짜와 행사명, 이어서 대상·내용·장소와 시간·신청 방법을 한 장면씩, tag 에 D-day·모집중·선착순 같은 짧은 말. 확정되지 않은 날짜는 "예정"으로.',
+    ad: true, adFor: ['event', 'course'],
+  },
+
+  {
+    id: 'review-stamp',
+    name: '후기형 — 형광펜 도장',
+    tagline: '흐린 배경 위 사진, 타자기로 찍히는 후기 문장에 형광펜, 왼쪽 위 ‘실제 후기’ 도장',
+    ref: {
+      format: '고객·수강생 후기 숏츠',
+      why: '남이 한 말을 그대로 보여 주는 후기는 내가 하는 자랑보다 믿게 만든다',
+      search: '공인중개사 고객 후기 쇼츠',
+    },
+    platforms: ['instagram', 'facebook', 'youtube'],
+    hook: '후기 첫 문장 인용 — "계약 다음 날 영상이 올라왔어요"',
+    beats: ['훅: 후기 한 문장', '고객 상황', '우리가 한 일', '결과', '같은 고민이면 CTA'],
+    visual: {
+      aspect: '9:16', template: 'blur', captionAnim: 'type', captionStyle: 'marker', overlay: 'stamp', transition: 'fade', motion: 'in', titleMode: 'band',
+      bandColor: '#1c1917', panelColor: '#ffffff', textColor: '#ffffff', inkColor: '#1c1917', highlightColor: '#fbbf24', // 갈색 흐림 위 호박색 형광펜 띠 + 검은 글자
+      font: '800', captionSize: 60, showProgress: true,
+      // 도장(scene.stamp — 실제 후기·계약 완료)이 주 장식, 상호·연락처 바는 2차. 사진이 원형으로 열리고 호박색 보케, 제목 떠오르기. blur 는 이미 contain 이라 photoFit 없음
+      photoIn: 'iris', titleAnim: 'rise', fx: 'ad', deco: ['bokeh'], extras: ['lower3'],
+    },
+    sample: {
+      title: '고객 *후기*\n이렇게 남겨 주셨어요',
+      scenes: [
+        { caption: '"계약 다음 날 *영상*이 올라왔어요"', img: 'r01-contract', kind: 'hook', duration: 2.8, stamp: '실제 후기' },
+        { caption: '3개월 안 나가던 *빌라*였습니다', img: 'v01-villa-before', duration: 3 },
+        { caption: '사진 6장으로 *쇼츠* 3편을 만들었고', img: 'v02-villa-after', duration: 3 },
+        { caption: '2주 만에 *계약*으로 이어졌습니다', img: 'a02-apt-living', duration: 3, stamp: '계약 완료' },
+        { caption: '비슷한 고민이면 *연락* 주세요', img: null, kind: 'cta', duration: 2.8 },
+      ],
+    },
+    music: 'calm',
+    prompt: '후기형: 첫 장면은 따옴표로 감싼 후기 한 문장, 이어서 상황→한 일→결과를 짧게, 마지막은 연락 안내. 후기는 동의받은 것만, 이름은 익명, 수익·시세 약속 금지.',
+    ad: true, adFor: ['proof'],
   },
 ];
