@@ -16,11 +16,45 @@ interface Side {
   missing: string;
 }
 
+/** 지금 화면에 보이는 정리 글과, 그 글을 만든 엔진·지시·설정·걸린 시간 */
+export interface ShownResult {
+  engine: EngineId;
+  req: AiRequest;
+  text: string;
+  ms: number;
+  /** 결과를 바꾸는 엔진 설정(모델·생각 깊이) — engineSetup()으로 만듭니다 */
+  setup: string;
+}
+
+/** 같은 엔진이라도 모델·생각 깊이가 다르면 다른 글이 나오므로, 그 둘을 묶어 비교에 씁니다. */
+export function engineSetup(engine: EngineId, settings: Settings): string {
+  const model = engine === "gemini" ? settings.geminiModel : engine === "account" ? settings.accountTier : settings.model;
+  return `${engine}|${model}|${settings.effort}`;
+}
+
+/**
+ * 화면에 있는 글을 이 엔진의 비교 결과로 그대로 써도 되는지. 같은 엔진·같은 설정·같은 지시로
+ * 끝까지 만든 글이면 같은 요청을 또 보내지 않습니다 (긴 강의 녹음이면 출력이 수만 토큰입니다).
+ */
+export function reusableFor(
+  shown: ShownResult | null | undefined,
+  engine: EngineId | null,
+  req: AiRequest,
+  settings: Settings,
+): ShownResult | null {
+  if (!shown || !engine || shown.engine !== engine) return null;
+  if (shown.req.system !== req.system || shown.req.user !== req.user) return null;
+  return shown.setup === engineSetup(engine, settings) ? shown : null;
+}
+
 interface Props {
   req: AiRequest;
   settings: Settings;
   accountAvailable: boolean;
-  onAdopt: (text: string, engine: EngineId, brand: string) => void;
+  /** 지금 화면의 정리 글. 같은 엔진 쪽은 처음 열 때 이 글을 보여 주고 다시 보내지 않습니다 */
+  shown?: ShownResult | null;
+  /** 고른 쪽의 글과 그 글을 만든 엔진·지시·설정 */
+  onAdopt: (picked: ShownResult, brand: string) => void;
   onOpenSettings: () => void;
   onClose: () => void;
 }
@@ -54,13 +88,18 @@ function sidesFor(settings: Settings, accountAvailable: boolean): Side[] {
 }
 
 /** 같은 원문·같은 지시를 Claude와 Gemini에 동시에 보내 결과를 나란히 견줘 봅니다. */
-export function ComparePanel({ req, settings, accountAvailable, onAdopt, onOpenSettings, onClose }: Props) {
+export function ComparePanel({ req, settings, accountAvailable, shown, onAdopt, onOpenSettings, onClose }: Props) {
   const [round, setRound] = useState(0);
   // 비교를 연(또는 '다시 비교'를 누른) 순간의 설정으로 고정합니다. 그 사이 설정을 바꿔도 머리말과 결과가 어긋나지 않습니다.
   const [snap, setSnap] = useState(() => ({ sides: sidesFor(settings, accountAvailable), settings }));
   const sides = snap.sides;
+  // 처음 열 때 화면의 글을 그대로 쓰는 쪽. 그 글은 이미 '지금 쓰는 글'입니다.
+  const [reused] = useState(() => {
+    const side = snap.sides.find((s) => reusableFor(shown, s.engine, req, snap.settings));
+    return side ? { key: side.key, result: shown! } : null;
+  });
   const [times, setTimes] = useState<Partial<Record<SideKey, number>>>({});
-  const [adopted, setAdopted] = useState<SideKey | null>(null);
+  const [adopted, setAdopted] = useState<SideKey | null>(reused?.key ?? null);
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -116,12 +155,13 @@ export function ComparePanel({ req, settings, accountAvailable, onAdopt, onOpenS
             req={req}
             settings={snap.settings}
             round={round}
+            reuse={round === 0 && reused?.key === side.key ? reused.result : null}
             fastest={fastest === side.key}
             adopted={adopted === side.key}
             onDone={onDone}
-            onAdopt={(text) => {
+            onAdopt={(text, ms) => {
               setAdopted(side.key);
-              onAdopt(text, side.engine!, side.brand);
+              onAdopt({ engine: side.engine!, req, text, ms, setup: engineSetup(side.engine!, snap.settings) }, side.brand);
             }}
             onOpenSettings={onOpenSettings}
           />
@@ -137,14 +177,16 @@ interface ColumnProps {
   req: AiRequest;
   settings: Settings;
   round: number;
+  /** 화면의 글을 그대로 쓸 때 (같은 요청을 다시 보내지 않음) */
+  reuse: ShownResult | null;
   fastest: boolean;
   adopted: boolean;
   onDone: (key: SideKey, ms: number) => void;
-  onAdopt: (text: string) => void;
+  onAdopt: (text: string, ms: number) => void;
   onOpenSettings: () => void;
 }
 
-function CompareColumn({ side, order, req, settings, round, fastest, adopted, onDone, onAdopt, onOpenSettings }: ColumnProps) {
+function CompareColumn({ side, order, req, settings, round, reuse, fastest, adopted, onDone, onAdopt, onOpenSettings }: ColumnProps) {
   const ai = useAiRun();
   const startedRef = useRef(0);
   const [ms, setMs] = useState<number | null>(null);
@@ -153,8 +195,15 @@ function CompareColumn({ side, order, req, settings, round, fastest, adopted, on
   const [stopped, setStopped] = useState(false);
 
   // 처음 열 때와 '다시 비교'를 누를 때마다 새로 정리합니다 (저장된 답은 쓰지 않음).
+  // 단, 처음 열 때 화면의 글과 같은 엔진·같은 지시인 쪽은 그 글과 걸린 시간을 그대로 보여 줍니다.
   useEffect(() => {
     if (!side.engine) return;
+    if (reuse) {
+      ai.show(reuse.text);
+      setMs(reuse.ms);
+      onDone(side.key, reuse.ms);
+      return;
+    }
     let alive = true;
     startedRef.current = performance.now();
     setMs(null);
@@ -215,6 +264,7 @@ function CompareColumn({ side, order, req, settings, round, fastest, adopted, on
           )}
           {ai.status === "error" && ai.error && <p className="result__error">{ai.error}</p>}
           {stopped && !ai.busy && !ai.text && <p className="cmp__note">멈췄습니다. '다시 비교'를 누르면 새로 정리합니다.</p>}
+          {reuse && ai.text && <p className="cmp__note">위에 정리된 글을 그대로 가져왔습니다 (다시 보내지 않음).</p>}
           {ai.text && <div className="cmp__text">{ai.text}</div>}
 
           <footer className="cmp__foot">
@@ -230,7 +280,7 @@ function CompareColumn({ side, order, req, settings, round, fastest, adopted, on
             </dl>
             {done && (
               <div className="cmp__actions">
-                <button type="button" className="btn btn--primary" onClick={() => onAdopt(ai.text)} disabled={adopted}>
+                <button type="button" className="btn btn--primary" onClick={() => onAdopt(ai.text, ms ?? 0)} disabled={adopted}>
                   {adopted ? "쓰는 중" : "이 글 쓰기"}
                 </button>
                 <button

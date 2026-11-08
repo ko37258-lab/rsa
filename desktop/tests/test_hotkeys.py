@@ -121,6 +121,42 @@ def test_lost_key_up_does_not_eat_typing():
     assert r.handle(Ev("down", 57)) is True  # 한참 뒤 그냥 Space는 글자로 들어가야 합니다
 
 
+ESC = 1
+
+
+def make_escape_router(active):
+    now = {"t": 0.0}
+    r, state = make_router(clock=lambda: now["t"])
+    r.codes_of = lambda k: {**CODES, "esc": (ESC,)}[k]
+    r.add_escape(lambda: active["on"], lambda: state["log"].append("esc"))
+    return r, state, now
+
+
+def test_escape_is_taken_only_while_recording_or_working():
+    """녹음·정리 중이 아닐 때의 Esc는 쓰던 창(엑셀 셀 편집·채팅 창)으로 그대로 보냅니다."""
+    active = {"on": False}
+    r, state, now = make_escape_router(active)
+    assert r.handle(Ev("down", ESC)) is True and r.handle(Ev("up", ESC)) is True
+    assert state["log"] == []
+    active["on"] = True
+    assert r.handle(Ev("down", ESC)) is False
+    active["on"] = False  # 취소해서 대기 상태가 되어도
+    assert r.handle(Ev("down", ESC)) is False  # 누르고 있는 동안의 반복 신호와
+    assert r.handle(Ev("up", ESC)) is False  # 뗌은 막습니다 (쓰던 창에 반쪽 Esc가 가지 않게)
+    assert state["log"] == ["esc"] and state["masks"] == 0
+    assert r.handle(Ev("down", ESC)) is True  # 다음 Esc는 다시 그대로
+
+
+def test_escape_with_alt_held_masks_the_menu_bar_and_lost_up_is_forgotten():
+    active = {"on": True}
+    r, state, now = make_escape_router(active)
+    state["mods"] = frozenset({"alt"})
+    assert r.handle(Ev("down", ESC)) is False and state["masks"] == 1
+    active["on"] = False
+    now["t"] = 5.0  # 뗌 신호를 놓친 채 한참 지남
+    assert r.handle(Ev("down", ESC)) is True
+
+
 def test_parse_combo():
     assert parse_combo("Ctrl+Shift+Space") == parse_combo("shift + ctrl + space")
     assert parse_combo("win+h") == parse_combo("windows+h") == parse_combo("h+windows")

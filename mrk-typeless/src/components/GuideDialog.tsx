@@ -136,10 +136,13 @@ export function GuideDialog({ open, onClose }: Props) {
                 <li>
                   <b>브라우저 음성인식</b> (무료): Chrome·Edge·Safari가 말하는 동안 바로 글자로 바꿉니다.
                 </li>
-                <li>
-                  <b>녹음 받아쓰기</b>: 다 말한 뒤 녹음을 Gemini·ElevenLabs·OpenAI로 보내 글자로 바꿉니다. 어사이드·웨일처럼 브라우저
-                  음성인식이 막힌 곳에서도 됩니다. 설정 → 음성 인식에서 고릅니다.
-                </li>
+                {/* 아티팩트에는 음성 인식 설정이 없어 녹음 받아쓰기를 쓸 수 없습니다. */}
+                {!__ARTIFACT__ && (
+                  <li>
+                    <b>녹음 받아쓰기</b>: 다 말한 뒤 녹음을 Gemini·ElevenLabs·OpenAI로 보내 글자로 바꿉니다. 어사이드·웨일처럼 브라우저
+                    음성인식이 막힌 곳에서도 됩니다. 설정 → 음성 인식에서 고릅니다.
+                  </li>
+                )}
               </ul>
             </div>
             {!__ARTIFACT__ && (
@@ -187,7 +190,7 @@ export function GuideDialog({ open, onClose }: Props) {
               <li className="gflow__step gflow__step--ai">
                 <span className="gflow__num">3</span>
                 <div>
-                  <p className="gflow__title">AI가 다듬기 (Claude 또는 Gemini)</p>
+                  <p className="gflow__title">{__ARTIFACT__ ? "AI가 다듬기 (Claude)" : "AI가 다듬기 (Claude 또는 Gemini)"}</p>
                   <ul className="gflow__list">
                     <li>뜻 없는 군더더기(음, 어, 그러니까)를 지웁니다</li>
                     <li>고쳐 말한 곳("목요일, 아 아니다 금요일")은 마지막 뜻만 남깁니다</li>
@@ -221,16 +224,29 @@ export function GuideDialog({ open, onClose }: Props) {
             <div className="gbox">
               <p className="gbox__title">어떤 AI가 정리하나요?</p>
               <ul>
-                <li>
-                  설정 → AI 정리 방식에서 고릅니다: <b>내 Claude 계정</b>(claude.ai에서 열었을 때), <b>Claude API 키</b>,{" "}
-                  <b>Gemini API 키</b>, <b>AI 없이</b>.
-                </li>
+                {/* 아티팩트에는 API 키 방식과 Claude·Gemini 비교가 없습니다. */}
+                {__ARTIFACT__ ? (
+                  <li>
+                    설정 → AI 정리 방식에서 고릅니다: <b>내 Claude 계정</b>(아티팩트 권한에서 Claude 사용을 허용), <b>AI 없이</b>.
+                  </li>
+                ) : (
+                  <li>
+                    설정 → AI 정리 방식에서 고릅니다: <b>내 Claude 계정</b>(claude.ai에서 열었을 때), <b>Claude API 키</b>,{" "}
+                    <b>Gemini API 키</b>, <b>AI 없이</b>.
+                  </li>
+                )}
                 <li>'AI 없이'는 군더더기와 반복만 지웁니다. 고쳐 말한 곳·목록·형식 바꾸기는 AI가 있어야 됩니다.</li>
-                <li>
-                  원문은 고른 AI 회사(Anthropic 또는 Google)로만 보냅니다. 단, <b>Claude·Gemini 비교</b>를 누르면 두 회사 모두로 보냅니다. 키와
-                  기록은 이 브라우저에만 저장합니다.
-                </li>
-                <li>Gemini 무료 등급에서는 보낸 내용이 Google 서비스 개선에 쓰일 수 있습니다. 민감한 내용은 유료 등급이나 Claude 키를 쓰세요.</li>
+                {__ARTIFACT__ ? (
+                  <li>원문은 로그인한 Claude 계정으로만 정리합니다. 기록은 이 브라우저에만 저장합니다.</li>
+                ) : (
+                  <>
+                    <li>
+                      원문은 고른 AI 회사(Anthropic 또는 Google)로만 보냅니다. 단, <b>Claude·Gemini 비교</b>를 누르면 두 회사 모두로 보냅니다.
+                      키와 기록은 이 브라우저에만 저장합니다.
+                    </li>
+                    <li>Gemini 무료 등급에서는 보낸 내용이 Google 서비스 개선에 쓰일 수 있습니다. 민감한 내용은 유료 등급이나 Claude 키를 쓰세요.</li>
+                  </>
+                )}
               </ul>
             </div>
             <p className="gsec__subtitle">글의 형식 {MODES.length}가지 (받아쓰기 탭 위쪽에서 고름)</p>
@@ -258,9 +274,11 @@ export function GuideDialog({ open, onClose }: Props) {
               <li>
                 <span className="gbtn">다시 정리</span>같은 원문을 AI가 새로 정리합니다
               </li>
-              <li>
-                <span className="gbtn">Claude·Gemini 비교</span>두 AI의 결과를 나란히 보고 마음에 드는 쪽을 고릅니다
-              </li>
+              {!__ARTIFACT__ && (
+                <li>
+                  <span className="gbtn">Claude·Gemini 비교</span>두 AI의 결과를 나란히 보고 마음에 드는 쪽을 고릅니다
+                </li>
+              )}
               <li>
                 <span className="gbtn">음성 편집으로 보내기</span>정리된 글을 말로 더 고칩니다
               </li>
@@ -286,7 +304,11 @@ export function GuideDialog({ open, onClose }: Props) {
               </div>
               <div>
                 <dt>설정</dt>
-                <dd>AI 정리 방식과 키, 말하는 언어, 음성 인식 방식, 나만의 문체, 이메일 서명을 정합니다.</dd>
+                <dd>
+                  {__ARTIFACT__
+                    ? "AI 정리 방식, 말하는 언어, 나만의 문체, 이메일 서명을 정합니다."
+                    : "AI 정리 방식과 키, 말하는 언어, 음성 인식 방식, 나만의 문체, 이메일 서명을 정합니다."}
+                </dd>
               </div>
             </dl>
           </section>

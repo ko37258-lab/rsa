@@ -51,7 +51,7 @@ def claude(monkeypatch):
         log.append(("client", {"timeout": timeout}))
         return types.SimpleNamespace(beta=types.SimpleNamespace(messages=FakeMessages(log)))
 
-    monkeypatch.setattr(llm.anthropic, "Anthropic", make_client)
+    monkeypatch.setattr("anthropic.Anthropic", make_client)  # llm은 Claude를 쓸 때만 anthropic을 불러옵니다
     return log
 
 

@@ -203,6 +203,35 @@ class HotkeyRouter:
     # 단축키가 아니라서 그대로 보낸 '누름' — 그 키의 반복 신호와 뗌도 그대로 보내야 Windows가 키를 눌린 채로 알지 않습니다.
     _passed: dict[int, float] = field(default_factory=dict)
     _codes: set[int] = field(default_factory=set)
+    # Esc: (스캔 코드, 지금 막을지, 누르면 할 일). 막은 Esc는 반복 신호와 뗌까지 막습니다 {스캔 코드: 마지막 신호 시각}.
+    _escape: tuple[frozenset[int], Callable[[], bool], Callable[[], None]] | None = None
+    _esc_eaten: dict[int, float] = field(default_factory=dict)
+
+    def add_escape(self, active: Callable[[], bool], on_press: Callable[[], None]) -> None:
+        """Esc는 active()일 때(녹음·정리 중)만 막고 on_press를 부릅니다. 그 밖에는 쓰던 창으로 그대로 보냅니다 —
+        그렇지 않으면 녹음을 버리려고 누른 Esc가 엑셀 셀 편집·채팅 창·웹 대화 상자까지 닫습니다."""
+        codes = frozenset((self.codes_of or scan_codes_of)("esc"))
+        self._escape = (codes, active, on_press)
+
+    def _handle_escape(self, event) -> bool | None:
+        """막으면 False, Esc 차례가 아니면 None (Ctrl+Esc 같은 단축키·보통 키로 계속 봅니다)."""
+        _codes, active, on_press = self._escape
+        code = event.scan_code
+        now = self.clock()
+        last = self._esc_eaten.get(code)
+        if event.event_type != "down":
+            return False if self._esc_eaten.pop(code, None) is not None else None
+        if last is not None and now - last <= STALE_SECONDS:
+            self._esc_eaten[code] = now  # 막은 Esc를 누르고 있는 동안의 반복 신호
+            return False
+        self._esc_eaten.pop(code, None)
+        if not active():
+            return None
+        self._esc_eaten[code] = now
+        if (self.held or held_modifiers)():
+            (self.mask or send_mask_key)()  # Alt만 눌렀다 뗀 것으로 보고 메뉴 막대가 열리지 않게
+        on_press()
+        return False
 
     def add(self, combo_text: str, on_press: Callable[[], None], on_release: Callable[[], None] | None = None) -> Combo:
         combo = parse_combo(combo_text)
@@ -222,6 +251,10 @@ class HotkeyRouter:
     def handle(self, event) -> bool:
         """True면 키를 그대로 보내고, False면 막습니다. 보조키·한/영·한자 키는 언제나 True입니다."""
         code = event.scan_code
+        if self._escape is not None and code in self._escape[0]:
+            taken = self._handle_escape(event)
+            if taken is not None:
+                return taken
         if code not in self._codes:
             return True
         down = event.event_type == "down"

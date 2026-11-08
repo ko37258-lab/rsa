@@ -10,7 +10,7 @@ import { Segmented } from "./components/Segmented";
 import { SettingsView } from "./components/SettingsView";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { DEFAULT_DICTIONARY, type Dictionary } from "./lib/dictionary";
-import { addToHistory, type HistoryItem } from "./lib/history";
+import { addToHistory, mergeHistory, type HistoryItem } from "./lib/history";
 import { inAppBrowser, openInChromeUrl } from "./lib/browser";
 import { copyText } from "./lib/clipboard";
 import { DOWNLOAD_PAGE_URL } from "./lib/desktop";
@@ -45,7 +45,8 @@ export function App() {
   const [inApp] = useState(() => (__ARTIFACT__ ? null : inAppBrowser()));
   const [inAppDismissed, setInAppDismissed] = useState(() => load<boolean>("inAppDismissed") === true);
   const [addressCopied, setAddressCopied] = useState(false);
-  const [tab, setTab] = usePersistentState<Tab>("tab", (s) => (s && TABS.some((t) => t.id === s) ? s : "dictate"));
+  // 보고 있는 메뉴는 탭마다 따로 둡니다 (다른 탭에서 메뉴를 바꿔도 이 탭은 그대로).
+  const [tab, setTab] = usePersistentState<Tab>("tab", (s) => (s && TABS.some((t) => t.id === s) ? s : "dictate"), undefined, false);
   const [firstVisit] = useState(() => load("history") === undefined && load("draft") === undefined);
   const [editSource, setEditSource] = useState("");
   const [accountAvailable, setAccountAvailable] = useState(false);
@@ -85,7 +86,16 @@ export function App() {
 
   const engine = resolveEngine(settings, accountAvailable, !__ARTIFACT__);
   const patchSettings = useCallback((patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch })), [setSettings]);
-  const saveItem = useCallback((item: HistoryItem) => setHistory((h) => addToHistory(h, item)), [setHistory]);
+  // 다른 탭이 방금 저장한 기록을 지우지 않도록, 저장된 기록과 id로 합친 뒤 새 기록을 넣습니다.
+  // replaceId: 받아쓰기 화면이 '이 기록을 바꾼다'고 알려 줄 때 씁니다 (addToHistory 참고).
+  const saveItem = useCallback(
+    (item: HistoryItem, replaceId?: string | null) =>
+      setHistory((h) => {
+        const stored = load<HistoryItem[]>("history");
+        return addToHistory(stored ? mergeHistory(stored, h) : h, item, replaceId);
+      }),
+    [setHistory],
+  );
   const sendToEdit = useCallback(
     (text: string) => {
       setEditSource(text);

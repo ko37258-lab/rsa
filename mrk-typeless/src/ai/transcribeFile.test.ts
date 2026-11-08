@@ -29,6 +29,12 @@ interface FakeOptions {
   queryReceived?: number;
   /** 파일 상태 확인(GET)이 처음 이만큼 503으로 실패 */
   pollFailures?: number;
+  /** countTokens가 돌려줄 토큰 수 (없으면 500) */
+  totalTokens?: number;
+  /** 올린 영상에 Gemini가 적어 줄 길이 (예: "3600s") */
+  videoDuration?: string;
+  /** 이 시각부터 시작하는 구간(구간 없이 한 번에면 "전체")에 돌려줄 답 */
+  replyFor?: Record<string, unknown>;
 }
 
 /** Gemini·ElevenLabs·OpenAI를 흉내 내는 가짜 fetch. 받은 요청을 calls에 남깁니다. */
@@ -66,7 +72,15 @@ function fakeServers(opts: FakeOptions = {}) {
       }
       return command === "upload, finalize" || command === "finalize"
         ? json(
-            { file: { name: "files/abc", uri: "https://g/files/abc", mimeType: "audio/m4a", state: opts.uploadState ?? "ACTIVE" } },
+            {
+              file: {
+                name: "files/abc",
+                uri: "https://g/files/abc",
+                mimeType: opts.videoDuration ? "video/mp4" : "audio/m4a",
+                state: opts.uploadState ?? "ACTIVE",
+                ...(opts.videoDuration ? { videoMetadata: { videoDuration: opts.videoDuration } } : {}),
+              },
+            },
             200,
             { "x-goog-upload-status": "final" },
           )
@@ -77,12 +91,16 @@ function fakeServers(opts: FakeOptions = {}) {
       return json({ name: "files/abc", uri: "https://g/files/abc", state: opts.pollState ?? "ACTIVE" });
     }
     if (url.endsWith("/v1beta/files/abc") && method === "DELETE") return json({});
+    if (url.includes(":countTokens"))
+      return opts.totalTokens ? json({ totalTokens: opts.totalTokens }) : json({ error: { code: 500, message: "busy" } }, 500);
     if (url.includes(":generateContent")) {
       const fail = failures.shift();
       if (fail) return json(fail.body ?? { error: { code: fail.status, message: "busy" } }, fail.status);
       const prompt = (body as { contents: { parts: { text?: string }[] }[] }).contents[0].parts[0].text ?? "";
       const range = prompt.match(/(\d\d+:\d\d)부터 (?:(\d\d+:\d\d)까지|녹음이 끝날 때까지)/);
       if (range && range[1] === opts.failFrom) return json({ error: { code: 400, message: "bad" } }, 400);
+      const reply = opts.replyFor?.[range ? range[1] : "전체"];
+      if (reply) return json(reply);
       return json({
         candidates: [
           {
@@ -100,6 +118,7 @@ function fakeServers(opts: FakeOptions = {}) {
 
 const deleted = (calls: Call[]) => calls.some((c) => c.method === "DELETE" && c.url.endsWith("/files/abc"));
 const generateCalls = (calls: Call[]) => calls.filter((c) => c.url.includes(":generateContent"));
+const countCalls = (calls: Call[]) => calls.filter((c) => c.url.includes(":countTokens"));
 
 const file = (bytes: number, name = "녹음.m4a", type = "audio/mp4") => new File([new Uint8Array(bytes)], name, { type });
 
@@ -173,7 +192,7 @@ describe("Gemini로 녹음 파일 받아쓰기", () => {
   it("큰 파일은 Files API로 8MB씩 올리고, 준비되면 받아쓴 뒤 파일을 지웁니다", async () => {
     const calls = fakeServers({ uploadState: "PROCESSING" });
     const progress: string[] = [];
-    const big = file(INLINE_MAX_BYTES + 3 * 1024 * 1024); // 17MB → 8 + 8 + 1
+    const big = file(17 * 1024 * 1024); // 17MB → 8 + 8 + 1
     const out = await transcribeFileWithGemini(big, {
       provider: "gemini",
       apiKey: "AIza-k",
@@ -263,7 +282,7 @@ describe("실패·멈추기에도 녹음을 남기지 않고, 받은 데까지�
   it("조각을 올리다 끊기면 서버가 받은 데부터 이어 올립니다", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const calls = fakeServers({ chunkFailAt: 8 * 1024 * 1024 });
-    const job = transcribeFileWithGemini(file(INLINE_MAX_BYTES + 3 * 1024 * 1024), { provider: "gemini", apiKey: "k", lang: "ko-KR" });
+    const job = transcribeFileWithGemini(file(17 * 1024 * 1024), { provider: "gemini", apiKey: "k", lang: "ko-KR" });
     await vi.advanceTimersByTimeAsync(5000);
     expect((await job).text).toBe("제미나이가 받아쓴 글");
     const chunks = calls.filter((c) => c.url === "https://upload.example/session-1");
@@ -278,7 +297,7 @@ describe("실패·멈추기에도 녹음을 남기지 않고, 받은 데까지�
 
   it("서버가 다 받았다는데 마무리가 안 됐으면 빈 finalize로 마무리합니다", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const size = INLINE_MAX_BYTES + 3 * 1024 * 1024;
+    const size = 17 * 1024 * 1024;
     const calls = fakeServers({ chunkFailAt: 16 * 1024 * 1024, queryReceived: size });
     const job = transcribeFileWithGemini(file(size), { provider: "gemini", apiKey: "k", lang: "ko-KR" });
     await vi.advanceTimersByTimeAsync(5000);
@@ -430,5 +449,99 @@ describe("고른 받아쓰기 서비스와 Gemini로 넘기기", () => {
     await expect(
       transcribeAudioFile(file(26 * 1024 * 1024), { provider: "openai", apiKey: "sk-o", lang: "ko-KR" }),
     ).rejects.toThrow(/25MB/);
+  });
+});
+
+describe("길이를 모르는 녹음은 올린 뒤 Gemini에 길이를 물어 나눕니다 (PC 프로그램과 같음)", () => {
+  it("녹음은 토큰 수 ÷ 25로 길이를 세고, 길면 20분씩 나눠 받아씁니다", async () => {
+    const calls = fakeServers({ totalTokens: 90000 }); // 3,600초
+    const out = await transcribeFileWithGemini(file(1000, "강의.aiff", "audio/aiff"), { provider: "gemini", apiKey: "k", lang: "ko-KR", durationSec: null });
+    expect(calls[0].url).toMatch(/\/upload\/v1beta\/files$/); // 작아도 바로 담지 않고 올립니다
+    expect(countCalls(calls)).toHaveLength(1);
+    const count = countCalls(calls)[0].body as { contents: { parts: { fileData?: { fileUri: string } }[] }[] };
+    expect(count.contents[0].parts[0].fileData?.fileUri).toBe("https://g/files/abc");
+    expect(generateCalls(calls)).toHaveLength(3);
+    expect(out).toEqual({ text: "구간 00:00~20:00\n\n구간 20:00~40:00\n\n구간 40:00~끝", missed: 0, stopped: undefined });
+  });
+
+  it("영상은 Gemini가 적어 준 길이(videoDuration)를 쓰고 토큰은 세지 않습니다", async () => {
+    const calls = fakeServers({ videoDuration: "2700s" });
+    await transcribeFileWithGemini(file(1000, "강의.avi", "video/avi"), { provider: "gemini", apiKey: "k", lang: "ko-KR" });
+    expect(countCalls(calls)).toHaveLength(0);
+    expect(generateCalls(calls)).toHaveLength(3);
+  });
+
+  it("길이를 끝내 모르면 한 번에 받아씁니다", async () => {
+    const calls = fakeServers(); // countTokens 실패
+    const out = await transcribeFileWithGemini(file(1000), { provider: "gemini", apiKey: "k", lang: "ko-KR" });
+    expect(out.text).toBe("제미나이가 받아쓴 글");
+    expect(countCalls(calls)).toHaveLength(1);
+    expect(generateCalls(calls)).toHaveLength(1);
+  });
+
+  it("짧은 녹음도 길이를 알면 세지 않고, 4MB가 넘으면 올려서 받아씁니다 (올린 만큼 진행률이 보임)", async () => {
+    const calls = fakeServers();
+    await transcribeFileWithGemini(file(INLINE_MAX_BYTES + 1024), { provider: "gemini", apiKey: "k", lang: "ko-KR", durationSec: 300 });
+    expect(calls[0].url).toMatch(/\/upload\/v1beta\/files$/);
+    expect(countCalls(calls)).toHaveLength(0);
+    expect(INLINE_MAX_BYTES).toBeLessThanOrEqual(4 * 1024 * 1024);
+  });
+});
+
+describe("Gemini가 빈 답을 돌려주면 받아쓴 것으로 치지 않습니다", () => {
+  it("긴 강의 중 한 구간이 이유 없이 비면(OTHER) 표시를 남기고 빠진 구간으로 셉니다", async () => {
+    fakeServers({ replyFor: { "20:00": { candidates: [{ finishReason: "OTHER" }] } } });
+    const out = await transcribeFileWithGemini(file(2000), { provider: "gemini", apiKey: "k", lang: "ko-KR", durationSec: 60 * 60 });
+    expect(out.text).toBe("구간 00:00~20:00\n\n[20:00~40:00 구간은 받아쓰지 못했습니다]\n\n구간 40:00~끝");
+    expect(out.missed).toBe(1);
+  });
+
+  it("짧은 녹음에서 후보가 없으면 '말소리가 없다'가 아니라 다시 하라고 알립니다", async () => {
+    fakeServers({ replyFor: { 전체: {} } });
+    const job = transcribeFileWithGemini(file(1000), { provider: "gemini", apiKey: "k", lang: "ko-KR", durationSec: 60 });
+    await expect(job).rejects.toMatchObject({ kind: "busy", message: expect.stringContaining("돌려주지 않았습니다") });
+  });
+
+  it("말소리가 없어 빈 글로 끝난 답(STOP)은 그대로 받아들입니다", async () => {
+    fakeServers({ replyFor: { 전체: { candidates: [{ content: { parts: [] }, finishReason: "STOP" }] } } });
+    const out = await transcribeFileWithGemini(file(1000), { provider: "gemini", apiKey: "k", lang: "ko-KR", durationSec: 60 });
+    expect(out).toEqual({ text: "", missed: 0 });
+  });
+});
+
+describe("OpenAI가 받지 않는 파일은 보내지 않고 Gemini로 넘깁니다 (PC 프로그램과 같음)", () => {
+  const openaiCalls = (calls: Call[]) => calls.filter((c) => c.url.includes("api.openai.com"));
+
+  it.each(["opus", "aac", "mov", "m4v", "aiff", "aif"])(".%s 파일은 Gemini로 받아씁니다", async (ext) => {
+    const calls = fakeServers();
+    const out = await transcribeAudioFile(file(1000, `녹음.${ext}`, ""), { provider: "openai", apiKey: "sk-o", geminiKey: "AIza", lang: "ko-KR", durationSec: 60 });
+    expect(openaiCalls(calls)).toHaveLength(0);
+    expect(out.switchedFrom).toBe("openai");
+    expect(out.reason).toContain(`.${ext} 파일을 받지 않습니다`);
+    expect(out.switchForGood).toBe(false);
+  });
+
+  it("Gemini 키가 없으면 보내 보지 않고 이유를 알려 줍니다", async () => {
+    const calls = fakeServers();
+    await expect(
+      transcribeAudioFile(file(1000, "녹음.opus", "audio/ogg"), { provider: "openai", apiKey: "sk-o", lang: "ko-KR", durationSec: 60 }),
+    ).rejects.toThrow(/\.opus 파일을 받지 않습니다/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("길이를 모르는 녹음은 Gemini 키가 있으면 Gemini로, 없으면 OpenAI로 보냅니다", async () => {
+    let calls = fakeServers();
+    const out = await transcribeAudioFile(file(1000), { provider: "openai", apiKey: "sk-o", geminiKey: "AIza", lang: "ko-KR", durationSec: null });
+    expect(out.reason).toContain("길이를 알 수 없습니다");
+    expect(openaiCalls(calls)).toHaveLength(0);
+    calls = fakeServers();
+    expect((await transcribeAudioFile(file(1000), { provider: "openai", apiKey: "sk-o", lang: "ko-KR" })).text).toBe("오픈에이아이가 받아쓴 글");
+  });
+
+  it("받는 형식이고 길이도 짧으면 OpenAI로 받아씁니다", async () => {
+    const calls = fakeServers();
+    const out = await transcribeAudioFile(file(1000, "녹음.m4a"), { provider: "openai", apiKey: "sk-o", geminiKey: "AIza", lang: "ko-KR", durationSec: 120 });
+    expect(out).toEqual({ text: "오픈에이아이가 받아쓴 글" });
+    expect(openaiCalls(calls)).toHaveLength(1);
   });
 });

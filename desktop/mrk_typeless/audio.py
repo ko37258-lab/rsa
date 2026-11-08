@@ -34,6 +34,8 @@ class Recorder:
             rms = float(np.sqrt(np.mean(np.square(indata.astype(np.float32) / 32768.0))))
             self.level = min(1.0, rms * 8)
 
+        if self._stream is not None:
+            self.cancel()  # 앞의 마이크가 열린 채 남아 있으면 먼저 닫습니다 (두 곳에서 겹쳐 녹음되지 않게)
         self._frames = []
         stream = None
         try:

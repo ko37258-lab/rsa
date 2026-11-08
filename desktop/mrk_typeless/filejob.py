@@ -12,7 +12,7 @@ import threading
 
 from . import filestt, llm, mediainfo
 from .cleanup import local_cleanup, sanitize_dictation
-from .config import append_history, polish_engine, stt_key
+from .config import append_history, polish_engine, stt_key, stt_provider_for
 from .dictionary import apply_replacements
 from .modes import MODES, get_mode
 from .prompts import build_polish_prompt
@@ -213,7 +213,7 @@ class FileJob:
                 if len(filestt.plan_segments(self.duration)) > 1:
                     self._ui(cancel, "set_working", "받아쓸 준비를 하는 중…", None, HINT + " 20분씩 나눠 받아씁니다.")
             dictionary = self.app._dictionary()
-            provider = cfg.get("stt_provider") or "gemini"
+            provider = stt_provider_for(cfg)
             out = filestt.transcribe_file(
                 self.path,
                 provider,

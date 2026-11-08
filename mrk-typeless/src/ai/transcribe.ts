@@ -122,15 +122,64 @@ export function geminiMime(type: string): string {
   return base;
 }
 
+/** 잠깐 바쁜 것(408·429·5xx·연결 끊김)이면 이만큼 기다렸다가 한 번만 더 보냅니다. */
+const RETRY_DELAY_MS = 1500;
+
+/** 기다리는 중에도 멈추기를 누르면 바로 그만둡니다. */
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("받아쓰기를 멈췄습니다.", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * 받아쓰기 요청을 보냅니다. 서버가 잠깐 바쁘거나 연결이 끊기면 조금 기다렸다 한 번 더 보냅니다.
+ * 녹음은 다시 말할 수 없으니, 한 번 삐끗했다고 버리지 않습니다(2026-11). 본문은 처음 한 번만 만들어 그대로 다시 씁니다.
+ * fail은 실패 응답을 오류로 바꾸고, 다시 보내 볼 만한지(transient)도 알려 줍니다.
+ */
+async function sendWithRetry(
+  url: string,
+  init: RequestInit,
+  fail: (res: Response) => Promise<{ error: SttError; transient: boolean }>,
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (e) {
+      if ((e as DOMException)?.name === "AbortError") throw e;
+      if (attempt === 0) {
+        await wait(RETRY_DELAY_MS, init.signal ?? undefined);
+        continue;
+      }
+      throw new SttError("받아쓰기 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.");
+    }
+    if (res.ok) return res;
+    const { error, transient } = await fail(res);
+    if (!transient || attempt > 0) throw error;
+    await wait(RETRY_DELAY_MS, init.signal ?? undefined);
+  }
+}
+
 export async function transcribe(audio: Blob, filename: string, opts: TranscribeOptions): Promise<string> {
   if (opts.provider === "gemini") return transcribeWithGemini(audio, opts);
+  const provider = opts.provider;
   const language = opts.lang.split("-")[0];
   const form = new FormData();
   form.append("file", audio, filename);
 
   let url: string;
   let headers: Record<string, string>;
-  if (opts.provider === "elevenlabs") {
+  if (provider === "elevenlabs") {
     url = "https://api.elevenlabs.io/v1/speech-to-text";
     headers = { "xi-api-key": opts.apiKey.trim() };
     form.append("model_id", "scribe_v2");
@@ -144,27 +193,34 @@ export async function transcribe(audio: Blob, filename: string, opts: Transcribe
     form.append("response_format", "json");
   }
 
-  let res: Response;
-  try {
-    res = await fetch(url, { method: "POST", headers, body: form, signal: opts.signal });
-  } catch (e) {
-    if ((e as DOMException)?.name === "AbortError") throw e;
-    throw new SttError("받아쓰기 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.");
-  }
-
-  if (!res.ok) {
+  const res = await sendWithRetry(url, { method: "POST", headers, body: form, signal: opts.signal }, async (res) => {
     let body: unknown = null;
     try {
       body = await res.json();
     } catch {
       // 본문이 JSON이 아니면 상태 코드만으로 판단합니다.
     }
-    throw sttFailure(opts.provider, res.status, body);
-  }
+    const error = sttFailure(provider, res.status, body);
+    // 크레딧이 떨어진 429(insufficient_quota)는 다시 보내도 안 되므로 'busy'일 때만 다시 보냅니다.
+    return { error, transient: res.status === 408 || error.kind === "busy" };
+  });
 
   const data = (await res.json()) as { text?: unknown };
   return typeof data.text === "string" ? data.text.trim() : "";
 }
+
+/** 하루 한도(무료 등급의 …PerDay…)인지. 기다려도 오늘은 풀리지 않으므로 다시 보내지 않습니다. */
+async function isDailyQuota(res: Response): Promise<boolean> {
+  try {
+    const body = (await res.clone().json()) as { error?: { message?: string; details?: unknown[] } };
+    return /per ?day|daily/i.test(`${body.error?.message ?? ""} ${JSON.stringify(body.error?.details ?? [])}`);
+  } catch {
+    return false;
+  }
+}
+
+/** 마이크 녹음이 출력 한도에 걸려 잘렸을 때 받은 글 끝에 붙이는 표시 (파일 받아쓰기와 같은 모양) */
+export const MIC_CUT_MARK = "[뒷부분은 너무 길어 받아쓰지 못했습니다]";
 
 // Gemini는 받아쓰기 전용 주소가 없어, 녹음을 그대로 넣고 들리는 대로 적으라고 부탁합니다.
 async function transcribeWithGemini(audio: Blob, opts: TranscribeOptions): Promise<string> {
@@ -179,32 +235,39 @@ async function transcribeWithGemini(audio: Blob, opts: TranscribeOptions): Promi
     .filter(Boolean)
     .join("\n");
 
-  let res: Response;
-  try {
-    res = await fetch(`${GEMINI_BASE}/${GEMINI_STT_MODEL}:generateContent`, {
+  // 녹음을 base64로 바꾸는 일은 한 번만 합니다 (다시 보낼 때도 같은 본문).
+  const body = JSON.stringify({
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }, { inlineData: { mimeType: geminiMime(audio.type), data: await blobToBase64(audio) } }],
+      },
+    ],
+    // 생각 토큰도 이 한도에 들어가므로, 25~30분 말하면 8,192로는 모자랐습니다. 파일 받아쓰기와 같은 한도입니다.
+    generationConfig: { maxOutputTokens: 32768, thinkingConfig: { thinkingLevel: thinkingLevelFor(GEMINI_STT_MODEL, "low") } },
+  });
+  const res = await sendWithRetry(
+    `${GEMINI_BASE}/${GEMINI_STT_MODEL}:generateContent`,
+    {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": opts.apiKey.trim() },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType: geminiMime(audio.type), data: await blobToBase64(audio) } },
-            ],
-          },
-        ],
-        generationConfig: { maxOutputTokens: 8192, thinkingConfig: { thinkingLevel: thinkingLevelFor(GEMINI_STT_MODEL, "low") } },
-      }),
+      body,
       signal: opts.signal,
-    });
-  } catch (e) {
-    if ((e as DOMException)?.name === "AbortError") throw e;
-    throw new SttError("받아쓰기 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.");
-  }
-  if (!res.ok) throw new SttError(failureMessage(await readFailure(res), "받아쓰기"));
+    },
+    async (res) => {
+      const daily = res.status === 429 && (await isDailyQuota(res));
+      const f = await readFailure(res);
+      const kind = daily ? "quota" : f.status === 429 || f.status >= 500 ? "busy" : "other";
+      return { error: new SttError(failureMessage(f, "받아쓰기"), kind), transient: kind === "busy" || f.status === 408 };
+    },
+  );
   const data = (await res.json()) as GeminiResponse;
   if (isBlocked(data)) throw new SttError("Gemini가 이 녹음을 받아쓰지 않았습니다. 다시 말해 주세요.");
-  if (isTruncated(data)) throw new SttError("녹음이 너무 길어 끝까지 받아쓰지 못했습니다. 나눠서 말해 주세요.");
-  return textOf(data).trim();
+  const text = textOf(data).trim();
+  if (isTruncated(data)) {
+    // 잘린 받아쓰기도 버리지 않습니다. 받은 데까지 쓰고 어디가 빠졌는지 표시합니다 (녹음은 다시 말할 수 없으니).
+    if (!text) throw new SttError("녹음이 너무 길어 끝까지 받아쓰지 못했습니다. 나눠서 말해 주세요.");
+    return `${text}\n${MIC_CUT_MARK}`;
+  }
+  return text;
 }

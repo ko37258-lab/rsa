@@ -107,6 +107,10 @@ export function useDictation(
     problem: useRecord ? recorder.problem : speechProblem,
     error: recorder.error,
     notice: recorder.notice,
+    /** 녹음을 받아쓰지 못해 같은 녹음을 다시 보낼 수 있을 때 */
+    canRetry: recorder.canRetry,
+    retry: recorder.retry,
+    clearMessages: recorder.clearMessages,
     elapsedMs: recording || useRecord ? recorder.elapsedMs : speech.elapsedMs,
     pulse: speech.pulse + recorder.pulse,
     hasKey,

@@ -31,6 +31,8 @@ interface Props {
 /** Typeless의 "말로 고치기": 글을 붙여넣고, 고칠 내용을 말하면 그대로 고칩니다. */
 export function EditView({ settings, dictionary, engine, source, onSource, onSave, onSettings }: Props) {
   const [command, setCommand] = useState("");
+  // 결과 아래 '지시:'에는 지금 입력칸의 글이 아니라, 그 결과를 만든 지시를 보여 줍니다.
+  const [applied, setApplied] = useState("");
   const commandRef = useRef("");
   const ai = useAiRun();
 
@@ -60,6 +62,7 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
         targetLanguage: settings.targetLanguage,
         signature: settings.signature,
       });
+      setApplied(cmd);
       const result = await ai.run(engine, req, settings, true);
       if (!result) return;
       onSave({
@@ -126,6 +129,8 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
+                // 한글 조합 중의 Enter와, AI가 고치는 중에 다시 누른 Enter는 새 요청을 보내지 않습니다.
+                if (e.nativeEvent.isComposing || ai.busy) return;
                 void apply(command);
               }
             }}
@@ -182,7 +187,7 @@ export function EditView({ settings, dictionary, engine, source, onSource, onSav
             고칠 글을 이 결과로 바꾸기
           </button>
         }
-        meta={command ? <span>지시: {command}</span> : null}
+        meta={applied ? <span>지시: {applied}</span> : null}
       />
     </div>
   );

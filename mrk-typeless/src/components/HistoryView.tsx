@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useCountUp } from "../hooks/useCountUp";
 import { copyText } from "../lib/clipboard";
 import { formatWhen, type HistoryItem } from "../lib/history";
@@ -13,6 +13,21 @@ interface Props {
   active: boolean;
 }
 
+/** 접힌 카드에는 앞부분만 그립니다. 강의 원고처럼 긴 글을 통째로 넣으면 세 줄로 접어도 브라우저가 다 배치해 탭이 멈춥니다. */
+const PREVIEW_CHARS = 400;
+
+// 기록은 한 번 만들면 바뀌지 않으므로, 글자 수는 기록마다 한 번만 셉니다 (새 기록이 생길 때마다 전부 다시 세면 느립니다).
+const charCache = new WeakMap<HistoryItem, number>();
+
+function resultChars(h: HistoryItem): number {
+  let n = charCache.get(h);
+  if (n === undefined) {
+    n = countChars(h.result);
+    charCache.set(h, n);
+  }
+  return n;
+}
+
 /** 최근 7일, 날마다 정리한 글자 수 */
 function lastSevenDays(history: HistoryItem[]): { labels: string[]; values: number[] } {
   const labels: string[] = [];
@@ -25,13 +40,14 @@ function lastSevenDays(history: HistoryItem[]): { labels: string[]; values: numb
     values.push(
       history
         .filter((h) => h.kind === "dictation" && h.createdAt >= d.getTime() && h.createdAt < next)
-        .reduce((sum, h) => sum + countChars(h.result), 0),
+        .reduce((sum, h) => sum + resultChars(h), 0),
     );
   }
   return { labels, values };
 }
 
-export function HistoryView({ history, onChange, active }: Props) {
+// 설정·사전에서 글자를 칠 때마다 숨은 기록 목록까지 다시 그리지 않도록 memo로 감쌉니다.
+export const HistoryView = memo(function HistoryView({ history, onChange, active }: Props) {
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -43,7 +59,7 @@ export function HistoryView({ history, onChange, active }: Props) {
     const dictations = history.filter((h) => h.kind === "dictation");
     return {
       count: dictations.length,
-      chars: dictations.reduce((sum, h) => sum + countChars(h.result), 0),
+      chars: dictations.reduce((sum, h) => sum + resultChars(h), 0),
       saved: dictations.reduce((sum, h) => sum + h.savedMs, 0),
     };
   }, [history]);
@@ -116,7 +132,9 @@ export function HistoryView({ history, onChange, active }: Props) {
                 {h.savedMs > 0 && <span>{formatDuration(h.savedMs)} 절약</span>}
               </div>
               {h.command && <p className="entry__command">지시: {h.command}</p>}
-              <p className={`entry__text${openId === h.id ? " is-open" : ""}`}>{h.result}</p>
+              <p className={`entry__text${openId === h.id ? " is-open" : ""}`}>
+                {openId === h.id ? h.result : h.result.slice(0, PREVIEW_CHARS)}
+              </p>
               {openId === h.id && (
                 <div className="result__original">
                   <span className="label">{h.kind === "edit" ? "고치기 전 글" : "받아쓴 원문"}</span>
@@ -223,4 +241,4 @@ export function HistoryView({ history, onChange, active }: Props) {
       )}
     </div>
   );
-}
+});

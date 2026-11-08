@@ -138,8 +138,23 @@ export function failureMessage(f: GeminiFailure, what: "정리" | "받아쓰기"
   return `Gemini가 요청을 거절했습니다 (${f.status})${f.message ? `: ${f.message}` : ""}`;
 }
 
-/** 녹음 파일을 Gemini에 넣을 수 있게 base64로 바꿉니다. */
+/**
+ * 녹음 파일을 Gemini에 넣을 수 있게 base64로 바꿉니다.
+ * 브라우저의 FileReader로 바꿔야 화면이 멈추지 않습니다. 글자를 하나씩 이어 붙이면 14MB 녹음에서
+ * 폰 화면이 2~4초 멈춰 '멈추기'도 눌리지 않았습니다(2026-11). FileReader가 없는 곳(테스트)에서만 직접 바꿉니다.
+ */
 export async function blobToBase64(blob: Blob): Promise<string> {
+  if (typeof FileReader !== "undefined") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = String(reader.result);
+        resolve(url.slice(url.indexOf(",") + 1));
+      };
+      reader.onerror = () => reject(reader.error ?? new Error("녹음 파일을 읽지 못했습니다."));
+      reader.readAsDataURL(blob);
+    });
+  }
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = "";
   const CHUNK = 0x8000;

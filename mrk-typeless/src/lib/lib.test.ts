@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyReplacements, DEFAULT_DICTIONARY } from "./dictionary";
-import { addToHistory, type HistoryItem } from "./history";
+import { addToHistory, mergeHistory, type HistoryItem } from "./history";
 import { localCleanup } from "./localCleanup";
 import { sanitizeDictation } from "./sanitize";
 import { getMode } from "./modes";
@@ -136,6 +136,48 @@ describe("addToHistory", () => {
   it("다른 내용이거나 시간이 많이 지났으면 새 기록으로 쌓는다", () => {
     expect(addToHistory([item("가", 0)], item("나", 1_000))).toHaveLength(2);
     expect(addToHistory([item("가", 0)], item("가 나", 11 * 60_000))).toHaveLength(2);
+  });
+
+  it("replaceId가 null이면 첫머리가 같아도 앞 기록을 남긴다 ('지우기' 뒤 새로 말한 글)", () => {
+    const list = addToHistory([item("네 알겠습니다", 1_000)], item("네 알겠습니다 내일 세 시에 뵙겠습니다", 5_000), null);
+    expect(list.map((h) => h.raw)).toEqual(["네 알겠습니다 내일 세 시에 뵙겠습니다", "네 알겠습니다"]);
+  });
+
+  it("replaceId를 주면 그 기록만 바꾼다", () => {
+    const list = addToHistory([item("나", 2_000), item("가", 1_000)], item("다", 5_000), "가");
+    expect(list.map((h) => h.raw)).toEqual(["다", "나"]);
+  });
+});
+
+describe("mergeHistory", () => {
+  const item = (id: string, createdAt: number): HistoryItem => ({
+    id,
+    createdAt,
+    kind: "dictation",
+    mode: "clean",
+    raw: id,
+    result: id,
+    engine: "local",
+    savedMs: 0,
+  });
+
+  it("다른 탭이 저장한 기록과 이 탭에만 있는 기록을 id로 합쳐 최신순으로 둔다", () => {
+    const stored = [item("B탭", 3_000), item("공통", 1_000)];
+    const local = [item("A탭", 2_000), item("공통", 1_000)];
+    expect(mergeHistory(stored, local).map((h) => h.id)).toEqual(["B탭", "A탭", "공통"]);
+  });
+
+  it("이 탭에만 있는 기록이 없으면 저장된 기록을 그대로 쓴다", () => {
+    const stored = [item("가", 1_000)];
+    expect(mergeHistory(stored, [item("가", 1_000)])).toBe(stored);
+  });
+
+  it("두 탭이 거의 동시에 정리해도 둘 다 남는다", () => {
+    // 탭 B가 먼저 저장했고, 탭 A는 아직 그 사실을 모른 채 새 기록을 넣는 경우
+    const stored = addToHistory([], item("B탭 메시지", 1_000), null);
+    const local: HistoryItem[] = [];
+    const next = addToHistory(mergeHistory(stored, local), item("A탭 메시지", 1_500), null);
+    expect(next.map((h) => h.id)).toEqual(["A탭 메시지", "B탭 메시지"]);
   });
 });
 

@@ -6,16 +6,18 @@ interface Props {
   onChange: (next: Dictionary) => void;
 }
 
+/** 쉼표·줄바꿈으로 적은 용어 중 새로 넣을 것. 한 번에 같은 용어를 두 번 적어도 하나만 넣습니다. */
+export function newTerms(input: string, existing: string[]): string[] {
+  return [...new Set(input.split(/[,\n]/).map((w) => w.trim()))].filter((w) => w && !existing.includes(w));
+}
+
 /** 개인 사전: 정확히 써야 할 용어와, 음성인식이 자주 틀리는 말의 바꿔쓰기 규칙 */
 export function DictionaryView({ dictionary, onChange }: Props) {
   const [term, setTerm] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
 
   function addTerm() {
-    const words = term
-      .split(/[,\n]/)
-      .map((w) => w.trim())
-      .filter((w) => w && !dictionary.terms.includes(w));
+    const words = newTerms(term, dictionary.terms);
     if (words.length) onChange({ ...dictionary, terms: [...dictionary.terms, ...words] });
     setTerm("");
   }

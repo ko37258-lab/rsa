@@ -82,9 +82,18 @@ SPEECH_LANGS = [("ko", "한국어"), ("en", "영어"), ("ja", "일본어"), ("zh
 TARGET_LANGS = ["영어", "일본어", "중국어(간체)", "베트남어", "한국어"]
 
 
+def stt_provider_for(cfg: dict) -> str:
+    """이번에 받아쓸 서비스. ElevenLabs·OpenAI를 골랐어도 그 키가 비어 있고 Gemini 키가 있으면 Gemini로 받아씁니다
+    (웹앱 sttProviderFor와 같음 — 1.0에서 ElevenLabs가 기본값이던 설정도 Gemini 키 하나로 됩니다)."""
+    provider = cfg.get("stt_provider") or "gemini"
+    if provider != "gemini" and not (cfg.get("stt_api_key") or "").strip() and (cfg.get("gemini_api_key") or "").strip():
+        return "gemini"
+    return provider
+
+
 def stt_key(cfg: dict) -> str:
-    """받아쓰기에 쓸 키: Gemini를 고르면 정리용 Gemini 키를 같이 씁니다."""
-    key = cfg.get("gemini_api_key") if cfg.get("stt_provider") == "gemini" else cfg.get("stt_api_key")
+    """받아쓰기에 쓸 키: Gemini로 받아쓰면 정리용 Gemini 키를 같이 씁니다."""
+    key = cfg.get("gemini_api_key") if stt_provider_for(cfg) == "gemini" else cfg.get("stt_api_key")
     return (key or "").strip()
 
 

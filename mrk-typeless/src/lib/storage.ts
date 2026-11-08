@@ -1,7 +1,8 @@
 // 모든 데이터(설정·사전·기록)는 이 브라우저에만 저장합니다.
 // 사생활 보호 창이나 차단된 저장소에서는 읽기/쓰기가 실패할 수 있으므로 조용히 넘어갑니다.
 // 저장 공간이 가득 차면(긴 강의 원고가 쌓이면 5MB를 넘길 수 있음) 그 사실을 알려 화면에서 안내합니다.
-const PREFIX = "mrk-typeless:v1:";
+/** localStorage 키 앞에 붙는 말. 다른 탭의 저장을 알아챌 때(storage 이벤트)도 씁니다. */
+export const PREFIX = "mrk-typeless:v1:";
 
 let storageFull = false;
 const listeners = new Set<(full: boolean) => void>();

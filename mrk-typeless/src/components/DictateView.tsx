@@ -20,10 +20,11 @@ import {
 } from "../ai/transcribeFile";
 import { countChars, estimateSavedMs, formatClock, formatDuration } from "../lib/stats";
 import { load, save } from "../lib/storage";
+import { forFile } from "../lib/fileMessages";
 import { HandNote } from "./HandNote";
 import { KeyboardDictationTip } from "./KeyboardDictationTip";
 import { MicButton, Waveform } from "./MicButton";
-import { ComparePanel } from "./ComparePanel";
+import { ComparePanel, engineSetup, type ShownResult } from "./ComparePanel";
 import { ResultPanel } from "./ResultPanel";
 import { Segmented } from "./Segmented";
 import { StrikePreview } from "./StrikePreview";
@@ -55,7 +56,7 @@ interface Props {
   engine: EngineId;
   accountAvailable: boolean;
   firstVisit: boolean;
-  onSave: (item: HistoryItem) => void;
+  onSave: (item: HistoryItem, replaceId?: string | null) => void;
   onSendToEdit: (text: string) => void;
   onOpenSettings: () => void;
 }
@@ -98,7 +99,24 @@ export function DictateView({
   const ai = useAiRun();
   // 지금 보이는 정리 글을 만든 엔진 (비교에서 다른 쪽을 고르면 바뀝니다)
   const [resultEngine, setResultEngine] = useState<EngineId>(engine);
-  const [compare, setCompare] = useState<{ id: number; req: AiRequest } | null>(null);
+  // 지금 보이는 정리 글을 만든 형식. 정리한 뒤 형식 칩을 바꿔도 글은 그대로이므로 제목·기록은 이걸 씁니다.
+  const [resultMode, setResultMode] = useState<ModeId>(settings.mode);
+  // 비교는 연 순간의 형식으로 지시를 만듭니다. 고른 글도 그 형식으로 기록합니다.
+  const [compare, setCompare] = useState<{ id: number; req: AiRequest; mode: ModeId } | null>(null);
+  // 끝까지 정리된 지금 화면의 글. 비교를 열 때 같은 엔진 쪽은 이 글을 그대로 씁니다 (같은 요청을 또 보내지 않게).
+  // 이 화면에서 마지막으로 저장한 기록. 그 원문에 이어서 말해 다시 정리하면 그 기록을 바꾸고,
+  // '지우기'·새 녹음 파일처럼 새 글을 시작하면 따로 남깁니다 (예전처럼 첫머리만 보고 짐작하지 않음).
+  const lastSavedRef = useRef<{ id: string; raw: string; mode: string } | null>(null);
+  const saveDictation = (item: HistoryItem) => {
+    const last = lastSavedRef.current;
+    const replaceId = last && last.mode === item.mode && item.raw.startsWith(last.raw) ? last.id : null;
+    lastSavedRef.current = { id: item.id, raw: item.raw, mode: item.mode ?? "" };
+    onSave(item, replaceId);
+  };
+  const shownRef = useRef<ShownResult | null>(null);
+  // 녹음 파일 받아쓰기의 오류·알림 (정리·말하기를 새로 시작하면 지웁니다)
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
   const [swapKey, setSwapKey] = useState(0);
 
   const updateRaw = useCallback((next: string) => {
@@ -175,16 +193,24 @@ export function DictateView({
       setNote(null);
       setCopyNote(null);
       setLastSaved(null);
+      // 지난 녹음 파일·녹음 받아쓰기 오류가 새 결과 옆에 남지 않게 지웁니다.
+      // (Gemini로 넘겨 받아썼다는 알림은 방금 녹음의 것이라 남겨 둡니다.)
+      setFileError(null);
+      setFileNotice(null);
+      speech.clearMessages(false);
       setOriginal(source);
       setCompare(null);
+      shownRef.current = null;
       setResultEngine(engine);
       const mode = getMode(settings.mode);
+      setResultMode(mode.id);
       const { corrected, req } = requestFor(source);
 
       let result: string | null;
       if (engine === "local") {
         const { text, removed } = localCleanup(corrected);
-        await ai.simulate(text);
+        // 줄 긋기 동안 멈추기·Esc를 눌렀으면 기록·복사하지 않습니다.
+        if (!(await ai.simulate(text))) return;
         result = text;
         setNote(
           mode.id === "clean"
@@ -192,13 +218,17 @@ export function DictateView({
             : `AI가 꺼져 있어 '${mode.label}' 형식 대신 기본 정리만 했습니다. 설정에서 AI 정리를 켜 주세요.`,
         );
       } else {
+        const startedAt = performance.now();
         result = await ai.run(engine, req, settings, fresh);
+        // 멈춰서 일부만 쓴 글(null)은 비교에서 다시 쓰지 않습니다.
+        if (result)
+          shownRef.current = { engine, req, text: result, ms: performance.now() - startedAt, setup: engineSetup(engine, settings) };
       }
       if (!result) return;
 
       const savedMs = estimateSavedMs(result, source, spokenMs);
       setLastSaved(savedMs);
-      onSave({
+      saveDictation({
         id: newId(),
         createdAt: Date.now(),
         kind: "dictation",
@@ -219,7 +249,7 @@ export function DictateView({
         );
       }
     },
-    [ai, clearVoiceTimer, engine, leaveExample, onSave, requestFor, settings, updateRaw],
+    [ai, clearVoiceTimer, engine, leaveExample, onSave, requestFor, settings, speech.clearMessages, updateRaw],
   );
 
   const spokenRef = useRef<number | undefined>(undefined);
@@ -246,14 +276,16 @@ export function DictateView({
     durationSec: number | null;
     progress: FileProgress | null;
   } | null>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
-  const [fileNotice, setFileNotice] = useState<string | null>(null);
 
   const handleFile = useCallback(
     async (file: File) => {
       if (fileAbortRef.current || speech.listening || speech.transcribing || ai.busy) return;
       setFileError(null);
       setFileNotice(null);
+      speech.clearMessages();
+      // 기다리던 키보드 음성 입력 자동 정리가 받아쓰는 도중에 끼어들지 않게 취소합니다.
+      voiceTypedRef.current = false;
+      clearVoiceTimer();
       const provider = sttProviderFor(settings);
       const apiKey = sttKeyFor(settings).trim();
       if (!apiKey) {
@@ -308,6 +340,7 @@ export function DictateView({
         const keep = before !== "" && before !== originalRef.current.trim();
         if (keep) notes.push("원문 칸에 있던 글 뒤에 이어 붙였습니다.");
         setFileError(null);
+        if (!keep) lastSavedRef.current = null;
         updateRaw(keep ? `${before}\n\n${text}` : text);
         spokenRef.current = durationSec ? Math.round(durationSec * 1000) : undefined;
         fileAbortRef.current = null;
@@ -318,13 +351,24 @@ export function DictateView({
         setFileNotice(notes.join(" ") || null);
       } catch (e) {
         if (!ctl.signal.aborted)
-          setFileError(e instanceof SttError ? e.message : "녹음 파일을 받아쓰는 중 문제가 생겼습니다. 다시 올려 주세요.");
+          setFileError(e instanceof SttError ? forFile(e.message) : "녹음 파일을 받아쓰는 중 문제가 생겼습니다. 다시 올려 주세요.");
       } finally {
         if (fileAbortRef.current === ctl) fileAbortRef.current = null;
         setFileJob((j) => (fileAbortRef.current ? j : null));
       }
     },
-    [ai, dictionary.terms, leaveExample, onSettings, settings, speech.listening, speech.transcribing, updateRaw],
+    [
+      ai,
+      clearVoiceTimer,
+      dictionary.terms,
+      leaveExample,
+      onSettings,
+      settings,
+      speech.clearMessages,
+      speech.listening,
+      speech.transcribing,
+      updateRaw,
+    ],
   );
 
   const cancelFile = useCallback(() => {
@@ -385,18 +429,23 @@ export function DictateView({
 
   // 비교에서 고른 글로 바꾸고, 방금 기록도 그 글로 고칩니다 (같은 원문이면 기록이 덮어써집니다).
   const adopt = useCallback(
-    async (text: string, from: EngineId, brand: string) => {
+    async (picked: ShownResult, brand: string) => {
+      const { text, engine: from } = picked;
+      // 비교를 연 뒤 형식 칩을 바꿨어도, 이 글은 비교를 연 때의 형식으로 만든 글입니다.
+      const modeId = compare?.mode ?? settings.mode;
       ai.show(text);
+      shownRef.current = picked;
       setResultEngine(from);
+      setResultMode(modeId);
       setSwapKey((k) => k + 1);
       setNote(null);
       const savedMs = estimateSavedMs(text, original, spokenRef.current);
       setLastSaved(savedMs);
-      onSave({
+      saveDictation({
         id: newId(),
         createdAt: Date.now(),
         kind: "dictation",
-        mode: settings.mode,
+        mode: modeId,
         raw: original,
         result: text,
         engine: from,
@@ -406,7 +455,7 @@ export function DictateView({
       const ok = settings.autoCopy && (await copyText(text));
       setCopyNote(`${brand}가 정리한 글로 바꿨습니다.${ok ? " 클립보드에도 복사했습니다." : ""}`);
     },
-    [ai, onSave, original, settings.autoCopy, settings.mode],
+    [ai, compare?.mode, onSave, original, settings.autoCopy, settings.mode],
   );
 
   const [usedMic, setUsedMic] = useState(() => load<boolean>("usedMic") === true);
@@ -417,13 +466,28 @@ export function DictateView({
       save("usedMic", true);
     }
     ai.cancel();
+    // 말하는 도중 키보드 음성 입력 자동 정리가 끼어들어 정리·복사하지 않게 취소합니다 (마이크로 말한 것과 함께 정리됩니다).
+    voiceTypedRef.current = false;
+    clearVoiceTimer();
+    setFileError(null);
+    setFileNotice(null);
     if (leaveExample()) {
       updateRaw("");
       ai.show("");
     }
     rawAtStartRef.current = rawRef.current;
     speech.start();
-  }, [ai, leaveExample, speech, updateRaw, usedMic]);
+  }, [ai, clearVoiceTimer, leaveExample, speech, updateRaw, usedMic]);
+
+  // 받아쓰지 못한 지난 녹음을 다시 보냅니다. 받아쓰면 마이크로 말했을 때처럼 이어 붙이고 정리합니다.
+  const retryTranscribe = useCallback(async () => {
+    if (fileAbortRef.current || speech.listening || speech.transcribing) return;
+    const rawAtStart = rawRef.current;
+    const { spokenMs, heard, cancelled } = await speech.retry();
+    if (cancelled || !heard) return;
+    spokenRef.current = spokenMs;
+    if (settings.autoPolish && rawRef.current !== rawAtStart) await polish(false, spokenMs);
+  }, [polish, settings.autoPolish, speech]);
 
   // 단축키: Space 길게 누르기 = 말하기, Ctrl/⌘+Enter = 정리, Esc = 멈춤
   const latest = useRef({ active, startListening, stopAndPolish, polish, speech, ai, cancelFile });
@@ -469,7 +533,8 @@ export function DictateView({
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
-        if (!ai.busy) void polish(false, spokenRef.current);
+        // 말하는 중·받아쓰는 중에는 옛 원문을 정리하지 않습니다 (끝나면 자동 정리가 돕니다).
+        if (!ai.busy && !speech.listening && !speech.transcribing) void polish(false, spokenRef.current);
         return;
       }
       // 글 칸·버튼이 아니거나 마이크 버튼이면 Space는 말하기. (마우스로 누른 버튼은 press.ts가 포커스를 풀어 줍니다.)
@@ -507,6 +572,8 @@ export function DictateView({
         ? "키보드 음성 입력"
         : "누르고 말하기";
   const mode = getMode(settings.mode);
+  // 결과가 있으면 그 글을 만든 형식을, 없으면 지금 고른 형식을 제목에 씁니다.
+  const shownMode = ai.text || ai.busy ? getMode(resultMode) : mode;
   const resultChars = countChars(ai.text);
   const rawChars = countChars(original);
 
@@ -665,7 +732,13 @@ export function DictateView({
               >
                 지우기
               </button>
-              <button type="button" className="btn btn--primary" onClick={() => void polish(false, spokenRef.current)} disabled={!raw.trim() || ai.busy || !!fileJob}>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => void polish(false, spokenRef.current)}
+                // 말하는 중·받아쓰는 중에 누르면 옛 원문만 정리하고, 끝나면 또 정리해 한 번이 헛돕니다.
+                disabled={!raw.trim() || ai.busy || !!fileJob || speech.listening || speech.transcribing}
+              >
                 정리하기
                 <kbd>{MOD_KEY} ↵</kbd>
               </button>
@@ -703,7 +776,22 @@ export function DictateView({
           </ul>
         </aside>
       )}
-      {speech.error && <p className="notice">{speech.error}</p>}
+      {speech.error && (
+        <p className="notice">
+          {speech.error}{" "}
+          {/* 서버가 잠깐 바빴거나 키를 고친 뒤라면, 다시 말하지 않고 같은 녹음을 다시 보냅니다. */}
+          {speech.canRetry && (
+            <button
+              type="button"
+              className="link"
+              onClick={() => void retryTranscribe()}
+              disabled={speech.transcribing || speech.listening || !!fileJob}
+            >
+              {speech.transcribing ? "다시 받아쓰는 중…" : "다시 받아쓰기"}
+            </button>
+          )}
+        </p>
+      )}
       {fileError && (
         <p className="notice" role="alert">
           {fileError}{" "}
@@ -726,7 +814,7 @@ export function DictateView({
       )}
 
       <ResultPanel
-        title={`정리된 글 · ${mode.label}`}
+        title={`정리된 글 · ${shownMode.label}`}
         status={ai.status}
         text={ai.text}
         error={ai.error}
@@ -775,7 +863,10 @@ export function DictateView({
                 type="button"
                 className="btn btn--ghost btn--compare"
                 aria-expanded={!!compare}
-                onClick={() => setCompare({ id: Date.now(), req: requestFor(original).req })}
+                // 열려 있으면 닫습니다. 다시 돌리려면 비교 칸의 '다시 비교'를 누릅니다 (누를 때마다 두 곳에 또 보내지 않게).
+                onClick={() =>
+                  setCompare((c) => (c ? null : { id: Date.now(), req: requestFor(original).req, mode: settings.mode }))
+                }
               >
                 <span className="btn--compare__dots" aria-hidden="true">
                   <i />
@@ -796,8 +887,9 @@ export function DictateView({
           key={compare.id}
           req={compare.req}
           settings={settings}
+          shown={ai.status === "done" && shownRef.current?.text === ai.text ? shownRef.current : null}
           accountAvailable={accountAvailable}
-          onAdopt={(text, from, brand) => void adopt(text, from, brand)}
+          onAdopt={(picked, brand) => void adopt(picked, brand)}
           onOpenSettings={onOpenSettings}
           onClose={() => setCompare(null)}
         />

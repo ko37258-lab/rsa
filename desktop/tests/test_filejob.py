@@ -221,6 +221,12 @@ def test_long_claude_polish_gets_up_to_128k(env):
     assert env.seen["ai"][0]["max_tokens"] == 128000
 
 
+def test_empty_chosen_stt_key_uses_gemini_for_the_file(env):
+    """ElevenLabs를 골랐어도 그 키가 비어 있으면 저장된 Gemini 키로 받아씁니다 (웹앱과 같음)."""
+    run_job(FakeApp(stt_provider="elevenlabs", stt_api_key=""), env.path)
+    assert env.seen["stt"][0]["provider"] == "gemini" and env.seen["stt"][0]["key"] == "AIza"
+
+
 def test_switch_to_gemini_for_good_updates_settings_and_tells(env):
     env.seen["out"] = FileTranscript("받아쓴 글", switched_from="elevenlabs", reason="ElevenLabs 크레딧(잔액)이 다 떨어졌습니다", switch_for_good=True, missed=1)
     app = FakeApp(stt_provider="elevenlabs", stt_api_key="sk_e")

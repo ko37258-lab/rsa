@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { failureMessage, isBlocked, isTruncated, parseSse, streamFailure, textOf, thinkingLevelFor } from "./gemini";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { blobToBase64, failureMessage, isBlocked, isTruncated, parseSse, streamFailure, textOf, thinkingLevelFor } from "./gemini";
 import { geminiMime } from "./transcribe";
 
 const chunk = (text: string, extra: object = {}) => ({ candidates: [{ content: { parts: [{ text }] }, ...extra }] });
@@ -69,5 +69,38 @@ describe("geminiMime", () => {
     expect(geminiMime("audio/webm;codecs=opus")).toBe("audio/webm");
     expect(geminiMime("audio/mp4")).toBe("audio/m4a");
     expect(geminiMime("")).toBe("audio/webm");
+  });
+});
+
+describe("blobToBase64", () => {
+  const bytes = new Uint8Array(70000).map((_, i) => (i * 37) % 256);
+  const b64 = (b: Uint8Array) => btoa(Array.from(b, (c) => String.fromCharCode(c)).join(""));
+  const expected = b64(bytes);
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("브라우저에서는 FileReader로 바꿔 화면을 멈추지 않습니다", async () => {
+    let used = false;
+    class FakeReader {
+      result: string | null = null;
+      error: Error | null = null;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      readAsDataURL(blob: Blob) {
+        used = true;
+        void blob.arrayBuffer().then((b) => {
+          this.result = `data:${blob.type || "application/octet-stream"};base64,${b64(new Uint8Array(b))}`;
+          this.onload?.();
+        });
+      }
+    }
+    vi.stubGlobal("FileReader", FakeReader);
+    expect(await blobToBase64(new Blob([bytes], { type: "audio/webm;codecs=opus" }))).toBe(expected);
+    expect(used).toBe(true);
+  });
+
+  it("FileReader가 없으면 직접 바꿔도 같은 결과입니다", async () => {
+    expect(typeof FileReader).toBe("undefined");
+    expect(await blobToBase64(new Blob([bytes]))).toBe(expected);
   });
 });

@@ -13,8 +13,8 @@ from . import __version__, autostart, update
 from .audio import AudioError, Recorder
 from .cleanup import local_cleanup, sanitize_dictation
 from .config import (
-    DEFAULTS,
     APP_DIR,
+    DEFAULTS,
     DICTIONARY_PATH,
     LOG_PATH,
     append_history,
@@ -24,9 +24,10 @@ from .config import (
     same_hotkey,
     save_config,
     stt_key,
+    stt_provider_for,
 )
 from .dictionary import apply_replacements
-from .llm import LlmError, run_ai
+from .llm import LlmError, budget_for, run_ai
 from .modes import MODES, get_mode
 from .prompts import build_edit_prompt, build_polish_prompt
 from .stt import SttError, can_switch, transcribe
@@ -42,6 +43,10 @@ log = logging.getLogger("mrk_typeless")
 
 class UserFacingError(Exception):
     """화면에 그대로 보여 줄 안내."""
+
+
+class JobCancelled(Exception):
+    """Esc로 취소한 받아쓰기·정리. 늦게 온 결과는 붙여넣지 않고 버립니다."""
 
 
 class App:
@@ -69,6 +74,11 @@ class App:
         self.newer_version: str | None = None  # 켤 때 확인한 새 버전 (없으면 None)
         self.file_job = None  # 녹음 파일 받아쓰기 (filejob.FileJob, 한 번에 하나)
         self._picking_file = False
+        # 받아쓰기·정리 한 번마다 늘리는 번호. Esc로 버리거나 취소하면 또 늘려, 앞 작업이 늦게 끝나도 결과를 버립니다.
+        self._job = 0
+        self._mic_lock = threading.Lock()  # 마이크 열기·닫기를 한 번에 하나씩 (여는 중에 닫으면 열린 채 남음)
+        self._mic_job: int | None = None  # 지금 마이크가 열려 있는 녹음의 번호
+        self._recording_view = None  # 그리고 있는 '듣는 중' 표시 (purpose, hint, probe)
         self.tray = Tray(self)
 
     # ---------- 화면(tk) 스레드로 일 넘기기 ----------
@@ -100,11 +110,29 @@ class App:
         """무거운 일(마이크 열기·닫기, WAV 만들기)은 키보드 훅 밖의 스레드에서 합니다."""
         threading.Thread(target=fn, args=args, daemon=True).start()
 
+    def _show(self, job: int, fn, *args) -> None:
+        """작업 스레드에서 화면 표시를 넘깁니다. 그 사이 Esc로 취소했으면 화면 스레드에서 버립니다."""
+        self.post(self._for_job, job, fn, *args)
+
+    def _for_job(self, job: int, fn, *args) -> None:
+        if job == self._job:
+            fn(*args)
+
+    def _check(self, job: int) -> None:
+        if job != self._job:
+            raise JobCancelled
+
+    def _end_job(self, job: int) -> None:
+        """작업이 끝나면 대기 상태로. 이미 취소한(다음 녹음이 시작됐을 수 있는) 작업은 상태를 건드리지 않습니다."""
+        with self._lock:
+            if job == self._job:
+                self._set_state("idle", "대기 중")
+
     # ---------- 단축키 ----------
-    def register_hotkeys(self) -> None:
+    def register_hotkeys(self) -> list[str]:
         """단축키를 겁니다. keyboard.add_hotkey(suppress=True)는 쓰지 않습니다 — 그 방식은 보조키를 삼켰다가
         다시 보내면서 한/영 키(오른쪽 Alt와 같은 스캔 코드)를 Alt로 바꿔 한글 입력을 망가뜨렸습니다.
-        자세한 까닭은 hotkeys.py 머리말에 있습니다."""
+        자세한 까닭은 hotkeys.py 머리말에 있습니다. 기본값으로 바꿔 건 단축키 목록을 돌려줍니다."""
         import keyboard
 
         from .hotkeys import HotkeyError, HotkeyRouter
@@ -141,10 +169,11 @@ class App:
         # Ctrl+Alt+1~8: 글 형식 바로 바꾸기 (자동 정리·메시지·이메일·보고서·강의 원고·상담 노트·번역·중개매물 정리)
         for i, mode in enumerate(MODES[:9], start=1):
             add(f"ctrl+alt+{i}", f"ctrl+alt+{i}", lambda m=mode["id"]: self.post(self.set_mode, m))
+        # Esc: 녹음·정리 중에만 막고 취소합니다. 그 밖의 Esc는 쓰던 창으로 그대로 갑니다.
+        router.add_escape(lambda: self.state in ("recording", "working"), self._on_escape)
         # 새 단축키를 다 만든 뒤에야 예전 것을 풉니다 — 중간에 실패해도 단축키가 하나도 없는 때가 없게
         keyboard.unhook_all()
         keyboard.hook(router.handle, suppress=True)
-        keyboard.on_press_key("esc", lambda _e: self._on_escape())
         self.hotkeys = router
         if problems:
             self.post(self.overlay.show_error, "쓸 수 없는 단축키를 기본값으로 바꿔 걸었습니다: " + ", ".join(problems))
@@ -155,6 +184,7 @@ class App:
             self.cfg["hotkey_edit"],
             "켬" if self.cfg.get("win_h", True) else "끔",
         )
+        return problems
 
     def _on_record_hotkey(self, purpose: str, trigger: str | None = None) -> None:
         # 키를 누르고 있으면 같은 신호가 반복해서 들어오므로 첫 번째만 받습니다.
@@ -168,7 +198,7 @@ class App:
                     self._finish_recording()
                 return
             if self.state == "working":
-                self.post(self.overlay.show_error, "아직 앞의 글을 정리하고 있습니다. 잠시만 기다려 주세요.")
+                self.post(self.overlay.show_error, "아직 앞의 글을 정리하고 있습니다. 잠시만 기다리거나 Esc로 취소하세요.")
                 return
             self._begin_recording(purpose)
 
@@ -183,21 +213,32 @@ class App:
                 self._finish_recording()
 
     def _on_escape(self) -> None:
+        """녹음 중이면 녹음을 버리고, 받아쓰기·정리 중이면 취소합니다 (늦게 온 결과는 붙여넣지 않음)."""
         with self._lock:
-            if self.state != "recording":
+            was = self.state
+            if was not in ("recording", "working"):
                 return
+            job = self._job
+            self._job += 1
             self.purpose = None
             self._set_state("idle", "대기 중")
-        self._spawn(self.recorder.cancel)
-        self.post(self.overlay.show_info, "녹음을 버렸습니다.", "", 1.5)
+        if was == "recording":
+            self._spawn(self._cancel_mic, job)
+            self.post(self.overlay.show_info, "녹음을 버렸습니다.", "", 1.5)
+        else:
+            self.post(self.overlay.show_info, "취소했습니다", "", 1.5)
 
     def _on_polish_hotkey(self) -> None:
         with self._lock:
+            if self.state == "recording":
+                return  # 녹음 중에 안내를 띄우면 '듣는 중' 표시가 지워집니다
             if self.state != "idle":
                 self.post(self.overlay.show_error, "지금은 다른 작업 중입니다. 잠시 뒤 다시 눌러 주세요.")
                 return
             self._set_state("working", "정리하는 중")
-        threading.Thread(target=self._polish_selection, daemon=True).start()
+            self._job += 1
+            job = self._job
+        threading.Thread(target=self._polish_selection, args=(job,), daemon=True).start()
 
     # ---------- 녹음 ----------
     def _begin_recording(self, purpose: str) -> None:
@@ -212,76 +253,129 @@ class App:
         self.purpose = purpose
         self._pressed_at = time.monotonic()
         self._set_state("recording", "듣는 중")
-        self._spawn(self._start_recording, purpose)
+        self._job += 1
+        self._recording_view = None
+        self._spawn(self._start_recording, purpose, self._job)
 
-    def _start_recording(self, purpose: str) -> None:
-        try:
-            self.recorder.start()
-        except AudioError as e:
+    def _start_recording(self, purpose: str, job: int) -> None:
+        with self._mic_lock:
+            if job != self._job or self.state != "recording":
+                return  # 마이크를 열기도 전에 끝내거나 버렸습니다
+            try:
+                self.recorder.start()
+            except AudioError as e:
+                with self._lock:
+                    if self.state == "recording" and job == self._job:
+                        self.purpose = None
+                        self._set_state("idle", "대기 중")
+                self.post(self.overlay.show_error, str(e))
+                return
+            self._mic_job = job
             with self._lock:
-                if self.state == "recording" and self.purpose == purpose:
-                    self.purpose = None
-                    self._set_state("idle", "대기 중")
-            self.post(self.overlay.show_error, str(e))
+                still = self.state == "recording" and job == self._job
+            if not still:
+                # 마이크가 열리는 동안(블루투스 헤드셋은 몇 초) 다시 누르거나 Esc를 눌렀습니다 — 열린 마이크를 바로 닫습니다.
+                self.recorder.cancel()
+                self._mic_job = None
+                return
+            hint = "손을 떼거나 같은 키를 한 번 더 누르면 끝 · Esc 취소"
+            recorder = self.recorder
+            self._recording_view = (purpose, hint, lambda: (recorder.level, time.monotonic() - recorder.started_at))
+            self._show(job, self._show_recording)
+
+    def _recording_title(self, purpose: str) -> str:
+        return f"듣는 중 · {get_mode(self.cfg['mode'])['label']}" if purpose == "dictate" else "고칠 내용을 말하세요"
+
+    def _show_recording(self) -> None:
+        """(tk 스레드) '듣는 중' 표시를 지금 글 형식으로 (다시) 그립니다."""
+        if self.state != "recording" or self._recording_view is None:
             return
-        title = f"듣는 중 · {get_mode(self.cfg['mode'])['label']}" if purpose == "dictate" else "고칠 내용을 말하세요"
-        hint = "손을 떼거나 같은 키를 한 번 더 누르면 끝 · Esc 취소"
-        recorder = self.recorder
-        self.post(self.overlay.show_recording, title, hint, lambda: (recorder.level, time.monotonic() - recorder.started_at))
+        purpose, hint, probe = self._recording_view
+        self.overlay.show_recording(self._recording_title(purpose), hint, probe)
+
+    def _cancel_mic(self, job: int) -> None:
+        with self._mic_lock:
+            if self._mic_job == job:
+                self.recorder.cancel()
+                self._mic_job = None
 
     def _finish_recording(self) -> None:
         """(락 안에서) 상태만 바꾸고, 녹음 멈추기·WAV 만들기는 작업 스레드에서 합니다."""
         purpose = self.purpose
         self.purpose = None
         self._set_state("working", "받아쓰는 중")
-        self._spawn(self._stop_recording, purpose)
+        self._spawn(self._stop_recording, purpose, self._job)
 
-    def _stop_recording(self, purpose: str) -> None:
-        wav, seconds = self.recorder.stop()
+    def _stop_recording(self, purpose: str, job: int) -> None:
+        with self._mic_lock:
+            if self._mic_job == job:
+                wav, seconds = self.recorder.stop()
+                self._mic_job = None
+            else:
+                wav, seconds = b"", 0.0  # 마이크가 열리기 전에 끝냈습니다
         if not wav or seconds < MIN_SPEECH_SECONDS:
-            self._set_state("idle", "대기 중")
-            self.post(self.overlay.show_info, "너무 짧아요", "누른 채 말하거나, 짧게 눌렀다가 다 말한 뒤 한 번 더 누르세요", 2.5)
+            self._end_job(job)
+            self._show(job, self.overlay.show_info, "너무 짧아요", "누른 채 말하거나, 짧게 눌렀다가 다 말한 뒤 한 번 더 누르세요", 2.5)
             return
-        self._process_recording(purpose, wav, seconds)
+        self._process_recording(purpose, wav, seconds, job)
 
     # ---------- 처리 (작업 스레드) ----------
-    def _process_recording(self, purpose: str, wav: bytes, seconds: float) -> None:
+    def _process_recording(self, purpose: str, wav: bytes, seconds: float, job: int) -> None:
         cfg = self.cfg
+        previous = None
         try:
-            self.post(self.overlay.show_working, "받아쓰는 중…")
+            self._show(job, self.overlay.show_working, "받아쓰는 중…")
             dictionary = self._dictionary()
-            spoken = self._transcribe(wav, cfg, dictionary.get("terms", []))
+            spoken = self._transcribe(wav, cfg, dictionary.get("terms", []), job)
+            self._check(job)
             spoken = sanitize_dictation(spoken).strip()
             if not spoken:
                 raise UserFacingError("말소리를 알아듣지 못했습니다. 마이크에 조금 더 가까이 대고 말해 주세요.")
             if purpose == "edit":
                 selection, previous = self._selection()
-                self.post(self.overlay.show_working, f"고치는 중… ({spoken[:24]})")
+                self._check(job)
+                self._show(job, self.overlay.show_working, f"고치는 중… ({spoken[:24]})")
                 system, user = build_edit_prompt(selection, spoken, cfg, dictionary)
-                result = run_ai(system, user, cfg)
-                self._deliver(result, raw=selection, kind="edit", previous=previous, command=spoken, seconds=seconds)
+                result = run_ai(system, user, cfg, max_tokens=budget_for(user, cfg))
+                self._deliver(result, raw=selection, kind="edit", previous=previous, command=spoken, seconds=seconds, job=job)
             else:
                 try:
-                    result = self._polish(spoken, dictionary)
+                    result = self._polish(spoken, dictionary, job)
                 except LlmError as e:
+                    self._check(job)
                     # 정리에 실패해도 받아쓴 말은 잃지 않도록 원문을 클립보드에 둡니다.
-                    from .clipboard import set_text
+                    from .clipboard import copy_text
 
-                    set_text(spoken)
+                    copy_text(spoken)
                     raise UserFacingError(f"{e} · 받아쓴 원문은 클립보드에 복사해 두었습니다 (Ctrl+V)") from e
-                self._deliver(result, raw=spoken, kind="dictation", seconds=seconds)
+                self._deliver(result, raw=spoken, kind="dictation", seconds=seconds, job=job)
+        except JobCancelled:
+            self._give_back(previous)
         except (SttError, LlmError, UserFacingError) as e:
-            self.post(self.overlay.show_error, str(e))
+            self._give_back(previous)
+            self._show(job, self.overlay.show_error, str(e))
         except Exception:
             log.exception("받아쓰기 처리 실패")
-            self.post(self.overlay.show_error, "문제가 생겼습니다. 트레이 메뉴 → 기록 폴더 열기 → log.txt를 확인해 주세요.")
+            self._give_back(previous)
+            self._show(job, self.overlay.show_error, "문제가 생겼습니다. 트레이 메뉴 → 기록 폴더 열기 → log.txt를 확인해 주세요.")
         finally:
-            self._set_state("idle", "대기 중")
+            self._end_job(job)
 
-    def _transcribe(self, wav: bytes, cfg: dict, hints: list[str]) -> str:
+    def _give_back(self, previous) -> None:
+        """선택한 글을 복사하느라 바꾼 클립보드를 되돌립니다 (정리에 실패하거나 취소해 붙여넣지 않았을 때)."""
+        if previous is None or not self.cfg.get("restore_clipboard", True):
+            return
+        from .clipboard import restore
+
+        try:
+            restore(previous)
+        except Exception:
+            log.exception("클립보드 되돌리기 실패")
+
+    def _transcribe(self, wav: bytes, cfg: dict, hints: list[str], job: int) -> str:
         """받아씁니다. ElevenLabs·OpenAI가 크레딧·키·차단 문제로 거절하면 같은 녹음을 Gemini로 다시 받아쓰고,
         다음부터 Gemini를 쓰도록 설정을 바꿉니다 (웹앱 useRecorder와 같음)."""
-        provider = cfg["stt_provider"]
+        provider = stt_provider_for(cfg)
         try:
             return transcribe(wav, provider, stt_key(cfg), cfg["speech_lang"], hints=hints)
         except SttError as e:
@@ -289,7 +383,7 @@ class App:
             if provider == "gemini" or not gemini_key or not can_switch(e):
                 raise
             log.info("받아쓰기를 Gemini로 넘김: %s", e)
-            self.post(self.overlay.show_working, "Gemini로 다시 받아쓰는 중…")
+            self._show(job, self.overlay.show_working, "Gemini로 다시 받아쓰는 중…")
             try:
                 text = transcribe(wav, "gemini", gemini_key, cfg["speech_lang"], hints=hints)
             except SttError as e2:
@@ -309,18 +403,25 @@ class App:
             log.warning("사전 파일 오류: %s", problem)
         return dictionary
 
-    def _polish_selection(self) -> None:
+    def _polish_selection(self, job: int) -> None:
+        previous = None
         try:
             selection, previous = self._selection()
-            result = self._polish(selection, self._dictionary())
-            self._deliver(result, raw=selection, kind="polish", previous=previous)
+            self._check(job)
+            result = self._polish(selection, self._dictionary(), job)
+            self._deliver(result, raw=selection, kind="polish", previous=previous, job=job)
+        except JobCancelled:
+            self._give_back(previous)
         except (LlmError, UserFacingError) as e:
-            self.post(self.overlay.show_error, str(e))
+            # 실패하면 선택한 글이 아니라 원래 복사해 둔 것(주소·스크린샷)이 클립보드에 남게 되돌립니다.
+            self._give_back(previous)
+            self._show(job, self.overlay.show_error, str(e))
         except Exception:
             log.exception("선택한 글 정리 실패")
-            self.post(self.overlay.show_error, "문제가 생겼습니다. 트레이 메뉴 → 기록 폴더 열기 → log.txt를 확인해 주세요.")
+            self._give_back(previous)
+            self._show(job, self.overlay.show_error, "문제가 생겼습니다. 트레이 메뉴 → 기록 폴더 열기 → log.txt를 확인해 주세요.")
         finally:
-            self._set_state("idle", "대기 중")
+            self._end_job(job)
 
     def _selection(self):
         from .clipboard import copy_selection
@@ -331,25 +432,29 @@ class App:
             raise UserFacingError("먼저 글을 마우스로 선택(드래그)한 뒤 단축키를 눌러 주세요.")
         return text, previous
 
-    def _polish(self, text: str, dictionary: dict) -> str:
+    def _polish(self, text: str, dictionary: dict, job: int) -> str:
         text, _ = apply_replacements(sanitize_dictation(text), dictionary.get("replacements", []))
         engine = polish_engine(self.cfg)
         if engine == "local":
             cleaned, _ = local_cleanup(text)
             return cleaned
         who = "Gemini" if engine == "gemini" else "Claude"
-        self.post(self.overlay.show_working, f"{who}가 정리하는 중… ({get_mode(self.cfg['mode'])['label']})")
+        self._show(job, self.overlay.show_working, f"{who}가 정리하는 중… ({get_mode(self.cfg['mode'])['label']})")
         system, user = build_polish_prompt(text, self.cfg["mode"], self.cfg, dictionary)
-        return run_ai(system, user, self.cfg)
+        # 긴 글(선택한 강의 원고 등)도 끝까지 정리하도록 출력 한도를 길이에 맞춰 늘립니다 (웹앱 outputBudget과 같음).
+        return run_ai(system, user, self.cfg, max_tokens=budget_for(user, self.cfg))
 
-    def _deliver(self, result: str, raw: str, kind: str, previous=None, command: str = "", seconds: float = 0) -> None:
-        from .clipboard import paste_text, set_text
+    def _deliver(self, result: str, raw: str, kind: str, previous=None, command: str = "", seconds: float = 0, job: int | None = None) -> None:
+        from .clipboard import copy_text, paste_text
 
+        if job is not None:
+            self._check(job)  # Esc로 취소했으면 붙여넣지 않습니다
         if self.cfg.get("auto_paste", True):
+            # 원래 클립보드는 뒤에서 되돌리므로 Ctrl+V를 보내자마자 '붙여넣었습니다'와 대기 상태로 돌아갑니다.
             paste_text(result, restore_previous=bool(self.cfg.get("restore_clipboard", True)), previous=previous)
             done, sub = "붙여넣었습니다", ""
         else:
-            set_text(result)
+            copy_text(result)
             done, sub = "복사했습니다", "쓰던 곳에서 Ctrl+V로 붙여넣으세요"
         if polish_engine(self.cfg) == "local" and kind != "edit":
             sub = "AI 키가 없어 기본 정리만 했습니다 (설정에서 Gemini 키를 넣어 주세요)"
@@ -415,6 +520,10 @@ class App:
     def set_mode(self, mode_id: str) -> None:
         self.cfg["mode"] = mode_id
         save_config(self.cfg)
+        if self.state == "recording":
+            # 녹음 중에는 안내로 '듣는 중' 표시를 지우지 않고 새 글 형식으로 다시 그립니다 (끝내면 이 형식으로 정리).
+            self._show_recording()
+            return
         self.overlay.show_info(f"글 형식: {get_mode(mode_id)['label']}", seconds=1.5)
 
     def open_settings(self, first_run: bool = False) -> None:
@@ -439,7 +548,8 @@ class App:
             log.exception("단축키 등록 실패")
             self.overlay.show_error("단축키를 등록하지 못했습니다. 설정에서 다른 단축키로 바꿔 주세요.")
             return
-        self.overlay.show_done("설정을 저장했습니다", f"말하기: {self.speak_hint()}")
+        if self.state != "recording":  # 녹음 중이면 '듣는 중' 표시를 그대로 둡니다
+            self.overlay.show_done("설정을 저장했습니다", f"말하기: {self.speak_hint()}")
         # 처음 설정을 마치면 바로 쓰는 법을 보여 줍니다.
         if self._first_setup and stt_key(cfg):
             self._first_setup = False
@@ -510,6 +620,8 @@ class App:
         except Exception:
             log.exception("단축키 다시 걸기 실패")
         log.info("키보드 상태 풀기: %s", released)
+        if self.state == "recording":
+            return  # '듣는 중' 표시를 지우지 않습니다
         self.overlay.show_info(
             "키보드 상태를 풀었습니다",
             "MR.K는 한/영·한자 키를 건드리지 않습니다. 그래도 안 되면 트레이 메뉴 → 사용 방법을 보세요",
@@ -558,10 +670,14 @@ class App:
                 log.info("켤 때 눌린 채로 남은 보조키를 풀었습니다: %s", released)
         except Exception:
             log.exception("보조키 풀기 실패")
+        problems = []
         try:
-            self.register_hotkeys()
+            problems = self.register_hotkeys()
         except Exception:
             log.exception("단축키 등록 실패")
+        if polish_engine(self.cfg) == "claude":
+            # Claude로 정리하는 사람만, 첫 정리가 늦지 않게 Anthropic SDK를 미리 불러 둡니다.
+            threading.Thread(target=lambda: __import__("anthropic"), daemon=True).start()
         self.root.after(40, self._pump)
         # 새 버전 확인은 켜고 잠시 뒤 다른 스레드에서, 실패해도 조용히
         self.root.after(8000, lambda: threading.Thread(target=self.check_update, daemon=True).start())
@@ -569,7 +685,7 @@ class App:
         if first_run:
             self._first_setup = True
             self.root.after(300, lambda: self.open_settings(first_run=True))
-        else:
+        elif not problems:  # 단축키를 기본값으로 바꿔 걸었다는 안내가 '켜졌습니다'에 가려지지 않게
             self.root.after(
                 300,
                 lambda: self.overlay.show_info("MR.K Typeless가 켜졌습니다", f"{self.speak_hint()}를 누르고 말하세요"),

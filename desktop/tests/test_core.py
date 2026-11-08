@@ -226,6 +226,108 @@ def test_clipboard_snapshot_roundtrip_without_windows(monkeypatch):
     assert clipboard.Snapshot([], "").empty
 
 
+def _fake_clipboard(monkeypatch, delay=0.3):
+    from mrk_typeless import clipboard
+
+    store = {"text": "원래 글"}
+    monkeypatch.setattr(clipboard, "RESTORE_DELAY", delay)
+    monkeypatch.setattr(clipboard, "wait_modifiers_released", lambda: None)
+    monkeypatch.setattr(clipboard, "snapshot", lambda: clipboard.Snapshot([], store["text"]))
+    monkeypatch.setattr(clipboard, "restore", lambda snap: store.__setitem__("text", snap.text))
+    monkeypatch.setattr(clipboard, "get_text", lambda: store["text"])
+    monkeypatch.setattr(clipboard, "set_text", lambda t: store.__setitem__("text", t))
+    return clipboard, store
+
+
+def test_paste_returns_at_once_and_next_paste_waits_for_the_restore(monkeypatch):
+    """붙여넣기는 Ctrl+V를 보내자마자 돌아오고, 원래 클립보드는 뒤에서 되돌립니다.
+    그 사이 다음 붙여넣기가 오면 되돌리기가 끝난 뒤에 해서, 새 글이 옛 내용으로 덮이지 않습니다."""
+    import time
+
+    clipboard, store = _fake_clipboard(monkeypatch)
+    pasted = []
+    monkeypatch.setattr(clipboard.keyboard, "send", lambda keys: pasted.append(store["text"]))
+    started = time.monotonic()
+    clipboard.paste_text("첫 글")
+    assert time.monotonic() - started < 0.2 and pasted == ["첫 글"]
+    clipboard.paste_text("둘째 글")
+    assert time.monotonic() - started >= 0.3  # 앞의 되돌리기를 기다렸습니다
+    assert pasted == ["첫 글", "둘째 글"] and store["text"] == "둘째 글"
+    time.sleep(0.45)
+    assert store["text"] == "원래 글"  # 둘째 붙여넣기도 원래 글로 되돌림 (첫 글이 아니라)
+
+
+def test_restore_does_not_overwrite_what_the_user_copied_meanwhile(monkeypatch):
+    import time
+
+    clipboard, store = _fake_clipboard(monkeypatch, delay=0.15)
+    monkeypatch.setattr(clipboard.keyboard, "send", lambda keys: None)
+    clipboard.paste_text("정리된 글")
+    store["text"] = "사용자가 방금 복사한 글"
+    time.sleep(0.3)
+    assert store["text"] == "사용자가 방금 복사한 글"
+    clipboard.copy_text("받아쓴 원문")  # 잠금이 풀려 있어 바로 들어갑니다
+    assert store["text"] == "받아쓴 원문"
+
+
+def test_stt_falls_back_to_gemini_when_chosen_key_is_empty():
+    """ElevenLabs·OpenAI를 골랐는데 그 키가 비어 있으면 Gemini 키로 받아씁니다 (웹앱 sttProviderFor와 같음)."""
+    from mrk_typeless.config import stt_provider_for
+
+    cfg = {**DEFAULTS, "stt_provider": "elevenlabs", "stt_api_key": "", "gemini_api_key": "AIza-x"}
+    assert stt_provider_for(cfg) == "gemini" and stt_key(cfg) == "AIza-x"
+    assert stt_provider_for({**cfg, "stt_api_key": "sk_e"}) == "elevenlabs"
+    assert stt_key({**cfg, "gemini_api_key": ""}) == ""  # 둘 다 없으면 여전히 키 없음
+    assert stt_provider_for({**cfg, "stt_provider": "openai", "gemini_api_key": ""}) == "openai"
+
+
+def test_anthropic_sdk_is_loaded_only_when_claude_is_used():
+    """Anthropic SDK는 불러오는 데 1초 가까이 걸려, 켤 때가 아니라 Claude로 정리할 때 불러옵니다."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    code = (
+        "import sys, types\n"
+        "sys.modules.setdefault('tkinter', types.ModuleType('tkinter'))\n"
+        "import mrk_typeless.app\n"
+        "print('anthropic' in sys.modules)\n"
+    )
+    out = subprocess.run([sys.executable, "-c", code], cwd=Path(__file__).parent.parent, capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip() == "False"
+
+
+def test_recorder_start_closes_a_stream_left_open(monkeypatch):
+    """마이크가 열린 채 남아 있으면 새로 열기 전에 닫아, 두 곳에서 겹쳐 녹음되지 않게 합니다."""
+    import sys
+    import types
+
+    from mrk_typeless import audio
+
+    closed = []
+
+    class Stream:
+        def __init__(self, **k):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def close(self):
+            closed.append(self)
+
+    monkeypatch.setitem(sys.modules, "sounddevice", types.SimpleNamespace(InputStream=Stream))
+    r = audio.Recorder()
+    r.start()
+    first = r._stream
+    r.start()
+    assert closed == [first] and r._stream is not first
+
+
 def test_history_respects_toggle_cap_and_trims(tmp_path, monkeypatch):
     path = tmp_path / "history.jsonl"
     monkeypatch.setattr(config_module, "HISTORY_PATH", path)

@@ -29,7 +29,8 @@ export function MicButton({ listening, disabled, size = "large", pulse, label, o
       aria-label={label}
       data-pulse={pulse % 2}
       onPointerDown={(e) => {
-        if (e.button !== 0) return;
+        // Chromium은 꺼진(disabled) 버튼에도 pointerdown을 보냅니다. 받아쓰는 중에 누른 탭이 새 녹음을 켜지 않게 막습니다.
+        if (disabled || e.button !== 0) return;
         // 누른 채 손가락·마우스가 버튼 밖으로 나가도 뗄 때 신호를 받도록 붙잡아 둡니다.
         try {
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -60,7 +61,7 @@ export function MicButton({ listening, disabled, size = "large", pulse, label, o
         downAtRef.current = null;
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") {
+        if (e.key === "Enter" && !disabled) {
           e.preventDefault();
           if (listening) onToggle();
           else onPressStart();

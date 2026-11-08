@@ -5,6 +5,7 @@
 
 import logging
 import sys
+import threading
 import time
 
 import keyboard
@@ -15,6 +16,9 @@ log = logging.getLogger("mrk_typeless")
 _MODIFIERS = ("ctrl", "shift", "alt", "windows")
 # 붙여넣기를 보낸 뒤 상대 프로그램이 클립보드를 읽을 시간. 원격 데스크톱·무거운 프로그램은 느립니다.
 RESTORE_DELAY = 1.2
+# 붙여넣은 뒤 원래 클립보드로 되돌리기는 뒤에서 합니다. 되돌리기가 끝날 때까지 이 잠금을 쥐고 있어,
+# 다음 붙여넣기·선택한 글 복사가 그 사이에 끼어들어 새 글을 옛 내용으로 덮이지 않게 합니다.
+_pending = threading.Lock()
 
 
 def wait_modifiers_released(timeout: float = 2.0) -> None:
@@ -149,29 +153,60 @@ def restore(snap: Snapshot) -> None:
 def copy_selection() -> tuple[str, Snapshot]:
     """지금 창에서 선택한 글과, 그 전의 클립보드 내용을 돌려줍니다. 선택한 글이 없으면 빈 문자열."""
     wait_modifiers_released()
-    previous = snapshot()
-    set_text("")
-    keyboard.send("ctrl+c")
-    end = time.monotonic() + 0.8
-    text = ""
-    while time.monotonic() < end:
-        time.sleep(0.05)
-        text = get_text()
-        if text:
-            break
-    if not text:
-        restore(previous)
+    with _pending:  # 앞의 붙여넣기가 클립보드를 되돌리는 중이면 끝난 뒤에 떠 둡니다
+        previous = snapshot()
+        set_text("")
+        keyboard.send("ctrl+c")
+        end = time.monotonic() + 0.8
+        text = ""
+        while time.monotonic() < end:
+            time.sleep(0.05)
+            text = get_text()
+            if text:
+                break
+        if not text:
+            restore(previous)
     return text, previous
 
 
-def paste_text(text: str, restore_previous: bool = True, previous: Snapshot | None = None) -> None:
-    """글을 클립보드에 넣고 Ctrl+V로 붙여넣습니다. restore_previous면 잠시 뒤 원래 클립보드로 되돌립니다."""
-    wait_modifiers_released()
-    if restore_previous and previous is None:
-        previous = snapshot()
-    set_text(text)
-    time.sleep(0.05)
-    keyboard.send("ctrl+v")
-    if restore_previous and previous is not None and not previous.empty:
+def copy_text(text: str) -> None:
+    """글을 클립보드에 넣습니다. 앞의 붙여넣기가 되돌리는 중이면 끝난 뒤에 넣어, 옛 내용으로 덮이지 않게 합니다."""
+    with _pending:
+        set_text(text)
+
+
+def _same_text(a: str, b: str) -> bool:
+    return a.replace("\r\n", "\n") == b.replace("\r\n", "\n")
+
+
+def _restore_later(text: str, previous: Snapshot) -> None:
+    """(뒤에서) 상대 프로그램이 붙여넣을 시간을 준 뒤 원래 클립보드로 되돌리고 잠금을 풉니다."""
+    try:
         time.sleep(RESTORE_DELAY)
-        restore(previous)
+        # 그 사이 사용자가 직접 다른 것을 복사했으면 그것을 덮지 않습니다.
+        if _same_text(get_text(), text):
+            restore(previous)
+    except Exception:  # noqa: BLE001 - 되돌리기에 실패해도 다음 받아쓰기는 되어야 합니다
+        log.exception("클립보드 되돌리기 실패")
+    finally:
+        _pending.release()
+
+
+def paste_text(text: str, restore_previous: bool = True, previous: Snapshot | None = None) -> None:
+    """글을 클립보드에 넣고 Ctrl+V로 붙여넣습니다. restore_previous면 잠시 뒤 원래 클립보드로 되돌립니다.
+    되돌리기는 뒤에서 하므로 Ctrl+V를 보내자마자 돌아옵니다 — 바로 '붙여넣었습니다'를 보이고 다음 말을 받을 수 있게."""
+    wait_modifiers_released()
+    _pending.acquire()
+    try:
+        if restore_previous and previous is None:
+            previous = snapshot()
+        set_text(text)
+        time.sleep(0.05)
+        keyboard.send("ctrl+v")
+    except BaseException:
+        _pending.release()
+        raise
+    if restore_previous and previous is not None and not previous.empty:
+        threading.Thread(target=_restore_later, args=(text, previous), daemon=True).start()
+    else:
+        _pending.release()

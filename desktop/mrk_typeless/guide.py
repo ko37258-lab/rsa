@@ -20,7 +20,7 @@ def help_items(cfg: dict) -> list[tuple[str, str, str]]:
         (pretty_hotkey(cfg["hotkey_dictate"]), "누른 채 말하기", "길게 누른 채 말하고 손을 떼면 끝. 짧게 누르면 다시 누를 때까지 듣습니다."),
         (pretty_hotkey(cfg["hotkey_polish"]), "선택한 글 정리", "이미 써 둔 글을 마우스로 선택하고 누르면 '음, 어'를 지우고 정리합니다."),
         (pretty_hotkey(cfg["hotkey_edit"]), "말로 고치기", "글을 선택하고 누른 채 \"더 공손하게\", \"세 줄로 요약해줘\"처럼 말합니다."),
-        ("Esc", "녹음 버리기", "말하는 중에 누르면 입력하지 않고 버립니다."),
+        ("Esc", "녹음 버리기·취소", "말하는 중이나 정리하는 중에 누르면 입력하지 않고 그만둡니다."),
         (
             "Ctrl + Alt + 1~8",
             "글 형식 바꾸기",

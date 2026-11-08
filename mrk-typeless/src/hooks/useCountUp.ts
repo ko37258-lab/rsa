@@ -15,7 +15,7 @@ export function useCountUp(target: number, run: boolean, durationMs = 700): numb
     const begin = from.current;
     let frame = 0;
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs);
+      const t = Math.min(1, Math.max(0, (now - start) / durationMs)); // 첫 프레임 시각이 시작보다 이를 수 있어 음수가 되지 않게
       const eased = 1 - Math.pow(1 - t, 3);
       setValue(Math.round(begin + (target - begin) * eased));
       if (t < 1) frame = requestAnimationFrame(tick);

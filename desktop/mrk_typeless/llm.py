@@ -3,8 +3,6 @@
 import math
 import re
 
-import anthropic
-
 from . import gemini
 from .config import polish_engine
 
@@ -24,6 +22,11 @@ def output_budget(text: str, cap: int = 64000) -> int:
     """정리 결과의 출력 한도 (웹앱 engine.ts의 outputBudget과 같음). 짧은 글은 16,000토큰, 1시간 강의 녹음처럼
     긴 원문은 길이에 맞춰 cap까지 늘립니다 (Claude 5.5는 스트리밍으로 128,000까지, Gemini는 65,536까지 받습니다)."""
     return min(cap, max(DEFAULT_MAX_TOKENS, math.ceil(len(text) * 2.5)))
+
+
+def budget_for(text: str, cfg: dict) -> int:
+    """말하기·선택한 글·말로 고치기의 출력 한도. 긴 글도 끝까지 정리하도록 녹음 파일과 같은 방식으로 늘립니다."""
+    return output_budget(text, 128000 if polish_engine(cfg) == "claude" else 64000)
 
 
 def run_ai(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_TOKENS, cancel=None, allow_partial: bool = False) -> str:
@@ -64,6 +67,8 @@ def run_claude(system: str, user: str, cfg: dict, max_tokens: int = DEFAULT_MAX_
     api_key = (cfg.get("claude_api_key") or "").strip()
     if not api_key:
         raise LlmError("Claude API 키가 없습니다. 트레이 아이콘 → 설정에서 넣어 주세요.")
+    # Anthropic SDK는 불러오는 데 1초 가까이 걸리고 메모리도 많이 써서, Claude로 정리할 때만 불러옵니다.
+    import anthropic
 
     model = cfg.get("model") or "claude-opus-5-5"
     long = max_tokens > DEFAULT_MAX_TOKENS

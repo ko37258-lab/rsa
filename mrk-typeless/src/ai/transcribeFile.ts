@@ -1,16 +1,18 @@
 // 녹음 파일 받아쓰기: 휴대폰 녹음(m4a)·강의 녹음(mp3)·영상(mp4)을 올리면 글로 바꿉니다.
 //
-// - Gemini: 14MB 이하는 요청에 바로 담고(한 요청 20MB 한도, base64로 33% 늘어남), 더 크면 Files API로 올립니다.
+// - Gemini: 길이를 아는 4MB 이하 녹음은 요청에 바로 담고, 더 크거나 길이를 모르면 Files API로 올립니다.
 //   Files API는 구글 공식 JS SDK(@google/genai)의 브라우저 업로드와 같은 방식입니다:
 //   resumable 시작 → x-goog-upload-url로 8MB씩 → 'upload, finalize' → ACTIVE가 될 때까지 기다림.
 // - 20분이 넘는 녹음은 같은 파일을 20분씩 나눠 받아쓰고 이어 붙입니다. 한 번에 시키면 출력 한도에 걸려 잘립니다.
 //   서버가 바쁘면(429·5xx) 잠시 뒤 다시 하고, 그래도 안 되는 구간은 표시만 남기고 나머지를 이어 받아씁니다.
+//   브라우저가 길이를 못 읽은 녹음(aiff 등)은 올린 뒤 Gemini에 길이를 물어 똑같이 나눕니다 (PC 프로그램과 같음).
 // - ElevenLabs(3GB·10시간까지)·OpenAI(25MB까지)는 파일을 그대로 보냅니다. 크레딧·키 문제나 크기 한도에 걸리면
 //   Gemini 키가 있을 때 Gemini로 넘깁니다.
 
 import {
   blobToBase64,
   failureMessage,
+  finishReasonOf,
   GEMINI_STT_MODEL,
   isBlocked,
   isTruncated,
@@ -22,8 +24,13 @@ import {
 import { canSwitchStt, LANG_NAMES, SttError, transcribe, type SttProvider } from "./transcribe";
 
 const API_ROOT = "https://generativelanguage.googleapis.com";
-/** 요청에 바로 담을 수 있는 크기. 한 요청 20MB 한도에서 base64(×4/3)와 프롬프트 몫을 뺐습니다. */
-export const INLINE_MAX_BYTES = 14 * 1024 * 1024;
+/**
+ * 요청에 바로 담는 크기. 한 요청 20MB 한도로는 14MB까지 되지만, 바로 담으면 33% 더 보내고(base64)
+ * 올리는 동안 진행률도 못 보여 줍니다. 폰에서 큰 녹음은 Files API로 올려야 몇 % 올렸는지 보입니다(2026-11).
+ */
+export const INLINE_MAX_BYTES = 4 * 1024 * 1024;
+/** Gemini가 녹음 1초를 세는 토큰 수 (길이를 모를 때 토큰 수로 길이를 셈) */
+const AUDIO_TOKENS_PER_SECOND = 25;
 /** Files API로 한 번에 보내는 조각 (공식 SDK와 같음) */
 const CHUNK_BYTES = 8 * 1024 * 1024;
 /** 한 번에 받아쓰는 길이. 20분 말은 대개 6~8천 자라 출력 한도에 넉넉합니다. */
@@ -34,6 +41,8 @@ export const SEGMENT_SECONDS = 20 * 60;
  */
 const OPENAI_MAX_BYTES = 25 * 1024 * 1024;
 const OPENAI_MAX_SECONDS = 600;
+/** OpenAI 받아쓰기가 받는 파일 형식. 그 밖의 형식(aac·opus·mov·aiff 등)은 400으로 거절합니다. */
+const OPENAI_EXTS = new Set(["flac", "m4a", "mp3", "mp4", "mpeg", "mpga", "oga", "ogg", "wav", "webm"]);
 /** 서버가 바쁠 때 다시 해 보는 횟수와, 이보다 오래 기다리라고 하면 기다리지 않는 한도 */
 const MAX_TRIES = 3;
 const MAX_RETRY_WAIT_MS = 60_000;
@@ -267,6 +276,8 @@ interface UploadedFile {
   name: string;
   uri: string;
   mimeType: string;
+  /** 영상이면 Gemini가 적어 준 길이 (예: "3600s") */
+  videoDuration?: string;
 }
 
 /** Files API에 올리고 ACTIVE가 될 때까지 기다립니다. */
@@ -339,7 +350,7 @@ export async function uploadToGemini(file: Blob, mimeType: string, displayName: 
       if (got && /^\d+$/.test(got) && Number(got) <= file.size) offset = Number(got);
     }
   }
-  let info: { name?: string; uri?: string; mimeType?: string; state?: string } | undefined;
+  let info: { name?: string; uri?: string; mimeType?: string; state?: string; videoMetadata?: { videoDuration?: string } } | undefined;
   try {
     info = ((await last?.json()) as { file?: typeof info } | undefined)?.file;
   } catch {
@@ -373,7 +384,7 @@ export async function uploadToGemini(file: Blob, mimeType: string, displayName: 
     void deleteGeminiFile(info.name!, key);
     throw e;
   }
-  return { name: info.name!, uri: info.uri!, mimeType: info.mimeType || mimeType };
+  return { name: info.name!, uri: info.uri!, mimeType: info.mimeType || mimeType, videoDuration: info.videoMetadata?.videoDuration };
 }
 
 /** 이어 올리기 전에 서버가 받은 크기를 묻습니다. 못 물으면 null. */
@@ -393,6 +404,30 @@ export async function deleteGeminiFile(name: string, apiKey: string): Promise<vo
     await fetch(`${API_ROOT}/v1beta/${name}`, { method: "DELETE", headers: { "x-goog-api-key": apiKey.trim() } });
   } catch {
     // 지우지 못해도 48시간 뒤 사라집니다.
+  }
+}
+
+/**
+ * 브라우저가 길이를 못 읽은 녹음: 영상은 Gemini가 적어 준 길이, 녹음은 토큰 수 ÷ 25로 셉니다.
+ * 이것도 모르면 null (한 번에 받아씁니다). PC 프로그램(filestt._duration_from_gemini)과 같습니다.
+ */
+async function durationFromGemini(file: UploadedFile, opts: FileTranscribeOptions): Promise<number | null> {
+  const m = /^([\d.]+)s$/.exec(file.videoDuration ?? "");
+  if (m) return Number(m[1]) || null;
+  if (!file.mimeType.startsWith("audio/")) return null;
+  checkAbort(opts.signal);
+  try {
+    const res = await fetch(`${API_ROOT}/v1beta/models/${GEMINI_STT_MODEL}:countTokens`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": opts.apiKey.trim() },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ fileData: { mimeType: file.mimeType, fileUri: file.uri } }] }] }),
+      signal: opts.signal,
+    });
+    const tokens = res.ok ? Number(((await res.json()) as { totalTokens?: unknown }).totalTokens) || 0 : 0;
+    return tokens > 0 ? tokens / AUDIO_TOKENS_PER_SECOND : null;
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    return null;
   }
 }
 
@@ -427,7 +462,12 @@ async function generate(part: object, prompt: string, opts: FileTranscribeOption
     if (res?.ok) {
       const data = (await res.json()) as GeminiResponse;
       if (isBlocked(data)) throw new SttError("Gemini가 이 녹음을 받아쓰지 않았습니다.");
-      return { text: textOf(data).trim(), truncated: isTruncated(data) };
+      const text = textOf(data).trim();
+      // 답이 없거나(후보 없음) 이유 없이 끝난 빈 답은 받아쓴 것으로 치지 않습니다 (조용히 한 구간이 사라지지 않게).
+      // 말소리가 없어 빈 글로 끝난 경우(STOP)는 그대로 받아들입니다. PC 프로그램과 같습니다.
+      if (!data.candidates?.length || (!text && !["STOP", "MAX_TOKENS"].includes(finishReasonOf(data) ?? "")))
+        throw new SttError("Gemini가 받아쓴 글을 돌려주지 않았습니다. 다시 해 주세요.", "busy");
+      return { text, truncated: isTruncated(data) };
     }
     const info = res ? await retryInfo(res) : { delayMs: null, daily: false };
     if (res && (!RETRY_STATUS.has(res.status) || attempt >= MAX_TRIES)) await geminiFail(res, info.daily);
@@ -455,12 +495,13 @@ export async function transcribeFileWithGemini(file: File, opts: FileTranscribeO
   const mime = fileMime(file.name, file.type);
   if (!mime) throw new SttError("이 파일 형식은 받아쓸 수 없습니다. m4a·mp3·wav·mp4 같은 녹음·영상 파일을 올려 주세요.");
   if (file.size > MAX_FILE_BYTES) throw new SttError("파일이 2GB보다 큽니다. 나눠서 올려 주세요.");
-  const segments = planSegments(opts.durationSec);
+  let segments = planSegments(opts.durationSec);
   // 영상은 말소리만 받아쓰면 되므로 화면을 낮은 해상도로 봅니다 (긴 강의 영상도 입력 한도에 걸리지 않게).
   const video = mime.startsWith("video/");
   const config = video ? { mediaResolution: "MEDIA_RESOLUTION_LOW" } : {};
 
-  if (file.size <= INLINE_MAX_BYTES && segments.length === 0) {
+  // 길이를 모르면 바로 담지 않고 올립니다. 올린 뒤 Gemini에 길이를 물어 길면 나눠 받아써야 하기 때문입니다.
+  if (file.size <= INLINE_MAX_BYTES && opts.durationSec && segments.length === 0) {
     opts.onProgress?.({ stage: "transcribe", done: 0, total: 1 });
     const p = await generate({ inlineData: { mimeType: mime, data: await blobToBase64(file) } }, filePrompt(opts.lang, opts.hints), opts, config);
     opts.onProgress?.({ stage: "transcribe", done: 1, total: 1 });
@@ -470,6 +511,7 @@ export async function transcribeFileWithGemini(file: File, opts: FileTranscribeO
   const uploaded = await uploadToGemini(file, mime, file.name, opts);
   try {
     const part = { fileData: { mimeType: uploaded.mimeType, fileUri: uploaded.uri } };
+    if (!opts.durationSec) segments = planSegments(await durationFromGemini(uploaded, opts));
     if (segments.length === 0) {
       opts.onProgress?.({ stage: "transcribe", done: 0, total: 1 });
       const p = await generate(part, filePrompt(opts.lang, opts.hints), opts, config);
@@ -529,9 +571,21 @@ export async function transcribeAudioFile(file: File, opts: FileTranscribeOption
   };
   if (opts.provider === "gemini") return viaGemini();
 
-  if (opts.provider === "openai" && (file.size > OPENAI_MAX_BYTES || (opts.durationSec ?? 0) > OPENAI_MAX_SECONDS)) {
-    const reason =
-      file.size > OPENAI_MAX_BYTES ? "OpenAI 받아쓰기는 25MB까지만 받습니다" : "OpenAI 받아쓰기는 10분이 넘는 녹음을 끝까지 받아쓰지 못합니다";
+  // OpenAI가 받지 않는 형식·크기·길이는 보내 보지도 않고 Gemini로 넘깁니다 (PC 프로그램과 같은 순서).
+  const ext = /\.([^./\\]+)$/.exec(file.name.toLowerCase())?.[1] ?? "";
+  const reason =
+    opts.provider !== "openai"
+      ? null
+      : ext && !OPENAI_EXTS.has(ext)
+        ? `OpenAI 받아쓰기는 .${ext} 파일을 받지 않습니다`
+        : file.size > OPENAI_MAX_BYTES
+          ? "OpenAI 받아쓰기는 25MB까지만 받습니다"
+          : (opts.durationSec ?? 0) > OPENAI_MAX_SECONDS
+            ? "OpenAI 받아쓰기는 10분이 넘는 녹음을 끝까지 받아쓰지 못합니다"
+            : opts.durationSec == null && geminiKey
+              ? "OpenAI 받아쓰기는 10분이 넘는 녹음의 뒷부분을 자르는데, 이 녹음은 길이를 알 수 없습니다"
+              : null;
+  if (reason) {
     if (geminiKey) return viaGemini("openai", reason);
     throw new SttError(`${reason}. 설정에서 받아쓰기 서비스를 Gemini로 바꾸면 2GB까지 긴 녹음도 올릴 수 있습니다.`);
   }

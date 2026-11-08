@@ -4,6 +4,7 @@ import Anthropic, {
   APIUserAbortError,
   AuthenticationError,
   BadRequestError,
+  InternalServerError,
   NotFoundError,
   PermissionDeniedError,
   RateLimitError,
@@ -11,6 +12,21 @@ import Anthropic, {
 import type { AiRequest } from "../lib/prompts";
 import type { Settings } from "../lib/settings";
 import { EngineError, outputBudget, type RunOptions } from "./engine";
+
+/**
+ * SDK의 e.message는 '529 {"type":"error",...}'처럼 응답 본문 JSON을 통째로 담습니다.
+ * 사람이 읽을 부분(error.error.message)만 꺼냅니다.
+ */
+function serverSaid(e: APIError): string {
+  const nested = (e.error as { error?: { message?: unknown } } | undefined)?.error?.message;
+  return typeof nested === "string" && nested.trim() ? nested.trim().slice(0, 200) : e.message;
+}
+
+/** 서버가 과부하·내부 오류인지. 스트리밍 도중 온 오류는 상태 코드 없이 본문의 type만 있습니다. */
+function isServerBusy(e: APIError): boolean {
+  const type = (e.error as { error?: { type?: unknown } } | undefined)?.error?.type;
+  return e instanceof InternalServerError || (e.status ?? 0) >= 500 || type === "overloaded_error" || type === "api_error";
+}
 
 // 브라우저에서 사용자 본인의 API 키로 Claude를 직접 부릅니다.
 // 키는 이 브라우저의 저장소에만 있고, Anthropic 서버 외에는 어디에도 보내지 않습니다.
@@ -28,7 +44,8 @@ export async function runWithApiKey(req: AiRequest, settings: Settings, opts: Ru
     const stream = client.beta.messages.stream(
       {
         model: settings.model,
-        max_tokens: outputBudget(req.user),
+        // 늘 스트리밍하므로 128K까지 받습니다 (긴 강의 정리가 64K에서 잘리지 않게).
+        max_tokens: outputBudget(req.user, 128000),
         system: req.system,
         messages: [{ role: "user", content: req.user }],
         output_config: { effort: settings.effort },
@@ -71,10 +88,12 @@ export async function runWithApiKey(req: AiRequest, settings: Settings, opts: Ru
       throw new EngineError("failed", "모델을 찾지 못했습니다. 설정에서 다른 모델을 골라 주세요.");
     if (e instanceof RateLimitError)
       throw new EngineError("failed", "요청이 많아 잠시 막혔습니다. 조금 뒤 다시 정리해 주세요.", streamed);
-    if (e instanceof BadRequestError) throw new EngineError("failed", `요청이 거절되었습니다: ${e.message}`);
+    if (e instanceof BadRequestError) throw new EngineError("failed", `요청이 거절되었습니다: ${serverSaid(e)}`);
     if (e instanceof APIConnectionError)
       throw new EngineError("failed", "Claude 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.", streamed);
-    if (e instanceof APIError) throw new EngineError("failed", `Claude 오류 (${e.status ?? "알 수 없음"}): ${e.message}`, streamed);
+    if (e instanceof APIError && isServerBusy(e))
+      throw new EngineError("failed", "Claude 서버가 바쁩니다(과부하). 잠시 뒤 다시 정리하거나 설정에서 정리 AI를 Gemini로 바꿔 주세요.", streamed);
+    if (e instanceof APIError) throw new EngineError("failed", `Claude 오류 (${e.status ?? "알 수 없음"}): ${serverSaid(e)}`, streamed);
     throw new EngineError("failed", "정리 중 문제가 생겼습니다. 다시 정리해 주세요.", streamed);
   }
 }
