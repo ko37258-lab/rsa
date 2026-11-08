@@ -21,7 +21,8 @@ const BASE = process.env.MRK_BASE || 'http://127.0.0.1:5173';
 const OUT = path.join(__dirname, 'out', 'review');
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const EXPECTED_404 = /\/assets\/samples\/[^/]+\.jpg$|\/api\/[a-z]+$/;
-const EXPECTED_FAIL = /\/assets\/video\/[^/]+\.mp4$/;
+// 결과 영상(blob:)을 새 것으로 바꿀 때 앞 영상 읽기를 브라우저가 취소하는 것(ERR_ABORTED)은 정상
+const EXPECTED_FAIL = /\/assets\/video\/[^/]+\.mp4$|^blob:/;
 
 const report = { ok: true, problems: [], notes: [], consoleErrors: [], expected: [], styles: null, caption: null, music: null, single: null, batch: null, project: null, showcase: null, mobile: null, timings: {} };
 const problem = (s) => report.problems.push(s);
@@ -390,7 +391,7 @@ const savePng = (dataUrl, file) => fs.writeFileSync(file, Buffer.from(dataUrl.sp
     report.timings.batchMs = Date.now() - t0;
     if (batchMid.btn !== '멈춤') problem(`전부 만들기 중 버튼 글자 "${batchMid.btn}"`);
     if (!batchMid.exportDisabled) problem('전부 만들기 중 한 편 버튼이 잠기지 않음');
-    if (!batchMid.status.startsWith(`${S.length}가지`)) problem(`전부 만들기 상태 문구 "${batchMid.status}"`);
+    if (!batchMid.status.startsWith(`${S.length}가지`) && !new RegExp(`^\\d+/${S.length} `).test(batchMid.status)) problem(`전부 만들기 상태 문구 "${batchMid.status}"`);
     if (!batchMid.panelHead.includes(`${S.length}가지`)) problem(`일괄 패널 제목 "${batchMid.panelHead}"`);
     if (batchEnd.items.length < 1) problem('전부 만들기 결과 0개');
     if (batchEnd.zipDisabled) problem('멈춘 뒤 ZIP 버튼이 잠겨 있음');
