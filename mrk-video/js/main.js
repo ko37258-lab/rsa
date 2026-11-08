@@ -9,6 +9,7 @@ import { firstWithKey } from './keys.js';
 import { initCompose } from './compose.js';
 import { initDownloader } from './downloader.js';
 import { initShowcase, pauseShowcase, resumeShowcase } from './showcase.js';
+import { followCase } from './recipe.js';
 
 const VIEWS = ['showcase', 'shorts', 'compose', 'download', 'guide'];
 let current = null;
@@ -36,7 +37,7 @@ function enterMotion(name) {
   if (!view) return;
   const title = view.querySelector('.view-head h1[data-kinetic], .hero-title[data-kinetic]');
   if (title) kinetic(title, { delay: 80 });
-  const panels = view.querySelectorAll('.studio-controls > .panel, .studio-preview > *, .prose > .panel, .view > .panel, .grid4 > .panel, .runbar, .hero');
+  const panels = view.querySelectorAll('.studio-controls > .panel, .studio-preview > *, .prose > .panel, .view > .panel, .grid4 > .panel, .runbar, .hero, .view > .follow, .recipe');
   rise(panels, { delay: 120, stagger: 45 });
 }
 
@@ -82,9 +83,22 @@ function wireKeyLinks() {
 
 function currentView() {
   const h = location.hash.replace('#', '');
+  // 따라하기 딥링크(#follow=<사례 id>)는 숏폼 화면으로(사례는 consumeFollow 가 싣음)
+  if (h.startsWith('follow=')) return 'shorts';
   // 사례 화면 안의 앵커(#case-shorts 등)는 사례 화면으로
   if (h.startsWith('case-')) return 'showcase';
   return h || 'showcase';
+}
+
+/**
+ * 주소가 #follow=<사례 id> 면 사례를 숏폼 화면에 싣습니다(recipe.js followCase). 주소는 바로 #shorts 로 바꿔
+ * 새로고침·뒤로가기에 다시 불러오지 않게 합니다. 모르는 id 면 recipe.js 가 토스트로 알리고 숏폼 화면만 남습니다.
+ */
+function consumeFollow() {
+  const m = location.hash.match(/^#follow=([a-z0-9-]+)$/i);
+  if (!m) return;
+  history.replaceState(null, '', '#shorts');
+  followCase(m[1], { from: 'link' });
 }
 
 /** 회원 라벨: 관리자는 "관리자", 기수는 "자동화 2기 회원" 처럼. 라벨이 없으면 빈 글자.
@@ -218,6 +232,7 @@ async function boot() {
     show(v);
     const h = location.hash.replace('#', '');
     if (h.startsWith('case-')) switching.then(() => document.getElementById(h)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    if (h.startsWith('follow=')) switching.then(() => consumeFollow()); // 화면 전환이 끝난 뒤 사례를 싣는다
   });
   window.addEventListener('resize', () => current && moveIndicator(current));
   show(currentView());
@@ -228,6 +243,8 @@ async function boot() {
     initCompose().catch((e) => console.error('compose', e)),
     initDownloader().catch((e) => console.error('download', e)),
   ]);
+  // 첫 진입이 #follow=<id> 면 숏폼 화면 준비(initShorts)가 끝난 뒤에 사례를 싣는다
+  consumeFollow();
   await initShowcase().catch((e) => console.error('showcase', e));
   if (current === 'showcase') resumeShowcase();
   document.fonts?.ready?.then(() => current && moveIndicator(current));

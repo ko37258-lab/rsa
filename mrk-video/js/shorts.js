@@ -14,11 +14,15 @@ import { MOODS, renderMood, playMood } from './music.js';
 import { PROVIDERS, providerOf, synthesize, MAX_TEXT } from './tts.js';
 import { getKey, onKeysChange } from './keys.js';
 import { initKeyBar, openKeyBar, initListing } from './listing.js';
+import { CASE_DATA } from './cases.js'; // 사례 제목도 '예시 제목'으로 판별(isSampleTitle)
+import { initRecipe } from './recipe.js'; // 따라하기(레시피) 바 — api 를 넘겨 줍니다(순환 import 없음)
 
 const SETTINGS_KEYS = [
   'aspect', 'template', 'font', 'captionSize', 'captionStyle', 'captionAnim', 'overlay', 'titleMode', 'motion', 'transition',
   'textColor', 'highlightColor', 'bandColor', 'panelColor', 'inkColor', 'showProgress', 'title', 'channel', 'ending',
   'bgmVolume', 'narrVolume', 'quality', 'style', 'styleMusic',
+  // 광고용 모션 어휘(docs/STYLE-SPEC.md 1절)와 상호·연락처(brand) — 엔진(shorts-render.js)이 읽는 이름 그대로
+  'photoIn', 'photoFit', 'deco', 'titleAnim', 'extras', 'fx', 'brand',
 ];
 
 const DEFAULTS = {
@@ -40,7 +44,14 @@ const DEFAULTS = {
   showProgress: true,
   title: SHORTS_CASE.title,
   channel: 'MR.K 고상철',
-  ending: { enabled: true, text: '*구독*하고\n땅 공부 같이 해요', sub: 'MR.K 고상철 · 부동산 AI', duration: 2.5 },
+  ending: { enabled: true, text: '*구독*하고\n땅 공부 같이 해요', sub: 'MR.K 고상철 · 부동산 AI', duration: 2.5, cta: '' }, // cta = 엔딩 버튼 문구(비우면 버튼 없음)
+  brand: { name: '', phone: '', sub: '' }, // 상호·연락처 — 로워서드(lower3)·엔딩 연락처 줄이 읽음. 매물 상자·따라하기가 채움
+  photoIn: 'none', // 사진 등장: none | push | reveal | pop | iris
+  photoFit: 'cover', // cover | smart(가로 사진은 흐린 배경 위에 온전히)
+  deco: [], // 사진 위 장식 레이어: sweep | bars | bokeh | frame
+  titleAnim: 'none', // 제목 등장: none | rise | mask | stamp
+  extras: [], // 주 장식 위에 겹치는 2차 장식: lower3 | stamp | ribbon | 기존 장식 id
+  fx: 'none', // none | ad(기존 장식의 미세 움직임)
   bgmVolume: 0.35,
   narrVolume: 1,
   quality: '1080',
@@ -55,6 +66,9 @@ const project = {
   logo: null,
 };
 project.ending = { ...DEFAULTS.ending, ...(project.ending || {}) };
+project.brand = { ...DEFAULTS.brand, ...(project.brand && typeof project.brand === 'object' ? project.brand : {}) };
+if (!Array.isArray(project.deco)) project.deco = [];
+if (!Array.isArray(project.extras)) project.extras = [];
 
 const audio = { bgm: null, narr: null }; // { name, buffer }
 let uploadInfo = null; // AI가 만든 업로드용 제목·설명·해시태그
@@ -88,6 +102,10 @@ let structureLock = ''; // 매물 대본 AI 가 쓰는 동안 장면 구성(추�
 let projectToken = 0; // 장면 묶음이 통째로 바뀔 때마다(프로젝트 열기·대본 적용·모두 지우기) 1씩 — 늦게 온 AI 결과를 버릴 때 비교
 let recording = false; // 매물 상자 ④ '내 목소리 녹음' 중 — 그동안 영상 만들기·전부 만들기·음성 만들기를 막는다(내레이션이 반만 들어가지 않게)
 let narrSerial = 0; // 내레이션이 바뀔 때마다 1씩(영상이 지금 내레이션으로 만든 것인지 가릴 때)
+let photoSink = null; // 따라하기(레시피) 모드: 넣은 사진을 받아 사례의 빈 자리에 넣는 함수(recipe.js placeImages) — 있으면 레시피 모드
+let recipeHooks = {}; // recipe.js 가 등록: replaced(scene,key)·snapshot()·restore(saved,scenes)·linesApplied()·styled(st)
+let sampleConfirm = ''; // 예시 사진이 남은 채 「영상 만들기」를 눌렀을 때 알린 장면 묶음 — 같은 상태에서 한 번 더 누르면 그대로 만듦
+let styleFilter = store.get('styleFilter', 'all') === 'ad' ? 'ad' : 'all'; // 스타일 보기 범위(전체 | 광고용 추천) — 화면 취향이라 store 에만
 
 /** 장면 구성을 바꾸는 동작 앞에서 부릅니다. 잠겨 있으면 까닭을 알리고 true. */
 function structureLocked() {
@@ -118,25 +136,35 @@ function newScene(img = null, caption = '', extra = {}) {
 
 const allSamples = () => project.scenes.length > 0 && project.scenes.every((s) => s.sample);
 function dropSamples() {
+  if (photoSink) return; // 따라하기 모드: 사례 장면은 사진 자리가 모두 '예시'라 통째로 비우지 않음
   if (allSamples()) project.scenes = [];
 }
 
-/** 사진 파일들을 장면으로 넣습니다(이름 순). 넣은 장 수를 돌려줍니다. 예시 장면뿐이면 먼저 비웁니다. */
+/**
+ * 사진 파일들을 장면으로 넣습니다(이름 순). 넣은 장 수를 돌려줍니다. 예시 장면뿐이면 먼저 비웁니다.
+ * 따라하기(레시피) 모드면 지우지 않고 사례의 빈 사진 자리에 순서대로 넣습니다(photoSink = recipe.js placeImages).
+ */
 async function addImageFiles(files) {
   if (structureLocked()) return 0;
   const imgs = files.filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name));
   if (!imgs.length) { toast('이미지 파일만 넣을 수 있습니다.'); return 0; }
-  dropSamples();
   imgs.sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true }));
+  const loaded = [];
   let fails = 0;
   for (const f of imgs) {
-    try {
-      project.scenes.push(newScene(await imageFromFile(f), ''));
-    } catch { fails++; }
+    try { loaded.push(await imageFromFile(f)); } catch { fails++; }
   }
+  if (photoSink) {
+    const r = photoSink(loaded);
+    changed(true);
+    toast(`사진 ${r.placed}장을 사례 자리에 넣었습니다.${r.added ? ` 장면 ${r.added}개를 더 만들었습니다.` : ''}${fails ? ` (${fails}장은 열지 못함)` : ''}`);
+    return loaded.length;
+  }
+  dropSamples();
+  for (const img of loaded) project.scenes.push(newScene(img, ''));
   changed(true);
-  toast(`사진 ${imgs.length - fails}장을 장면으로 넣었습니다.${fails ? ` (${fails}장은 열지 못함)` : ''}`);
-  return imgs.length - fails;
+  toast(`사진 ${loaded.length}장을 장면으로 넣었습니다.${fails ? ` (${fails}장은 열지 못함)` : ''}`);
+  return loaded.length;
 }
 
 function applyLines(lines, hints = []) {
@@ -159,6 +187,7 @@ function applyLines(lines, hints = []) {
   ttsTextEdited = false; // 새 대본을 넣었으니 내레이션 대본 칸도 새 자막으로
   changed(true);
   toast(`대본 ${lines.length}줄을 장면 자막에 넣었습니다.`);
+  if (photoSink) recipeHooks.linesApplied?.(); // 따라하기 바에 "사례 읽을 문장은 비웠습니다" 알림
 }
 
 function moveScene(i, d) {
@@ -195,8 +224,10 @@ function renderScenes() {
     const thumb = document.createElement('button');
     thumb.type = 'button';
     thumb.className = 'scene-thumb';
-    thumb.title = '사진 바꾸기';
-    thumb.setAttribute('aria-label', `${i + 1}번 장면 ${s.img ? '사진 바꾸기' : '글자 장면 — 사진 넣기'}`);
+    const sampleImg = !!(s.sample && s.img); // 예시 사진이 남은 자리(따라하기·첫 화면 예시)
+    thumb.classList.toggle('sample', sampleImg);
+    thumb.title = sampleImg ? '내 사진으로 바꾸기' : '사진 바꾸기';
+    thumb.setAttribute('aria-label', `${i + 1}번 장면 ${s.img ? (sampleImg ? '예시 사진 — 내 사진으로 바꾸기' : '사진 바꾸기') : '글자 장면 — 사진 넣기'}`);
     if (s.img) {
       const im = document.createElement('img');
       im.src = s.img.src;
@@ -239,11 +270,26 @@ function renderScenes() {
     tag.style.width = '110px';
     tag.setAttribute('aria-label', `${i + 1}번 장면 태그`);
     tag.addEventListener('input', () => { s.tag = tag.value; changed(false); });
-    meta.append(dur, document.createTextNode('초'), kind, tag);
+    // 도장 글(scene.stamp): 도장 장식(stamp)·광고 스타일의 2차 장식이 읽음. 10자까지, 짧게
+    const stamp = document.createElement('input');
+    stamp.type = 'text';
+    stamp.className = 'scene-stamp';
+    stamp.maxLength = 10;
+    stamp.value = s.stamp || '';
+    stamp.placeholder = '도장(급매)';
+    stamp.setAttribute('aria-label', `${i + 1}번 장면 도장 글`);
+    stamp.addEventListener('input', () => { s.stamp = stamp.value; changed(false); });
+    meta.append(dur, document.createTextNode('초'), kind, tag, stamp);
+    if (s.slot != null && s.img) {
+      const sl = document.createElement('span');
+      sl.className = 'tag';
+      sl.textContent = `자리 ${s.slot}`;
+      meta.append(sl);
+    }
     if (s.sample) {
       const t = document.createElement('span');
       t.className = 'tag';
-      t.textContent = '예시';
+      t.textContent = s.img ? '예시 사진 — 눌러서 내 사진으로' : '예시';
       meta.append(t);
     }
     if (s.hint) {
@@ -289,15 +335,19 @@ replaceInput.addEventListener('change', async () => {
   const f = replaceInput.files?.[0];
   replaceInput.value = '';
   if (!f || !replaceTarget) return;
+  const { scene, key } = replaceTarget;
   try {
-    replaceTarget.img = await imageFromFile(f);
-    replaceTarget.sample = false;
+    scene[key] = await imageFromFile(f);
+    // 따라하기 모드면 그 자리를 '채움'으로(같은 사진을 쓰는 장면·예시 표시까지 recipe.js 가 맞춤), 아니면 예시 표시만 내림
+    if (recipeHooks.replaced) recipeHooks.replaced(scene, key);
+    else scene.sample = false;
     changed(true);
   } catch (e) { toast(e.message); }
 });
-function pickReplacement(scene) {
+/** 장면 사진 한 장 바꾸기. key 는 'img'(기본) 또는 'img2'(비교·전후의 둘째 사진 — 장면 목록에는 칸이 없어 따라하기 바의 자리 버튼이 씀) */
+function pickReplacement(scene, key = 'img') {
   if (structureLocked()) return;
-  replaceTarget = scene;
+  replaceTarget = { scene, key: key === 'img2' ? 'img2' : 'img' };
   replaceInput.click();
 }
 
@@ -324,6 +374,7 @@ function markCurrentScene() {
 // ── 변경 처리 ─────────────────────────────────────────
 function changed(structural) {
   tl = buildTimeline(project);
+  if (structural) sampleConfirm = ''; // 장면 구성이 바뀌면 예시 사진 경고의 '한 번 더 누르기'도 처음부터
   if (structural) renderScenes();
   else {
     $('#sceneSummary').textContent = project.scenes.length ? `${project.scenes.length}개 장면 · 총 ${tl.total.toFixed(1)}초` : '';
@@ -595,7 +646,29 @@ function exportLabel() {
 
 /** 스타일 수. 데이터를 못 읽었을 때는 index.html 자리표시(data-style-count)에 적힌 수를 쓴다 */
 const styleCount = () => STYLES.length || Number(document.querySelector('[data-style-count]')?.textContent) || 0;
-const batchLabel = () => `${styleCount()}가지 전부 만들기`;
+/** 광고용 추천 스타일(styles-data 의 ad:true) */
+const adStyles = () => STYLES.filter((st) => st.ad);
+/** 보기 범위 필터로 지금 보이는 스타일 — 「전부 만들기」도 이 목록만 만듭니다 */
+const visibleStyles = () => (styleFilter === 'ad' ? adStyles() : STYLES);
+const batchLabel = () => (styleFilter === 'ad' ? `광고용 추천 ${adStyles().length}가지 만들기` : `${styleCount()}가지 전부 만들기`);
+
+/** 필터대로 카드를 숨기고(hidden → 접근성 트리에서도 빠짐) 칩·전부 만들기 버튼 글을 맞춥니다 */
+function applyStyleFilter() {
+  for (const card of document.querySelectorAll('#styleStrip .style-card')) {
+    const st = STYLES.find((x) => x.id === card.dataset.id);
+    card.hidden = styleFilter === 'ad' && !st?.ad;
+  }
+  for (const b of document.querySelectorAll('#styleFilter .chipbtn')) b.setAttribute('aria-pressed', String(b.dataset.filter === styleFilter));
+  const cnt = $('#adStyleCount');
+  if (cnt) cnt.textContent = String(adStyles().length);
+  if (!batch) $('#styleBatchBtn').textContent = batchLabel();
+}
+function setStyleFilter(v) {
+  styleFilter = v === 'ad' ? 'ad' : 'all';
+  store.set('styleFilter', styleFilter);
+  applyStyleFilter();
+  renderStripThumbs(); // 숨어 있던 카드는 썸네일을 아직 안 그렸을 수 있음
+}
 
 function markStyleCards() {
   for (const card of document.querySelectorAll('#styleStrip .style-card')) card.setAttribute('aria-pressed', String(card.dataset.id === project.style));
@@ -647,9 +720,17 @@ function renderStyleStrip() {
     pick.className = 'pick';
     pick.textContent = '✓';
     card.append(no, c, name, tag, pick);
-    card.addEventListener('click', () => applyStyle(st));
+    if (st.ad) {
+      const ad = document.createElement('small');
+      ad.className = 'ad-badge';
+      ad.textContent = '광고용 추천';
+      card.append(ad);
+    }
+    // 따라하기 모드에서는 장면은 그대로 두고 스타일만 바뀝니다(사례 장면이 스타일 예시로 뒤집히지 않게)
+    card.addEventListener('click', () => applyStyle(st, { keepScenes: !!photoSink }));
     strip.append(card);
   });
+  applyStyleFilter();
   renderStyleDesc();
   renderStripThumbs();
 }
@@ -665,6 +746,7 @@ function renderStripThumbs() {
     const t0 = performance.now();
     while (i < cards.length && performance.now() - t0 < 12) {
       const card = cards[i++];
+      if (card.hidden) continue; // 필터로 숨은 카드는 그리지 않음(비용 절약)
       const st = STYLES.find((s) => s.id === card.dataset.id);
       const c = card.querySelector('canvas');
       if (!st || !c) continue;
@@ -680,9 +762,21 @@ function renderStripThumbs() {
 }
 const scheduleStripRender = debounce(renderStripThumbs, 400);
 
-function applyStyle(st) {
+/**
+ * 스타일을 입힙니다. idOrStyle 은 STYLES 항목 또는 id.
+ * keepScenes: 예시 장면뿐이어도 스타일의 예시 장면으로 바꾸지 않음(따라하기 사례 장면은 사진 자리가 모두 '예시'라 그대로 두어야 함).
+ * quiet: 토스트 없이(따라하기가 사례를 실을 때).
+ * @returns {boolean} 스타일을 찾아 입혔으면 true
+ */
+function applyStyle(idOrStyle, { keepScenes = false, quiet = false } = {}) {
+  const st = typeof idOrStyle === 'string' ? STYLES.find((s) => s.id === idOrStyle) : idOrStyle;
+  if (!st || typeof st.apply !== 'function') return false;
   st.apply(project);
   project.style = st.id;
+  // 필터로 숨어 있는 스타일을 입혔으면(사례가 고른 스타일 등) 보기 범위를 '전체'로 되돌리고 그 카드가 보이게
+  const card = document.querySelector(`#styleStrip .style-card[data-id="${st.id}"]`);
+  const wasHidden = !!card?.hidden;
+  if (wasHidden) setStyleFilter('all');
   markStyleCards();
   const finish = () => {
     sizePreview();
@@ -694,9 +788,11 @@ function applyStyle(st) {
     if (!exporting) $('#exportBtn').textContent = exportLabel(); // 녹화 중이면 '만들기 멈춤' 글자를 지키기
   };
   finish();
+  if (wasHidden) card.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  recipeHooks.styled?.(st); // 따라하기 바: 사례 스타일과 다르면 「사례 스타일로 되돌리기」
   // 예시 장면뿐이면 스타일의 예시 장면으로 바꿔 보여 준다(연달아 눌렀으면 마지막에 누른 것만 반영)
   const job = ++styleJob;
-  if (allSamples() && st.sample?.scenes?.length) {
+  if (!keepScenes && allSamples() && st.sample?.scenes?.length) {
     loadStyleSample(st).then((scenes) => {
       if (job !== styleJob) return;
       project.scenes = scenes;
@@ -705,7 +801,8 @@ function applyStyle(st) {
       finish();
     });
   }
-  toast(`스타일: ${st.name}`);
+  if (!quiet) toast(`스타일: ${st.name}`);
+  return true;
 }
 
 /** 스타일의 예시 장면을 만들어 돌려줍니다(project 는 건드리지 않음). */
@@ -810,6 +907,7 @@ async function exportVideo(opts = {}) {
   if (recording) return refuse('녹음 중입니다. 매물 상자 ④에서 녹음을 먼저 멈춰 주세요.');
   if (structureLock) return refuse(structureLock);
   if (!project.scenes.length) return refuse('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
+  if (!sampleGate((text) => { $('#exportStatus').textContent = text; toast(text, 5000); try { onStatus(text, 0); } catch { /* 표시 문제는 무시 */ } })) return null;
   stopPlayback();
   stopMusicPreview();
   const btn = $('#exportBtn');
@@ -863,6 +961,23 @@ async function exportVideo(opts = {}) {
   }
 }
 
+/**
+ * 예시 사진이 남아 있을 때의 '한 번 더 누르기' 관문(확인창 없음 — 매물 상자 ⑥ 보내기와 같은 방식).
+ * 따라하기 모드이거나 내 사진과 예시 사진이 섞여 있으면 한 번 알리고, 같은 상태에서 한 번 더 누르면 그대로 만듭니다.
+ * 사례 모드가 아니고 순수 예시(첫 화면 데모)면 지금처럼 바로 만듭니다. say(text) 로 어디에 알릴지 받습니다.
+ */
+function sampleGate(say) {
+  const left = project.scenes.filter((s) => s.sample && s.img);
+  const mixed = left.length > 0 && project.scenes.some((s) => !s.sample && s.img);
+  if (!left.length || !(photoSink || mixed)) return true;
+  const key = left.map((s) => s.id).join(',');
+  if (sampleConfirm === key) { sampleConfirm = ''; return true; }
+  sampleConfirm = key;
+  const slots = left.map((s) => s.slot).filter((n) => n != null);
+  say(`예시 사진 ${left.length}장이 아직 들어 있습니다${slots.length ? `(자리 ${slots.join('·')})` : ''}. 내 사진으로 바꾼 뒤 만들거나, 그대로 만들려면 한 번 더 누르세요.`);
+  return false;
+}
+
 function showResult(r) {
   resultExt = r.ext;
   resultBlob = r.blob;
@@ -910,14 +1025,17 @@ function videoFileName(ext = resultExt, suffix = '') {
 }
 
 // ── 내보내기(모든 스타일 전부) ─────────────────────────────
-async function exportAllStyles() {
+/** 보이는 스타일(list — 기본은 필터대로: 전체 또는 광고용 추천)마다 영상 한 편씩. 만드는 중에 다시 부르면 멈춥니다. */
+async function exportAllStyles(list = visibleStyles()) {
   if (batch) { batch.abort.abort(); return; }
   if (exporting) return toast('한 편 만들기가 진행 중입니다. 먼저 멈춰 주세요.');
   if (ttsBusy) return toast('내레이션을 만드는 중입니다. 끝난 뒤 영상을 만들어 주세요.');
   if (recording) return toast('녹음 중입니다. 매물 상자 ④에서 녹음을 먼저 멈춰 주세요.');
   if (structureLocked()) return;
   if (!STYLES.length) return toast('스타일 데이터가 없습니다.');
+  if (!Array.isArray(list) || !list.length) return toast('만들 스타일이 없습니다. 보기 범위를 「전체」로 바꿔 보세요.');
   if (!project.scenes.length) return toast('장면이 없습니다. 사진이나 대본을 먼저 넣어 주세요.');
+  if (!sampleGate((text) => { $('#batchPanel').hidden = false; $('#batchStatus').textContent = text; toast(text, 5000); })) return;
   stopPlayback();
   stopMusicPreview();
   const snap = previewProject(); // 모든 스타일을 시작 시점의 장면·설정으로
@@ -934,15 +1052,15 @@ async function exportAllStyles() {
   const abort = new AbortController();
   batch = { abort, results: [] };
   $('#styleBatchBtn').textContent = '멈춤';
-  status.textContent = `${STYLES.length}가지 × ${tl.total.toFixed(0)}초 ≈ ${formatTime(tl.total * STYLES.length)} 걸립니다. 이 탭을 띄워 두세요.`;
+  status.textContent = `${list.length}가지 × ${tl.total.toFixed(0)}초 ≈ ${formatTime(tl.total * list.length)} 걸립니다. 이 탭을 띄워 두세요.`;
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   // 한 스타일씩 돌려서, 중간에 멈춰도 그때까지 만든 것은 남깁니다.
-  for (let i = 0; i < STYLES.length; i++) {
+  for (let i = 0; i < list.length; i++) {
     if (abort.signal.aborted) break;
-    const st = STYLES[i];
+    const st = list[i];
     try {
       // 배경음악 파일이 없고 '자동'이면 스타일마다 그 스타일이 추천하는 분위기 루프로(분위기마다 한 번만 만듦. 파일이 있으면 모두 그 파일)
-      status.textContent = `${i + 1}/${STYLES.length} ${st.name} — 소리 준비 중…`;
+      status.textContent = `${i + 1}/${list.length} ${st.name} — 소리 준비 중…`;
       const bgm = await bgmSource(st);
       if (abort.signal.aborted) break;
       const withAudio = !!(bgm || audio.narr);
@@ -952,8 +1070,8 @@ async function exportAllStyles() {
         audioCtx: withAudio ? audioCtx() : null,
         signal: abort.signal,
         onProgress: ({ t, total }) => {
-          bar.firstElementChild.style.transform = `scaleX(${(i + t / total) / STYLES.length})`;
-          status.textContent = `${i + 1}/${STYLES.length} ${st.name} — ${formatTime(t)} / ${formatTime(total)}`;
+          bar.firstElementChild.style.transform = `scaleX(${(i + t / total) / list.length})`;
+          status.textContent = `${i + 1}/${list.length} ${st.name} — ${formatTime(t)} / ${formatTime(total)}`;
         },
       });
       if (r) { r.sig = sig; batch.results.push(r); renderBatchList(batch.results); }
@@ -1123,16 +1241,20 @@ async function imageToDataURL(img, max = 1600) {
 async function saveProject() {
   const data = {
     app: 'mrk-video',
-    version: 2,
+    version: 3, // 3: 장면 slot·slot2·hint2·stamp·labelA·labelB·vsLabel, 설정 brand·ending.cta·모션 어휘, 따라하기 recipe 스냅샷(읽는 쪽은 버전을 검사하지 않아 옛 파일도 그대로 열림)
     savedAt: new Date().toISOString(),
     settings: pickSettings(project),
     logo: project.logo ? await imageToDataURL(project.logo, 600) : null,
     uploadInfo,
     // 매물 정보·중개사무소 정보(listing.js). AI 키는 여기에도, 어디에도 넣지 않습니다.
     listing: listingIO ? listingIO.get() : null,
+    // 따라하기(레시피) 상태 — 어느 사례의 어느 자리가 채워졌는지(장면은 번호로). 레시피 모드가 아니면 null
+    recipe: recipeHooks.snapshot?.() || null,
     scenes: await Promise.all(project.scenes.map(async (s) => ({
       caption: s.caption, narration: s.narration || '', duration: s.duration, hint: s.hint || '', sample: !!s.sample, kind: s.kind || 'normal', tag: s.tag || '', label: s.label || '',
       counter: s.counter || null,
+      // 따라하기 자리 번호·둘째 사진 자리·도장·비교 라벨(엔진 어휘)
+      slot: s.slot ?? null, slot2: s.slot2 ?? null, hint2: s.hint2 || '', stamp: s.stamp || '', labelA: s.labelA || '', labelB: s.labelB || '', vsLabel: s.vsLabel || '',
       image: await imageToDataURL(s.img),
       image2: await imageToDataURL(s.img2), // 비교(vs)·비포애프터의 둘째 사진
     }))),
@@ -1153,28 +1275,27 @@ async function openProject(file) {
     if (structureLock) throw new Error(structureLock); // 파일을 읽는 사이 대본 만들기가 시작됐으면 열지 않음
     Object.assign(project, pickSettings(data.settings || {}));
     project.ending = { ...DEFAULTS.ending, ...(project.ending || {}) };
+    project.brand = { ...DEFAULTS.brand, ...(project.brand && typeof project.brand === 'object' ? project.brand : {}) };
+    if (!Array.isArray(project.deco)) project.deco = [];
+    if (!Array.isArray(project.extras)) project.extras = [];
     project.logo = data.logo ? await loadImage(data.logo) : null;
-    project.scenes = await Promise.all((data.scenes || []).map(async (s) => newScene(
-      s.image ? await loadImage(s.image) : null,
-      s.caption || '',
-      {
+    project.scenes = await Promise.all((data.scenes || []).map(async (s) => {
+      const extra = {
         duration: s.duration, hint: s.hint, sample: s.sample, kind: s.kind || 'normal', tag: s.tag, label: s.label,
         narration: typeof s.narration === 'string' ? s.narration : '',
         counter: s.counter || undefined, img2: s.image2 ? await loadImage(s.image2) : null,
-      },
-    )));
+        slot: s.slot ?? null, // 따라하기 자리 번호(옛 파일은 null)
+      };
+      // 있을 때만 넣는 선택 필드(둘째 사진 자리·도장·비교 라벨)
+      if (s.slot2 != null) extra.slot2 = s.slot2;
+      for (const k of ['hint2', 'stamp', 'labelA', 'labelB', 'vsLabel']) if (typeof s[k] === 'string' && s[k]) extra[k] = s[k];
+      return newScene(s.image ? await loadImage(s.image) : null, s.caption || '', extra);
+    }));
     projectToken++;
     uploadInfo = data.uploadInfo && typeof data.uploadInfo === 'object' ? data.uploadInfo : null;
     // 프로젝트 파일에는 소리·영상이 들어가지 않습니다. 앞 프로젝트(다른 매물)의 내레이션·결과 영상이 남아 새 제목·표시 항목과 함께
     // 저장·전송되지 않게 버립니다(사용자가 넣은 배경음악 파일은 그대로 둠).
-    const hadMedia = !!(audio.narr || resultBlob || lastBatch.length);
-    audio.narr = null;
-    $('#narrFile').value = '';
-    ttsResult = null;
-    $('#ttsSave').hidden = true;
-    clearResults();
-    $('#exportStatus').textContent = '영상 길이만큼 시간이 걸립니다. 만드는 동안 이 탭을 띄워 두세요.';
-    ttsNote();
+    const hadMedia = resetMedia();
     listingIO?.set(data.listing && typeof data.listing === 'object' ? data.listing : null);
     ttsTextEdited = false; // 다른 프로젝트를 열었으니 대본 칸도 그 자막으로
     syncControls();
@@ -1187,10 +1308,29 @@ async function openProject(file) {
     syncMusicPreview();
     $('#exportBtn').textContent = exportLabel();
     $('#scriptText').value = project.scenes.map((s) => s.caption).join('\n');
+    // 따라하기 상태 복원(파일에 recipe 가 있고 그 사례가 아직 있을 때). 없으면 켜져 있던 레시피 모드를 조용히 끝냄
+    recipeHooks.restore?.(data.recipe && typeof data.recipe === 'object' ? data.recipe : null, project.scenes);
     toast(hadMedia ? '프로젝트를 열었습니다. 목소리와 영상은 프로젝트에 들어가지 않아 다시 만들어야 합니다.' : '프로젝트를 열었습니다.', hadMedia ? 5000 : undefined);
   } catch (e) {
     toast(e.message || '프로젝트를 열지 못했습니다.');
   }
+}
+
+/**
+ * 만든 내레이션·결과 영상(한 편·전부)을 버립니다 — 다른 프로젝트를 열거나 사례를 새로 실을 때(새 장면에 예전 소리·영상이 붙지 않게).
+ * 사용자가 넣은 배경음악 파일은 그대로 둡니다. 버린 것이 있었으면 true.
+ */
+function resetMedia() {
+  const hadMedia = !!(audio.narr || resultBlob || lastBatch.length);
+  audio.narr = null;
+  $('#narrFile').value = '';
+  ttsResult = null;
+  $('#ttsSave').hidden = true;
+  clearResults();
+  $('#exportStatus').textContent = '영상 길이만큼 시간이 걸립니다. 만드는 동안 이 탭을 띄워 두세요.';
+  ttsNote();
+  renderAudioInfo();
+  return hadMedia;
 }
 
 // ── AI 대본 ───────────────────────────────────────────
@@ -1488,13 +1628,42 @@ const api = {
   setEnding(patch) { project.ending = { ...project.ending, ...(patch || {}) }; syncControls(); changed(false); },
   /** 처음부터 들어 있던 값(DEFAULTS) — 사용자가 고친 값인지 가릴 때 */
   defaults: { channel: DEFAULTS.channel, ending: { ...DEFAULTS.ending }, title: DEFAULTS.title },
-  /** 예시(강의) 제목인지 — 첫 화면 예시나 스타일 예시 제목이면 true */
+  /** 예시 제목인지 — 첫 화면 예시·스타일 예시·따라하기 사례 제목이면 true(② 매물 정보를 적으면 매물 제목으로 바뀜) */
   isSampleTitle(t) {
     const k = (x) => plainText(String(x || '')).replace(/\s+/g, ' ').trim();
     const v = k(t);
     if (!v) return false;
-    return v === k(SHORTS_CASE.title) || STYLES.some((st) => st.sample?.title && k(st.sample.title) === v);
+    return v === k(SHORTS_CASE.title) || STYLES.some((st) => st.sample?.title && k(st.sample.title) === v) || CASE_DATA.some((c) => k(c.title) === v);
   },
+  /** 스타일 입히기(id 또는 STYLES 항목). { keepScenes } 면 예시 장면을 스타일 예시로 바꾸지 않음 — 따라하기가 씀 */
+  applyStyle(idOrStyle, opts) { return applyStyle(idOrStyle, opts); },
+  styleOf(id) { return STYLES.find((st) => st.id === id) || null; },
+  /** 스타일 음악 고르기('auto' | 'off' | MOODS id) — 소리 패널 select 도 같이 */
+  setStyleMusic(v) {
+    project.styleMusic = typeof v === 'string' && v ? v : 'auto';
+    syncControls();
+    renderAudioInfo();
+    syncMusicPreview();
+    changed(false);
+  },
+  resetMedia,
+  /** 매물 상자 ②의 중개사무소 정보(없으면 이 브라우저에 기억한 값) */
+  officeInfo() { return listingIO?.office?.() || store.get('office', {}) || {}; },
+  /** 매물 상자의 매물·사무소 정보 { facts, office }(AI 다듬기 프롬프트용) */
+  listingInfo() { return listingIO?.get?.() || null; },
+  /** 매물 상자에 "이 채널·엔딩은 내가(앱이) 넣은 값"이라고 알려 둡니다 — 나중에 ②에서 상호를 고치면 따라오게 */
+  noteBrand(o) { listingIO?.noteBrand?.(o); },
+  /** 상호·연락처(p.brand) 바꾸기({ name, phone, sub } 중 일부) — 제목·채널 패널 칸도 같이 */
+  setBrand(patch) { project.brand = { ...DEFAULTS.brand, ...(project.brand || {}), ...(patch && typeof patch === 'object' ? patch : {}) }; syncControls(); changed(false); },
+  /** 따라하기 모드 켬/끔: fn(imgs) → { placed, added } 가 있으면 넣은 사진이 사례 자리로 갑니다(null 이면 평소대로 뒤에 붙임) */
+  registerPhotoSink(fn) { photoSink = typeof fn === 'function' ? fn : null; },
+  /** recipe.js 가 한 번 등록: replaced(scene,key)·snapshot()·restore(saved,scenes)·linesApplied()·styled(st) */
+  registerRecipeHooks(hooks) { recipeHooks = hooks && typeof hooks === 'object' ? hooks : {}; },
+  get recipeMode() { return !!photoSink; },
+  pickReplacement,
+  /** 장면 구성이 잠겨 있으면 까닭을 토스트로 알리고 true */
+  structureLocked,
+  saveProject,
   /** 지금 영상 길이(초) */
   get duration() { return tl.total; },
   tts,
@@ -1546,10 +1715,13 @@ const BINDINGS = [
   ['bandColor', 'bandColor'], ['panelColor', 'panelColor'], ['inkColor', 'inkColor'], ['showProgress', 'showProgress', 'check'], ['title', 'title'],
   ['channel', 'channel'], ['quality', 'quality'], ['styleMusic', 'styleMusic'],
   ['bgmVolume', 'bgmVolume', Number], ['narrVolume', 'narrVolume', Number],
+  ['photoIn', 'photoIn'], ['photoFit', 'photoFit'], ['titleAnim', 'titleAnim'], // 광고용 모션 어휘(select 하나 = 값 하나)
 ];
 const ENDING_BINDINGS = [
-  ['endingOn', 'enabled', 'check'], ['endingText', 'text'], ['endingSub', 'sub'], ['endingDur', 'duration', Number],
+  ['endingOn', 'enabled', 'check'], ['endingText', 'text'], ['endingSub', 'sub'], ['endingDur', 'duration', Number], ['endingCta', 'cta'],
 ];
+/** 추가 장식 체크칸(#extrasField) — 여기 없는 장식 id(스타일이 넣은 기존 장식 등)는 체크를 바꿔도 그대로 둡니다 */
+const extraChecks = () => [...document.querySelectorAll('#extrasField input[data-extra]')];
 
 function syncControls() {
   for (const [id, key, kind] of BINDINGS) {
@@ -1565,9 +1737,24 @@ function syncControls() {
   }
   for (const [id, key, kind] of ENDING_BINDINGS) {
     const el = document.getElementById(id);
+    if (!el) continue;
     if (kind === 'check') el.checked = !!project.ending[key];
-    else el.value = project.ending[key];
+    else el.value = project.ending[key] ?? '';
   }
+  // 배열·객체 값 조절(사진 위 장식·추가 장식·광고형 움직임·상호·연락처)
+  const deco = $('#deco');
+  if (deco) {
+    const v = Array.isArray(project.deco) && project.deco.length ? String(project.deco[0]) : 'none';
+    deco.value = v;
+    if (deco.value !== v) deco.value = 'none'; // 목록에 없는 값은 '없음'으로 보이기만(값은 그대로 둠)
+  }
+  for (const el of extraChecks()) el.checked = Array.isArray(project.extras) && project.extras.includes(el.dataset.extra);
+  const fx = $('#fx');
+  if (fx) fx.checked = project.fx === 'ad';
+  const bn = $('#brandName');
+  if (bn) bn.value = project.brand?.name || '';
+  const bp = $('#brandPhone');
+  if (bp) bp.value = project.brand?.phone || '';
   $('#bgmVolOut').textContent = `${Math.round(project.bgmVolume * 100)}%`;
   $('#narrVolOut').textContent = `${Math.round(project.narrVolume * 100)}%`;
 }
@@ -1587,11 +1774,24 @@ function wireControls() {
   }
   for (const [id, key, kind] of ENDING_BINDINGS) {
     const el = document.getElementById(id);
+    if (!el) continue;
     el.addEventListener('input', () => {
       project.ending[key] = kind === 'check' ? el.checked : kind ? kind(el.value) : el.value;
       changed(false);
     });
   }
+  $('#deco')?.addEventListener('input', (e) => { project.deco = e.target.value === 'none' ? [] : [e.target.value]; changed(false); });
+  for (const el of extraChecks()) {
+    el.addEventListener('input', () => {
+      const ids = extraChecks().map((x) => x.dataset.extra);
+      const keep = (Array.isArray(project.extras) ? project.extras : []).filter((x) => !ids.includes(x));
+      project.extras = [...keep, ...extraChecks().filter((x) => x.checked).map((x) => x.dataset.extra)];
+      changed(false);
+    });
+  }
+  $('#fx')?.addEventListener('input', (e) => { project.fx = e.target.checked ? 'ad' : 'none'; changed(false); });
+  $('#brandName')?.addEventListener('input', (e) => { project.brand = { ...DEFAULTS.brand, ...(project.brand || {}), name: e.target.value.slice(0, 60) }; changed(false); });
+  $('#brandPhone')?.addEventListener('input', (e) => { project.brand = { ...DEFAULTS.brand, ...(project.brand || {}), phone: e.target.value.slice(0, 40) }; changed(false); });
 }
 
 // ── 시작 ─────────────────────────────────────────────
@@ -1616,6 +1816,8 @@ export async function initShorts() {
   onKeysChange(() => { refreshAiBox(); renderTtsKeyState(); });
   $('#aiRun').addEventListener('click', runAI);
   initListing(api); // 매물 사진으로 쇼츠 만들기(단계 1~6) — 이 화면과 같은 project 를 씁니다
+  initRecipe(api); // 따라하기(레시피) 바 — 사례 화면의 「이대로 따라하기」가 여기로 들어옵니다
+  for (const b of document.querySelectorAll('#styleFilter .chipbtn')) b.addEventListener('click', () => setStyleFilter(b.dataset.filter));
 
   wireDrop($('#sceneDrop'), addImageFiles);
   $('#addTextScene').addEventListener('click', () => {
@@ -1692,7 +1894,7 @@ export async function initShorts() {
     toast((await copyText($('#uploadText').textContent)) ? '업로드용 글을 복사했습니다.' : '복사하지 못했습니다.');
   });
 
-  $('#styleBatchBtn').addEventListener('click', exportAllStyles);
+  $('#styleBatchBtn').addEventListener('click', () => exportAllStyles()); // 인자 없이(필터대로 보이는 스타일만)
   $('#batchStop').addEventListener('click', () => batch?.abort.abort());
   $('#batchZip').addEventListener('click', saveBatchZip);
   $('#viralToggle').addEventListener('click', (e) => {

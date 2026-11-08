@@ -290,9 +290,10 @@ const ls = {
   staleVideo: false, // '예전 영상' 안내를 이미 띄웠는지
   autoTitle: '', // 이 상자가 ② 정보로 만들어 넣은 제목(사용자가 고치지 않았으면 정보가 바뀔 때 같이 바꿈)
   autoChannel: typeof saved.autoChannel === 'string' ? saved.autoChannel : '', // 이 상자가 넣은 영상 이름(상호)
-  autoEnding: saved.autoEnding && typeof saved.autoEnding === 'object' ? saved.autoEnding : null, // 이 상자가 넣은 엔딩 { text, sub }
+  autoEnding: saved.autoEnding && typeof saved.autoEnding === 'object' ? saved.autoEnding : null, // 이 상자가 넣은 엔딩 { text, sub, keepText? }
+  autoBrand: saved.autoBrand && typeof saved.autoBrand === 'object' ? saved.autoBrand : null, // 이 상자가 넣은 상호·연락처(p.brand) { name, phone }
 };
-const saveListingPrefs = () => store.set('listing', { ai: ls.ai, voiceTab: ls.voiceTab, autoChannel: ls.autoChannel, autoEnding: ls.autoEnding });
+const saveListingPrefs = () => store.set('listing', { ai: ls.ai, voiceTab: ls.voiceTab, autoChannel: ls.autoChannel, autoEnding: ls.autoEnding, autoBrand: ls.autoBrand });
 /** 상태 칸의 처음 안내 문구(index.html) — 프로젝트를 새로 열 때 되돌림 */
 const NOTES = {};
 const saveOffice = debounce(() => store.set('office', ls.office), 300);
@@ -439,13 +440,25 @@ function applyOfficeBrand() {
     if (p.channel !== name) api.setChannel(name);
     ls.autoChannel = name;
   }
-  const end = { text: '*문의*는 설명란 연락처로', sub: [ls.office.name, ls.office.phone].filter(Boolean).join(' ') };
   const e = p.ending || {};
   const isDefault = e.text === d.ending.text && e.sub === d.ending.sub;
-  const isMine = ls.autoEnding && e.text === ls.autoEnding.text && e.sub === ls.autoEnding.sub;
+  const isMine = !!ls.autoEnding && e.text === ls.autoEnding.text && e.sub === ls.autoEnding.sub;
+  // keepText: 따라하기 사례가 넣은 엔딩 문구("가맹 상담은 *프로필 연락처*로")는 지키고 부제(상호 전화)만 맞춥니다(noteBrand 로 알려 둔 값)
+  const keepText = isMine && !!ls.autoEnding.keepText;
+  const end = { text: keepText ? (e.text || '') : '*문의*는 설명란 연락처로', sub: [ls.office.name, ls.office.phone].filter(Boolean).join(' ') };
   if (isDefault || isMine) {
     if (e.text !== end.text || e.sub !== end.sub) api.setEnding({ text: end.text, sub: end.sub });
-    ls.autoEnding = end;
+    ls.autoEnding = { ...end, keepText };
+  }
+  // 상호·연락처(p.brand — 로워서드·엔딩 연락처 줄): 비어 있거나 이 상자가 넣은 값 그대로일 때만 바꿉니다(아래 제목·채널 패널에서 고친 값은 그대로)
+  if (name && typeof api.setBrand === 'function') {
+    const b = p.brand || {};
+    const mine = !b.name || (ls.autoBrand && b.name === ls.autoBrand.name && (b.phone || '') === (ls.autoBrand.phone || ''));
+    if (mine) {
+      const brand = { name, phone: ls.office.phone || '' };
+      if (b.name !== brand.name || (b.phone || '') !== brand.phone) api.setBrand(brand);
+      ls.autoBrand = brand;
+    }
   }
   saveListingPrefs();
 }
@@ -1342,6 +1355,19 @@ const listingIO = {
   },
   /** 아래 숏폼 화면의 업로드 글(복사·ZIP) — 매물 영상이면 매물 글, 아니면 null(숏폼 기본 글) */
   uploadText() { return api && listingContext() ? listingUploadText() : null; },
+  /** 지금 ②에 적힌 중개사무소 정보(복사본) — 따라하기(recipe.js)가 채널·엔딩·brand 를 채울 때 읽습니다 */
+  office() { return { ...ls.office }; },
+  /**
+   * 다른 곳(따라하기)이 넣은 채널·엔딩을 "이 상자가 넣은 값"으로 기억해 두어, 나중에 ②에서 상호를 고치면 applyOfficeBrand 가 따라 바꿉니다.
+   * keepText 면 엔딩 큰 글은 그대로 두고 부제(상호 전화)만 맞춥니다.
+   */
+  noteBrand({ channel, ending, keepText } = {}) {
+    if (typeof channel === 'string') ls.autoChannel = channel;
+    if (ending && typeof ending === 'object') ls.autoEnding = { text: String(ending.text ?? ''), sub: String(ending.sub ?? ''), keepText: !!keepText };
+    const b = api?.project?.brand;
+    if (b && b.name) ls.autoBrand = { name: b.name, phone: b.phone || '' };
+    saveListingPrefs();
+  },
 };
 
 // ── 시작 ─────────────────────────────────────────────

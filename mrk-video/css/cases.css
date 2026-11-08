@@ -44,8 +44,8 @@
 /* 16:9 사례는 격자가 2열 이상일 때 두 칸을 차지해 가로 미리보기가 작아지지 않게(showcase.js fitWideCards 가 열 수를 보고 .wide 를 붙임 — 1열이면 안 붙여 넘치지 않음) */
 .follow-card.wide { grid-column: span 2; }
 .follow-card.wide .monitor[data-aspect="16:9"] { width: min(100%, 560px); margin: 0 auto; }
-.fc-photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 56px)); gap: 6px; } /* 카드 폭 280px 에 6칸(5장 + '+N')이 한 줄로, 사진이 적어도 56px 넘게 커지지 않게 */
-.fc-photos li { position: relative; min-width: 0; }
+.fc-photos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.fc-photos li { position: relative; flex: 1 1 42px; min-width: 42px; max-width: 56px; } /* 카드 폭 280px 에 6칸(5장 + '+N')이 한 줄로, 사진이 적으면 56px 까지만 커짐 */
 .fc-photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 9px; display: block; background: var(--surface-2); border: 1px solid var(--line); }
 .fc-photos b {
   position: absolute; top: 4px; left: 4px; padding: 1px 6px; border-radius: 6px;
@@ -101,7 +101,8 @@
   .follow-grid { grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); } /* 400px 에서 2열 */
   .follow-filter { flex-basis: 100%; }
   .follow-card { padding: 10px; border-radius: 14px; gap: 10px; }
-  .fc-photos { grid-template-columns: repeat(auto-fit, minmax(40px, 56px)); gap: 5px; }
+  .fc-photos { gap: 5px; }
+  .fc-photos li { flex-basis: 40px; min-width: 40px; }
   .fc-out .phone.sm { width: 100%; }
   .fc-body h3 { font-size: 15px; }
   .fc-body .row.wrap .btn { flex: 1 1 100%; }

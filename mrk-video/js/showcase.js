@@ -365,11 +365,13 @@ function renderFilter() {
   }
 }
 
-/** 16:9 카드는 격자가 2열 이상일 때만 두 칸(.wide)을 차지합니다 — 1열인데 span 2 를 주면 격자가 옆으로 넘치므로 실제 열 수를 보고 붙입니다. */
+/** 16:9 카드는 격자가 2열 이상일 때 두 칸(.wide)을 차지해 가로 미리보기가 작아지지 않게, 1:1 카드는 2열(폰)일 때만 — 옆의 9:16 폰보다 훨씬 낮아 카드 아래가 비기 때문.
+ *  1열인데 span 2 를 주면 격자가 옆으로 넘치므로 실제 열 수를 보고 붙입니다. */
 function fitWideCards(grid) {
   if (!grid.clientWidth) return; // 화면이 숨겨져 있으면 열 수를 알 수 없음(보이면 ResizeObserver 가 다시 부름)
   const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
-  for (const c of follow.cards) c.el.classList.toggle('wide', c.data.aspect === '16:9' && cols >= 2);
+  const wide = (c) => (c.data.aspect === '16:9' ? cols >= 2 : c.data.aspect === '1:1' ? cols === 2 : false);
+  for (const c of follow.cards) c.el.classList.toggle('wide', wide(c));
 }
 
 function applyFilter(id, { remember = false } = {}) {

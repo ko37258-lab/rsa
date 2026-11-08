@@ -144,6 +144,9 @@ async function prepareAll(page) {
     check('A 카드 접근성(role·aria-labelledby·canvas img·링크 aria-label·대본 토글)', basic.a11y.every((c) => c.role === 'listitem' && c.hasH3 && c.canvas.startsWith('img|사례 「') && c.link.startsWith('#follow=') && c.link.includes('이대로 따라하기') && c.toggle === 'false|true'), basic.a11y[0]);
     check('A 카드 글에 별표 남지 않음', basic.stars === 0, basic.stars);
     check('A 스타일·음악 이름', basic.a11y.every((c) => /^스타일 「.+」 · 음악 「.+」$/.test(c.style)), basic.a11y.map((c) => c.style));
+    const wide = await page.evaluate(() => ({ cols: getComputedStyle(document.getElementById('followGrid')).gridTemplateColumns.split(' ').length, wide: [...document.querySelectorAll('#followGrid .follow-card.wide')].map((c) => c.dataset.id), aspects: [...document.querySelectorAll('#followGrid .follow-card.wide .monitor')].map((m) => m.dataset.aspect) }));
+    report.detail.wide = wide;
+    check('A 1280: 16:9 카드만 두 칸(.wide)', wide.cols >= 3 && wide.aspects.length === wide.wide.length && wide.aspects.every((a) => a === '16:9') && wide.wide.length === cats.length - cats.length + (await page.evaluate(() => import('./js/cases-data.js').then((m) => m.CASE_DATA.filter((c) => c.aspect === '16:9').length))), wide);
 
     // 보이게 스크롤하면 그려짐
     const prepared = await prepareAll(page);
@@ -308,6 +311,9 @@ async function prepareAll(page) {
     check('M 400px 문서 가로 스크롤 없음', m1.scrollW <= m1.vw, `${m1.scrollW} / ${m1.vw}`);
     check('M 400px 갤러리 요소가 화면 밖으로 나가지 않음(칩 줄은 자체 스크롤)', m1.over.length === 0 && m1.filterRight <= m1.vw + 1, m1);
     check('M 400px 카드 2열', m1.cols === 2, m1.cols);
+    const wideM = await pm.evaluate(() => [...document.querySelectorAll('#followGrid .follow-card.wide .monitor')].map((m) => m.dataset.aspect).sort());
+    const wantM = await pm.evaluate(() => import('./js/cases-data.js').then((m) => m.CASE_DATA.filter((c) => c.aspect !== '9:16').map((c) => c.aspect).sort()));
+    check('M 400px 2열: 16:9·1:1 카드가 한 줄(.wide)', JSON.stringify(wideM) === JSON.stringify(wantM), { wideM, wantM });
     check('K 모바일 #case-follow 가 위 메뉴 줄 아래로', m1.secTop >= m1.sideBottom - 1 && m1.secTop <= m1.sideBottom + 80, { secTop: m1.secTop, sideBottom: m1.sideBottom });
     const preparedM = await prepareAll(pm);
     check('M 400px 카드가 모두 그려짐', preparedM.every((p) => p.ready && !p.blank), preparedM.filter((p) => !p.ready || p.blank).map((p) => p.id).join(',') || '전부');
