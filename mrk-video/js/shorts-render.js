@@ -474,8 +474,9 @@ export const PHOTO_INS = ['none', 'push', 'reveal', 'pop', 'iris', 'plate'];
 export const PHOTO_FITS = ['cover', 'smart'];
 /** 사진 위·배경 장식(배열로 여러 개) */
 export const DECOS = ['sweep', 'bars', 'bokeh', 'frame', 'vignette'];
-/** 제목 등장(titleMode=band) */
-export const TITLE_ANIMS = ['none', 'rise', 'mask', 'stamp'];
+/** 제목 등장(titleMode=band). slide·words·scale 은 자막 등장(captionAnim)과 같은 움직임을 제목에 씁니다. 목록 밖 값은 none */
+export const TITLE_ANIMS = ['none', 'rise', 'mask', 'stamp', 'slide', 'words', 'scale'];
+const TITLE_ANIM_SET = new Set(TITLE_ANIMS);
 /** 장면 전환 */
 export const TRANSITIONS = ['fade', 'slide', 'zoom', 'none', 'wipe', 'flash', 'push'];
 /** 기존 장식 미세 움직임 묶음 */
@@ -1315,7 +1316,8 @@ function photoInOf(p, seg, t, fx) {
   const mode = p.photoIn;
   if (!on(mode) || !PHOTO_IN_SET.has(mode) || seg.kind !== 'scene' || !seg.scene.img || hasHookBg(p, seg.scene)) return null;
   const dur = Math.min(PHOTO_IN, (seg.end - seg.start) * 0.5);
-  const delay = (fx.cut || 0) + (mode === 'push' ? fx.delay || 0 : 0);
+  // 색판이 먼저 깔리는 push·plate 는 밀기·와이프 전환이 끝난 뒤(색판이 장면과 함께 들어온 뒤) 시작. reveal·pop·iris 는 지연하면 빈 판이 보여 바로 시작
+  const delay = (fx.cut || 0) + (mode === 'push' || mode === 'plate' ? fx.delay || 0 : 0);
   const local = t - seg.start - delay;
   if (local >= dur) return null;
   const x = Math.max(0, local);
@@ -1417,7 +1419,7 @@ function drawPhoto(ctx, p, img, r, zoom, m, u) {
  * 사진 위 장식(deco). 사진 칸 clip 안에서 사진을 그린 뒤·자막 전에 부릅니다. bokeh 는 배경층이라 여기 없음(drawBokeh).
  *  sweep   : 흰 반투명 빛 띠(폭 220u, 가운데 알파 0.5, 아래가 왼쪽으로 칸 높이의 0.45 기울어짐)가 장면 0.4~1.0초에 왼→오로 한 번
  *  frame   : 안쪽 28u 흰 액자 선(3u)이 0.6초 동안 위→오른쪽→아래→왼쪽 순서로 그려짐
- *  vignette: 가장자리를 검정 45% 로 어둡게(정지, 캐시 캔버스 1장). blur 템플릿은 흐린 배경 쪽에서 따로 그림
+ *  vignette: 가장자리를 검정 45% 로 어둡게(정지, 캐시 캔버스 1장). blur 템플릿은 흐린 배경 쪽에서 따로 그리고 card 는 그리지 않음(프레임 예산)
  *  bars    : 위아래 70u 레터박스 띠(bandColor) + 안쪽 가장자리 3u 강조색 선(정지)
  * photo=false(사진 없는 글자 장면)면 bars 만, hookBg=true(훅 배경)면 bars·vignette 만 그립니다.
  */
@@ -1467,7 +1469,8 @@ function drawDeco(ctx, p, r, local, u, photo = true, hookBg = false) {
       ctx.stroke();
     }
   }
-  if ((photo || hookBg) && p.template !== 'blur' && d.includes('vignette')) drawVignette(ctx, r);
+  // 비네트: blur 는 흐린 배경 쪽에서 화면 전체에, card 는 프레임 예산 때문에 그리지 않음
+  if ((photo || hookBg) && p.template !== 'blur' && p.template !== 'card' && d.includes('vignette')) drawVignette(ctx, r);
   if (d.includes('bars')) {
     const bh = 70 * u;
     ctx.fillStyle = p.bandColor;
@@ -1496,8 +1499,9 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
   ctx.translate(fx.dx, fx.dy || 0);
 
   if (hasHookBg(p, scene)) {
-    // photoIn 이 켜져 있으면 훅 배경 사진도 1.06→1 로 살짝 정착(광고 첫 1초에 움직임이 있게). 꺼져 있으면 1.08×1 로 옛 값 그대로
-    drawHookBackground(ctx, p, W, H, scene, on(p.photoIn) ? 1 + 0.06 * (1 - easeOut((local - (fx.cut || 0)) / 0.5)) : 1);
+    // photoIn 이 켜져 있으면 훅 배경 사진도 1.06→1 로 살짝 정착(광고 첫 1초에 움직임이 있게), 플래시 컷 뒤 줌 정착(fx.zoom)도 받음. 둘 다 아니면 1.08×1 로 옛 값 그대로
+    const hookZoom = (on(p.photoIn) ? 1 + 0.06 * (1 - easeOut((local - (fx.cut || 0)) / 0.5)) : 1) * (p.transition === 'flash' ? fx.zoom || 1 : 1);
+    drawHookBackground(ctx, p, W, H, scene, hookZoom);
     if (hasDeco(p, 'bars') || hasDeco(p, 'vignette')) drawDeco(ctx, p, { x: 0, y: 0, w: W, h: H }, local, u, false, true);
     ctx.restore();
     return;
@@ -1516,9 +1520,9 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
     const cx = card.x + card.w / 2;
     const cy = card.y + card.h / 2;
     ctx.translate(cx, cy);
-    // photoIn:'pop' 은 카드 전체(테두리·그림자 포함)가 카드 가운데를 중심으로 톡 자리 잡음
+    // photoIn:'pop' 은 카드 전체(테두리·그림자 포함)가 카드 가운데를 중심으로 0.85→1 로 톡 커지며 나타남
     if (pin?.mode === 'pop') {
-      const s = 1 + 0.12 * (1 - pin.e);
+      const s = 0.85 + 0.15 * pin.e;
       ctx.scale(s, s);
       ctx.globalAlpha *= pin.a;
     }
@@ -1731,11 +1735,13 @@ function drawChrome(ctx, p, L, W, H, logo, alpha, t = Infinity) {
     ctx.drawImage(logo, W - pad - lw, chY - lh / 2, lw, lh);
   }
   if (p.titleMode === 'band') {
-    // titleAnim(제목 등장): 영상 시작 0.9초 동안만. rise=아래 40u 에서 떠오르며 강조색 밑줄이 왼→오로 그려짐(0.9초에 사라짐),
-    // mask=왼→오로 열림, stamp=1.3→1 로 쾅. 0.9초 뒤엔 변환이 없어 정착 모양은 지금 제목과 같습니다
+    // titleAnim(제목 등장): 제목이 처음 보이는 장면 시작(t) 뒤 0.9초 동안만. rise=아래 40u 에서 떠오르며 강조색 밑줄이 왼→오로 그려짐(0.9초에 사라짐),
+    // mask=왼→오로 열림, stamp=1.3→1 로 쾅, slide·words·scale=자막 등장과 같은 움직임(drawRichText 의 anim 재사용, 1초 창).
+    // 0.9초 뒤엔 변환·anim 이 없어 정착 모양은 지금 제목과 같습니다. 목록 밖 값은 none
     const ta = p.titleAnim;
-    const live = on(ta) && t < 0.9;
-    if (live) {
+    const live = on(ta) && TITLE_ANIM_SET.has(ta) && t < 0.9;
+    const reuse = live && (ta === 'slide' || ta === 'words' || ta === 'scale');
+    if (live && !reuse) {
       ctx.save();
       const e = easeOut(t / 0.5);
       if (ta === 'rise') { ctx.translate(0, (1 - e) * 40 * u); ctx.globalAlpha *= e; }
@@ -1753,8 +1759,9 @@ function drawChrome(ctx, p, L, W, H, logo, alpha, t = Infinity) {
     const titleOpt = { size: p.captionSize * 1.08 * u, weight: p.font, style: overPhoto ? 'outline' : 'plain', maxLines: L.wide ? 2 : 3 };
     drawRichText(ctx, titleText, L.title, {
       ...titleOpt, color: p.titleColor || ink, hl: p.highlightColor, shadow: overPhoto, valign: 'center', u,
+      ...(reuse ? { anim: { mode: ta, t, dur: 1.0 } } : {}),
     });
-    if (live) {
+    if (live && !reuse) {
       if (ta === 'rise' && t > 0.5 && plainText(titleText).trim()) {
         // 밑줄: 글 블록(세로 가운데) 바로 아래, 가장 긴 줄의 왼쪽 끝에서 그 줄 폭만큼 왼→오로. 줄나눔은 layoutText 캐시라 비용 없음
         const TLt = layoutText(ctx, titleText, L.title, titleOpt, titleOpt.style);
@@ -2632,7 +2639,7 @@ function pushWindow(p, L, prev, seg) {
     const b = cardRects(p, L, seg.scene).card;
     const m = 40 * L.u;
     const x = Math.min(a.x, b.x) - m;
-    const y = Math.min(a.y, b.y) - m;
+    const y = Math.max(Math.min(a.y, b.y) - m, L.titleH - 10 * L.u); // 제목 띠 아래(−2° 모서리 16.7u 만 여유)
     return { x, y, w: Math.max(a.x + a.w, b.x + b.w) + m - x, h: Math.max(a.y + a.h, b.y + b.h) + m - y };
   }
   return L.img;
@@ -2669,8 +2676,8 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
   const entering = inTr && on(p.photoIn) && photoInOf(p, seg, t, {}) !== null;
   // 제목 등장(titleAnim)의 시계: 제목이 처음 보이는 장면(훅 배경이 아닌 첫 장면)의 시작부터. full/blur 훅 스타일은 둘째 장면에 제목이 처음 나옵니다
   const tTitle = on(p.titleAnim) ? t - (tl.segs.find((s) => s.kind === 'scene' && !hasHookBg(p, s.scene)) || tl.segs[0]).start : t;
-  // 보케는 full·blur 에선 사진에 덮여 보이지 않으므로 그리지 않습니다(비용만 듦)
-  const bokeh = hasDeco(p, 'bokeh') && p.template !== 'full' && p.template !== 'blur';
+  // 보케는 full·blur 에선 사진에 덮여 보이지 않고, card 는 프레임 예산(22~29ms)이 빠듯해 그리지 않습니다
+  const bokeh = hasDeco(p, 'bokeh') && p.template !== 'full' && p.template !== 'blur' && p.template !== 'card';
 
   drawStaticBackground(ctx, p, L, W, H);
   if (bokeh) drawBokeh(ctx, p, L, W, H, t);
@@ -2777,11 +2784,11 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
     ctx.fillRect(0, H - bh, (W * t) / tl.total, bh);
   }
 
-  // 플래시 컷의 흰빛(강조색 25% 섞음): 제목·장식·자막까지 함께 하얘지게 맨 위에, 알파는 sin 곡선(0→0.92→0)
+  // 플래시 컷의 흰빛(강조색 25% 섞음): 제목·장식·자막까지 함께 하얘지게 맨 위에, 알파는 sin 곡선(0→0.9→0)
   if (inTr && p.transition === 'flash') {
     const { r, g, b } = rgbOf(p.highlightColor);
     const mix = (c) => Math.round(255 - (255 - c) * 0.25);
-    ctx.fillStyle = `rgba(${mix(r)},${mix(g)},${mix(b)},${(Math.sin(raw * Math.PI) * 0.92).toFixed(3)})`;
+    ctx.fillStyle = `rgba(${mix(r)},${mix(g)},${mix(b)},${(Math.sin(raw * Math.PI) * 0.9).toFixed(3)})`;
     ctx.fillRect(0, 0, W, H);
   }
 

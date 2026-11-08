@@ -41,7 +41,10 @@
 /* 넣는 것: 사진 자리 띠(자리 번호 + 라벨) */
 .fc-io, .fc-out, .fc-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .fc-body { flex: 1 1 auto; } /* 설명이 짧아도 버튼 줄은 같은 줄 카드끼리 아래에 맞춤 */
-.fc-photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 6px; } /* 카드 폭 280px 에 6칸(5장 + '+N')이 한 줄로 */
+/* 16:9 사례는 격자가 2열 이상일 때 두 칸을 차지해 가로 미리보기가 작아지지 않게(showcase.js fitWideCards 가 열 수를 보고 .wide 를 붙임 — 1열이면 안 붙여 넘치지 않음) */
+.follow-card.wide { grid-column: span 2; }
+.follow-card.wide .monitor[data-aspect="16:9"] { width: min(100%, 560px); margin: 0 auto; }
+.fc-photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 56px)); gap: 6px; } /* 카드 폭 280px 에 6칸(5장 + '+N')이 한 줄로, 사진이 적어도 56px 넘게 커지지 않게 */
 .fc-photos li { position: relative; min-width: 0; }
 .fc-photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 9px; display: block; background: var(--surface-2); border: 1px solid var(--line); }
 .fc-photos b {
@@ -59,7 +62,7 @@
 .fc-out .phone.sm .phone-notch { top: 11px; width: 40px; height: 4px; }
 .monitor { position: relative; width: 100%; padding: 6px; border-radius: 12px; background: var(--monitor); box-shadow: var(--shadow), 0 0 0 1px rgb(255 255 255 / 10%) inset; }
 .monitor[data-aspect="16:9"] { aspect-ratio: 16 / 9; }
-.monitor[data-aspect="1:1"] { aspect-ratio: 1; width: min(100%, 220px); margin: 0 auto; }
+.monitor[data-aspect="1:1"] { aspect-ratio: 1; width: min(100%, 264px); margin: 0 auto; }
 .monitor canvas { width: 100%; height: 100%; border-radius: 8px; display: block; background: #000; }
 /* 준비 전(보이기 전) 캔버스는 단색 뼈대 — 준비되면 data-ready 가 붙고 엔진이 그린 프레임이 보입니다 */
 .follow-card:not([data-ready]) canvas { background: var(--surface-2); }
@@ -98,7 +101,7 @@
   .follow-grid { grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); } /* 400px 에서 2열 */
   .follow-filter { flex-basis: 100%; }
   .follow-card { padding: 10px; border-radius: 14px; gap: 10px; }
-  .fc-photos { grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); gap: 5px; }
+  .fc-photos { grid-template-columns: repeat(auto-fit, minmax(40px, 56px)); gap: 5px; }
   .fc-out .phone.sm { width: 100%; }
   .fc-body h3 { font-size: 15px; }
   .fc-body .row.wrap .btn { flex: 1 1 100%; }

@@ -209,7 +209,14 @@ const PAGE_CODE = String.raw`
     }
     const p2 = await project({ titleAnim: 'rise', template: 'band', aspect: '16:9' });
     cells.push(cell(p2, 0.7, 'titleAnim rise 16:9 t=0.7', '가로 한 줄 제목 + 밑줄', 'band / 16:9', 640, errors));
-    return { title: '(d) titleAnim — rise · mask · stamp × 0.2/0.5/0.9초', cells, boxW: 640, boxH: 640, cols: 5 };
+    for (const titleAnim of ['slide', 'words', 'scale']) {
+      const p = await project({ titleAnim, template: 'split', panelColor: '#eaf7e4', highlightColor: '#1fcf62' });
+      cells.push(cell(p, 0.25, 'titleAnim ' + titleAnim + ' t=0.25', '자막 등장과 같은 움직임을 제목에', 'split / t=0.25', 360, errors));
+    }
+    // 훅 배경 스타일(full 훅): 제목이 둘째 장면에 처음 보이므로 시계도 둘째 장면 시작부터
+    const ph = await project({ titleAnim: 'mask', template: 'full' });
+    cells.push(cell(ph, seg(ph, 1).start + 0.3, 'titleAnim mask 훅 스타일 둘째 장면 +0.3s', '제목이 처음 보이는 장면 기준으로 열림', 'full / 둘째 장면', 360, errors));
+    return { title: '(d) titleAnim — rise · mask · stamp × 0.2/0.5/0.9초, slide · words · scale', cells, boxW: 640, boxH: 640, cols: 5 };
   }
 
   async function sectionE(errors) {

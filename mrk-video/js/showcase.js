@@ -365,6 +365,13 @@ function renderFilter() {
   }
 }
 
+/** 16:9 카드는 격자가 2열 이상일 때만 두 칸(.wide)을 차지합니다 — 1열인데 span 2 를 주면 격자가 옆으로 넘치므로 실제 열 수를 보고 붙입니다. */
+function fitWideCards(grid) {
+  if (!grid.clientWidth) return; // 화면이 숨겨져 있으면 열 수를 알 수 없음(보이면 ResizeObserver 가 다시 부름)
+  const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+  for (const c of follow.cards) c.el.classList.toggle('wide', c.data.aspect === '16:9' && cols >= 2);
+}
+
 function applyFilter(id, { remember = false } = {}) {
   if (id !== 'all' && !CASE_CATEGORIES.some((k) => k.id === id)) id = 'all';
   for (const b of document.querySelectorAll('#followFilter .chipbtn')) b.setAttribute('aria-pressed', String(b.dataset.cat === id));
@@ -385,6 +392,9 @@ function fillFollowGallery() {
     }).filter(Boolean);
     follow.byEl = new Map(follow.cards.map((c) => [c.el, c]));
     for (const c of follow.cards) grid.append(c.el);
+    fitWideCards(grid);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => fitWideCards(grid)).observe(grid);
+    else window.addEventListener('resize', () => fitWideCards(grid));
     renderFilter();
     applyFilter(store.get('followFilter', 'all'));
     observeCards();
