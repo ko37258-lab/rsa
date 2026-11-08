@@ -97,7 +97,7 @@ function currentView() {
 function consumeFollow() {
   const m = location.hash.match(/^#follow=([a-z0-9-]+)$/i);
   if (!m) return;
-  history.replaceState(null, '', '#shorts');
+  try { history.replaceState(null, '', '#shorts'); } catch { /* 미리보기 틀 등에서 막혀도 따라하기는 진행 */ }
   followCase(m[1], { from: 'link' });
 }
 

@@ -197,6 +197,8 @@ function showAsk(c) {
  * 사례 → 프로젝트 변환은 cases.js 의 caseToProject 하나로(갤러리 미리보기와 같은 결과).
  */
 async function loadCase(c) {
+  // 바의 「불러오기」는 묻는 사이 영상·목소리 만들기가 시작됐을 수 있음 — 만드는 중에 장면·소리를 지우지 않게
+  if (api.busy) { toast('영상이나 목소리를 만드는 중입니다. 끝난 뒤 다시 눌러 주세요.'); return; }
   const office = api.officeInfo();
   const built = await caseToProject(c, { office, defaults: { channel: api.defaults.channel }, newScene: api.newScene });
   if (api.structureLocked()) return; // 기다리는 사이 AI 대본이 시작됐으면 넣지 않음
@@ -236,6 +238,7 @@ async function loadCase(c) {
 /** 「사례 그만」 — 레시피 모드만 끝냅니다. 장면·예시 표시·자리 번호는 그대로 둡니다(남은 예시 사진이 있으면 내보내기 경고는 계속). */
 export function stop({ quiet = false } = {}) {
   const had = !!recipe;
+  job?.abort.abort(); // AI 다듬기 중에 끝내면 다듬기도 멈춤(끝난 사례에 늦은 결과가 붙지 않게)
   recipe = null;
   ask = null;
   styleNote = '';
@@ -310,6 +313,7 @@ async function refine() {
   const used = changedScenes.slice(0, MAX_AI_PHOTOS);
   const usedImgs = used.map((s) => s.img);
   const start = [...scenesNow()];
+  const { category, name: caseName, slots: slotsAtStart } = recipe; // 기다리는 사이 「사례 그만」으로 recipe 가 비어도 쓸 수 있게
   const token = api.projectToken;
   const abort = new AbortController();
   job = { abort };
@@ -324,13 +328,13 @@ async function refine() {
       if (abort.signal.aborted) throw Object.assign(new Error('멈춤'), { name: 'AbortError' });
     }
     const photoOf = new Map(used.map((s, i) => [s.id, i]));
-    const extraIds = new Set(recipe.slots.filter((sl) => sl.extra).flatMap((sl) => sl.targets.map((t) => t.sceneId)));
+    const extraIds = new Set(slotsAtStart.filter((sl) => sl.extra).flatMap((sl) => sl.targets.map((t) => t.sceneId)));
     const st = api.currentStyle();
     const info = api.listingInfo() || {};
     const office = api.officeInfo();
     const prompt = buildRecipePrompt({
-      caseName: recipe.name,
-      categoryLabel: categoryOf({ category: recipe.category }).label,
+      caseName,
+      categoryLabel: categoryOf({ category }).label,
       scenes: start.map((s) => ({
         kind: s.kind, caption: s.caption, narration: s.narration || '', stamp: s.stamp, tag: s.tag, label: s.label, counter: s.counter,
         img: !!s.img, sample: !!s.sample, extra: extraIds.has(s.id), photo: photoOf.has(s.id) ? photoOf.get(s.id) : null,
@@ -342,6 +346,7 @@ async function refine() {
     });
     say(`${P.name}가 사진 ${used.length}장을 보고 자막·읽을 문장을 다듬는 중… (보통 10~60초)`);
     const data = await generateJSON({ provider, prompt, schema: RECIPE_SCHEMA, images, signal: abort.signal });
+    if (abort.signal.aborted) throw Object.assign(new Error('멈춤'), { name: 'AbortError' });
     const r = normalizeRecipeResult(data, start.length);
     // 잠금으로 막았어도 남는 경합에 대비: 장면 묶음·순서·보낸 사진이 그대로인지
     const now = scenesNow();
@@ -351,7 +356,7 @@ async function refine() {
     const hadVoice = !!api.audio.narr;
     for (const [i, ch] of r.changes) { now[i].caption = ch.caption; now[i].narration = ch.narration; }
     if (r.title && api.isSampleTitle(api.project.title)) api.setTitle(r.title); // 아직 사례 제목 그대로일 때만
-    const u = api.uploadInfo || { source: recipe.category === 'listing' ? 'listing' : 'recipe', platforms: {} };
+    const u = api.uploadInfo || { source: category === 'listing' ? 'listing' : 'recipe', platforms: {} };
     api.setUploadInfo({
       ...u,
       title: plainText(api.project.title).replace(/\n/g, ' ').trim(),

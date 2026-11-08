@@ -510,6 +510,8 @@ async function generate() {
   const out = (t, k) => say('lsGenStatus', t, k);
   if (inArtifact) return out('Claude 미리보기에서는 매물 대본 AI 를 쓸 수 없습니다. ko372.com 에서 써 주세요.', 'bad');
   if (ls.rec || ls.recStarting) return out('녹음을 먼저 멈춰 주세요. 녹음하는 동안 대본이 바뀌면 읽은 내용과 어긋납니다.', 'bad');
+  // 따라하기(사례) 중에는 ③ 이 사례 장면(예시 자리·마무리 글자 장면)을 지워 사례 구성이 깨지므로, 위 따라하기 바의 다듬기를 쓰게 안내합니다
+  if (api.recipeMode) return out('지금은 사례를 따라하는 중입니다. 위 따라하기 바의 「AI 로 사진에 맞춰 대본 다듬기」를 눌러 주세요(사례 구성은 그대로 두고 자막만 사진에 맞춥니다). 새로 쓰려면 「사례 그만」을 먼저 누르세요.', 'bad');
   const photos = photoScenes();
   if (!photos.length) { out('매물 사진을 먼저 넣어 주세요(① 매물 사진 넣기).', 'bad'); $('#lsFiles')?.focus(); return; }
   if (api.busy) return out('영상이나 목소리를 만드는 중입니다. 끝난 뒤 다시 눌러 주세요.', 'bad');
@@ -1359,6 +1361,8 @@ const listingIO = {
   uploadText() { return api && listingContext() ? listingUploadText() : null; },
   /** 지금 ②에 적힌 중개사무소 정보(복사본) — 따라하기(recipe.js)가 채널·엔딩·brand 를 채울 때 읽습니다 */
   office() { return { ...ls.office }; },
+  /** AI 에 보낼 매물 사실(빈 칸·숨긴 건축물 칸 뺌 — 매물 대본과 같은 규칙). 따라하기 AI 다듬기가 씁니다 */
+  facts() { return factsFilled(); },
   /**
    * 다른 곳(따라하기)이 넣은 채널·엔딩을 "이 상자가 넣은 값"으로 기억해 두어, 나중에 ②에서 상호를 고치면 applyOfficeBrand 가 따라 바꿉니다.
    * keepText 면 엔딩 큰 글은 그대로 두고 부제(상호 전화)만 맞춥니다.

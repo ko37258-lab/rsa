@@ -999,7 +999,7 @@ function showResult(r) {
  * (길이·스타일은 넣지 않습니다 — 대본·목소리가 바뀐 경우만 '예전 영상'으로 알리려는 것)
  */
 function projectSig(p = project, narr = audio.narr) {
-  return JSON.stringify([plainText(p.title), p.scenes.map((s) => [s.id, s.caption, s.narration || '']), narr ? narr.serial || narr.name : null]);
+  return JSON.stringify([plainText(p.title), p.scenes.map((s) => [s.id, s.caption, s.narration || '', s.img?.src || '', s.img2?.src || '']), narr ? narr.serial || narr.name : null]);
 }
 
 /** 만든 영상·전부 만들기 결과를 버립니다(다른 프로젝트를 열었을 때 — 예전 매물 영상이 새 제목으로 나가지 않게). */
@@ -1650,7 +1650,12 @@ const api = {
   /** 매물 상자 ②의 중개사무소 정보(없으면 이 브라우저에 기억한 값) */
   officeInfo() { return listingIO?.office?.() || store.get('office', {}) || {}; },
   /** 매물 상자의 매물·사무소 정보 { facts, office }(AI 다듬기 프롬프트용) */
-  listingInfo() { return listingIO?.get?.() || null; },
+  listingInfo() {
+    const info = listingIO?.get?.();
+    if (!info) return null;
+    // 종류가 토지일 때 숨긴 건축물 칸(방 수·준공 등)에 남은 값은 AI 에 보내지 않습니다(매물 대본과 같은 규칙)
+    return listingIO.facts ? { ...info, facts: listingIO.facts() } : info;
+  },
   /** 매물 상자에 "이 채널·엔딩은 내가(앱이) 넣은 값"이라고 알려 둡니다 — 나중에 ②에서 상호를 고치면 따라오게 */
   noteBrand(o) { listingIO?.noteBrand?.(o); },
   /** 상호·연락처(p.brand) 바꾸기({ name, phone, sub } 중 일부) — 제목·채널 패널 칸도 같이 */

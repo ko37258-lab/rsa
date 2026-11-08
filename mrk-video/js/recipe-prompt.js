@@ -163,6 +163,6 @@ export function normalizeRecipeResult(data, sceneCount) {
     upload,
     longCount: vals.filter((c) => c.long).length,
     // 화면 안내용: 과장·단정으로 보일 수 있는 말(자동으로 고치지 않음)
-    banned: findBannedWords(title, vals.map((c) => [c.caption, c.narration]), upload.description),
+    banned: findBannedWords(title, vals.map((c) => [c.caption, c.narration]), upload.description, upload.hashtags),
   };
 }
