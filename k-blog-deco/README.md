@@ -38,6 +38,7 @@ AI 키가 없으면 **템플릿 모드**(규칙 기반 생성)로 전체 흐름�
 
 `.env.local` 에 `ANTHROPIC_API_KEY` 를 넣으면 레퍼런스 분석·자유로운 말로 수정이 켜집니다.
 기본 모델은 `claude-opus-5-5` 이며 `AI_MODEL` 로 바꿀 수 있습니다. 호출 기록(토큰·시간)은 DB 의 `ai_runs` 표에 남습니다.
+입력 토큰은 단가가 다른 세 열로 나뉩니다 — 캐시를 거치지 않은 `input_tokens`, 캐시에 새로 쓴 `cache_write_tokens`, 캐시에서 읽은 `cache_read_tokens` (세 값의 합이 전체 입력). 시스템 프롬프트·도구 스키마가 캐시되므로 `input_tokens` 만 보면 실제 입력보다 훨씬 작게 보입니다.
 
 ## 4. 환경 변수
 
@@ -66,7 +67,7 @@ npm run build       # 프로덕션 빌드 (.next/standalone 생성)
 
 ### Vercel + Supabase (현재 운영 방식)
 
-1. Supabase 프로젝트에 `db/0001_init.sql`, `db/0002_rls_storage.sql` 을 적용합니다 (테이블 + RLS + 비공개 버킷 `kblog`).
+1. Supabase 프로젝트에 `db/` 의 SQL 을 번호 순서대로 적용합니다 — `0001_init.sql`(테이블), `0002_rls_storage.sql`(RLS + 비공개 버킷 `kblog`), `0003_ai_runs_cache_tokens.sql`(`ai_runs` 캐시 토큰 열). 이미 운영 중이면 새로 추가된 파일만 적용하면 됩니다.
 2. Vercel 프로젝트(Root Directory `k-blog-deco`)에서 **Integrations → Supabase** 로 프로젝트를 연결하면 DB·저장소 키가 자동으로 들어갑니다.
 3. 환경 변수에 `APP_URL`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `ANTHROPIC_API_KEY` (선택: `SESSION_SECRET`) 를 넣고 다시 배포합니다.
 

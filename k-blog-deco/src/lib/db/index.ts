@@ -10,10 +10,13 @@ import * as schema from "./schema";
 /**
  * DB 연결
  * - 운영(Vercel): DATABASE_URL 또는 POSTGRES_URL (Supabase 연결 풀러) → postgres.js
- * - 로컬 개발/테스트: 주소가 없으면 내장형 Postgres(PGlite)를 DATA_DIR/pglite 에 만들고 스키마를 자동 적용
- * 운영 스키마는 db/*.sql 을 Supabase 에 적용해 관리합니다.
+ * - 로컬 개발/테스트: 주소가 없으면 내장형 Postgres(PGlite)를 DATA_DIR/pglite 에 만들고 db/*.sql 을 자동 적용
+ * 운영 스키마는 db/*.sql 을 번호 순서대로 Supabase 에 적용해 관리합니다.
  */
 export type Db = PostgresJsDatabase<typeof schema>;
+
+/** Supabase 에서만 실행하는 파일 (RLS·Storage 버킷). 내장 DB 에는 적용하지 않습니다. */
+const SUPABASE_ONLY_SQL = new Set(["0002_rls_storage.sql"]);
 
 const globalForDb = globalThis as unknown as { __kbdDb?: Promise<Db> };
 
@@ -37,8 +40,10 @@ async function connectLocal(): Promise<Db> {
   const dir = path.resolve(env.dataDir, "pglite");
   fs.mkdirSync(dir, { recursive: true });
   const client = new PGlite(dir);
-  const sql = fs.readFileSync(path.join(process.cwd(), "db", "0001_init.sql"), "utf8");
-  await client.exec(sql);
+  // db/*.sql 을 이름 순서대로 모두 적용합니다. 모든 문장이 IF NOT EXISTS 라 기동마다 다시 실행해도 안전합니다.
+  const dbDir = path.join(process.cwd(), "db");
+  const files = fs.readdirSync(dbDir).filter((f) => f.endsWith(".sql") && !SUPABASE_ONLY_SQL.has(f)).sort();
+  for (const f of files) await client.exec(fs.readFileSync(path.join(dbDir, f), "utf8"));
   return drizzle(client, { schema }) as unknown as Db;
 }
 

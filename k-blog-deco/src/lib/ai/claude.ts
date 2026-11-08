@@ -10,7 +10,20 @@ function getClient() {
   return client;
 }
 
-export type AiUsage = { model: string; inputTokens: number; outputTokens: number };
+/**
+ * 토큰 사용량 (재시도가 있으면 모든 시도의 합).
+ * 입력 세 항목은 서로 겹치지 않으므로 전체 입력 토큰 = inputTokens + cacheWriteTokens + cacheReadTokens.
+ * - inputTokens: 프롬프트 캐시를 거치지 않은 입력 (정가). 시스템 프롬프트·도구 스키마는 캐시되므로 보통 사용자 내용(브리프·이미지)만 여기 잡힙니다.
+ * - cacheWriteTokens: 캐시에 새로 쓴 입력 (cache_creation_input_tokens, 정가보다 높은 단가)
+ * - cacheReadTokens: 캐시에서 읽은 입력 (cache_read_input_tokens, 정가보다 훨씬 낮은 단가)
+ */
+export type AiUsage = {
+  model: string;
+  inputTokens: number;
+  cacheWriteTokens: number;
+  cacheReadTokens: number;
+  outputTokens: number;
+};
 
 export type DesignTool = {
   name: string;
@@ -38,7 +51,7 @@ export async function designToolCall<T>(opts: {
   effort: "low" | "medium" | "high";
 }): Promise<{ data: T; usage: AiUsage }> {
   const anthropic = getClient();
-  const usage: AiUsage = { model: env.aiModel, inputTokens: 0, outputTokens: 0 };
+  const usage: AiUsage = { model: env.aiModel, inputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 };
   let lastReason = "";
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -84,8 +97,7 @@ export async function designToolCall<T>(opts: {
     }
 
     usage.model = msg.model;
-    usage.inputTokens += msg.usage.input_tokens;
-    usage.outputTokens += msg.usage.output_tokens;
+    addUsage(usage, msg.usage);
 
     if (msg.stop_reason === "refusal") {
       throw new ApiError(422, "ai_refusal", "AI 가 이 요청을 처리하지 않았습니다. 요청 문구나 첨부 이미지를 바꿔 다시 시도해 주세요.");
@@ -106,6 +118,14 @@ export async function designToolCall<T>(opts: {
   }
 
   throw new ApiError(502, "ai_invalid_output", "AI 응답 형식이 올바르지 않습니다. 잠시 후 다시 시도해 주세요.");
+}
+
+/** 응답 한 건의 토큰을 누적합니다. 캐시 항목은 캐시가 적용되지 않은 응답에서 null 일 수 있어 0 으로 봅니다. */
+function addUsage(total: AiUsage, u: Anthropic.Beta.BetaUsage) {
+  total.inputTokens += u.input_tokens;
+  total.cacheWriteTokens += u.cache_creation_input_tokens ?? 0;
+  total.cacheReadTokens += u.cache_read_input_tokens ?? 0;
+  total.outputTokens += u.output_tokens;
 }
 
 /** 도구 호출 입력을 꺼냅니다. 도구를 부르지 않고 글로 JSON 을 쓴 경우도 받아 줍니다. */

@@ -197,6 +197,8 @@ async function logRun(r: {
     model: r.usage?.model ?? env.aiModel,
     status: r.status,
     inputTokens: r.usage?.inputTokens ?? null,
+    cacheWriteTokens: r.usage?.cacheWriteTokens ?? null,
+    cacheReadTokens: r.usage?.cacheReadTokens ?? null,
     outputTokens: r.usage?.outputTokens ?? null,
     durationMs: r.ms,
     error: r.error?.slice(0, 500) ?? null,

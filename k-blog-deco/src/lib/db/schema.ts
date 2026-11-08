@@ -91,7 +91,10 @@ export const aiRuns = pgTable(
     kind: text("kind").notNull(), // generate | revise
     model: text("model").notNull(),
     status: text("status").notNull(), // ok | error
-    inputTokens: bigint("input_tokens", { mode: "number" }),
+    // 입력 토큰은 단가가 다른 세 항목으로 나눠 기록합니다 (서로 겹치지 않음, 합 = 전체 입력). 재시도가 있으면 모든 시도의 합.
+    inputTokens: bigint("input_tokens", { mode: "number" }), // 캐시를 거치지 않은 입력 (정가)
+    cacheWriteTokens: bigint("cache_write_tokens", { mode: "number" }), // 프롬프트 캐시에 새로 쓴 입력 (cache_creation_input_tokens)
+    cacheReadTokens: bigint("cache_read_tokens", { mode: "number" }), // 프롬프트 캐시에서 읽은 입력 (cache_read_input_tokens)
     outputTokens: bigint("output_tokens", { mode: "number" }),
     durationMs: bigint("duration_ms", { mode: "number" }),
     error: text("error"),
