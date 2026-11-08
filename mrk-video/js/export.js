@@ -43,6 +43,16 @@ export async function exportProject({ project, quality = '1080', startAudio = nu
   const ctx = canvas.getContext('2d');
   const timeline = buildTimeline(project);
   if (!timeline.total) throw new Error('장면이 없습니다.');
+  // 예열: 장면마다 첫 프레임과 등장 효과가 끝난 프레임을 미리 한 번 그려 둔다. 흐린 배경(blurredOf)·보케 같은 캐시 그림은
+  // 처음 그릴 때 15~25ms 가 걸려, 녹화 중에 장면이 바뀌는 순간 프레임이 끊길 수 있기 때문이다(녹화 시작 전에는 얼마가 걸려도 영상에 남지 않음).
+  onProgress({ t: 0, total: timeline.total, text: '준비 중…' });
+  for (const seg of timeline.segs) {
+    for (const dt of [0.05, 0.6]) {
+      const t = seg.start + dt;
+      if (t < seg.end) drawFrame(ctx, project, W, H, t, timeline);
+    }
+    if (signal?.aborted) break;
+  }
   drawFrame(ctx, project, W, H, 0, timeline);
 
   const stream = canvas.captureStream(30);
