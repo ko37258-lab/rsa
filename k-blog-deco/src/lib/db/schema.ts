@@ -1,6 +1,9 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { pgTable, text, bigint, index, uniqueIndex } from "drizzle-orm/pg-core";
 
-export const users = sqliteTable(
+// 시각 값은 모두 밀리초 epoch (bigint, JS number 로 다룸)
+const ms = (name: string) => bigint(name, { mode: "number" });
+
+export const users = pgTable(
   "users",
   {
     id: text("id").primaryKey(),
@@ -10,13 +13,13 @@ export const users = sqliteTable(
     nickname: text("nickname"),
     email: text("email"),
     profileImage: text("profile_image"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
+    createdAt: ms("created_at").notNull(),
+    updatedAt: ms("updated_at").notNull(),
   },
   (t) => [uniqueIndex("users_provider_uq").on(t.provider, t.providerId)],
 );
 
-export const projects = sqliteTable(
+export const projects = pgTable(
   "projects",
   {
     id: text("id").primaryKey(),
@@ -26,27 +29,27 @@ export const projects = sqliteTable(
     brief: text("brief").notNull(), // JSON (ProjectBrief)
     currentVersionId: text("current_version_id"),
     lastError: text("last_error"),
-    createdAt: integer("created_at").notNull(),
-    updatedAt: integer("updated_at").notNull(),
+    createdAt: ms("created_at").notNull(),
+    updatedAt: ms("updated_at").notNull(),
   },
   (t) => [index("projects_user_idx").on(t.userId, t.updatedAt)],
 );
 
-export const designVersions = sqliteTable(
+export const designVersions = pgTable(
   "design_versions",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
-    versionNo: integer("version_no").notNull(),
+    versionNo: bigint("version_no", { mode: "number" }).notNull(),
     design: text("design").notNull(), // JSON (BlogDesign)
     source: text("source").notNull(), // ai-generate | ai-revise | manual | restore | template
     note: text("note"),
-    createdAt: integer("created_at").notNull(),
+    createdAt: ms("created_at").notNull(),
   },
   (t) => [uniqueIndex("versions_project_no_uq").on(t.projectId, t.versionNo)],
 );
 
-export const assets = sqliteTable(
+export const assets = pgTable(
   "assets",
   {
     id: text("id").primaryKey(),
@@ -56,16 +59,16 @@ export const assets = sqliteTable(
     label: text("label"),
     filename: text("filename"),
     mime: text("mime").notNull(),
-    size: integer("size").notNull(),
-    width: integer("width"),
-    height: integer("height"),
+    size: bigint("size", { mode: "number" }).notNull(),
+    width: bigint("width", { mode: "number" }),
+    height: bigint("height", { mode: "number" }),
     storageKey: text("storage_key").notNull(),
-    createdAt: integer("created_at").notNull(),
+    createdAt: ms("created_at").notNull(),
   },
   (t) => [index("assets_project_idx").on(t.projectId), uniqueIndex("assets_key_uq").on(t.storageKey)],
 );
 
-export const apiTokens = sqliteTable(
+export const apiTokens = pgTable(
   "api_tokens",
   {
     id: text("id").primaryKey(),
@@ -73,13 +76,13 @@ export const apiTokens = sqliteTable(
     name: text("name").notNull(),
     prefix: text("prefix").notNull(),
     tokenHash: text("token_hash").notNull(),
-    lastUsedAt: integer("last_used_at"),
-    createdAt: integer("created_at").notNull(),
+    lastUsedAt: ms("last_used_at"),
+    createdAt: ms("created_at").notNull(),
   },
   (t) => [uniqueIndex("api_tokens_hash_uq").on(t.tokenHash)],
 );
 
-export const aiRuns = sqliteTable(
+export const aiRuns = pgTable(
   "ai_runs",
   {
     id: text("id").primaryKey(),
@@ -87,12 +90,12 @@ export const aiRuns = sqliteTable(
     projectId: text("project_id"),
     kind: text("kind").notNull(), // generate | revise
     model: text("model").notNull(),
-    status: text("status").notNull(), // ok | error | refusal
-    inputTokens: integer("input_tokens"),
-    outputTokens: integer("output_tokens"),
-    durationMs: integer("duration_ms"),
+    status: text("status").notNull(), // ok | error
+    inputTokens: bigint("input_tokens", { mode: "number" }),
+    outputTokens: bigint("output_tokens", { mode: "number" }),
+    durationMs: bigint("duration_ms", { mode: "number" }),
     error: text("error"),
-    createdAt: integer("created_at").notNull(),
+    createdAt: ms("created_at").notNull(),
   },
   (t) => [index("ai_runs_user_idx").on(t.userId, t.createdAt)],
 );

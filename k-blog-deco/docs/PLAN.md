@@ -151,11 +151,11 @@ Opus 5.5 단가($4 / $20 per 1M 토큰) 기준 추정입니다. 실제 키로 10
 | 구분 | 선택 |
 |---|---|
 | 프레임워크 | Next.js 16 (App Router, TypeScript), React 19, Tailwind CSS 4 |
-| DB | Drizzle ORM + libSQL(SQLite 호환) — 개발은 파일 하나, 운영은 Turso 원격 가능 |
+| DB·저장소 | Drizzle ORM + Postgres — 운영은 Supabase(서울 리전, DB + 비공개 Storage 버킷), 로컬은 내장 Postgres(PGlite) |
 | 인증 | 네이버 OAuth 직접 구현(외부 인증 라이브러리 의존 없음) + jose(JWT 서명 세션) |
 | AI | `@anthropic-ai/sdk` (구조화 출력·스트리밍·대체 모델) |
 | 폰트 | Pretendard + Fontsource 한글 폰트 9종 (모두 OFL 무료, npm 자체 호스팅) |
-| 배포 | Docker(standalone) + `/data` 볼륨 — 국내 VPS·NCP·Lightsail 등 단일 서버 권장 |
+| 배포 | Vercel 별도 프로젝트 → `deco.ko372.com`, ko372.com 도구함에서 연결 (Docker 단일 서버 배포도 지원) |
 
 ---
 

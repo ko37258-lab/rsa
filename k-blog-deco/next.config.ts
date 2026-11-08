@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   cacheComponents: true,
   partialPrefetching: true,
-  // libsql ships native bindings; keep it out of the server bundle.
-  serverExternalPackages: ["@libsql/client", "libsql"],
+  // 로컬 개발용 내장 Postgres(WASM 파일 포함)는 번들에서 제외
+  serverExternalPackages: ["@electric-sql/pglite"],
   turbopack: {
     rules: {
       "*.css": {

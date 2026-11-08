@@ -5,7 +5,8 @@ AI 가 **네이버 홈페이지형 블로그**용 스킨 배경 이미지·버�
 만든 뒤에도 **말로(AI 수정)**, **직접(끌어서 편집)**, **버전 되돌리기**로 계속 고칠 수 있고, 모든 기능은 REST API 로도 쓸 수 있습니다.
 
 - 서비스 기획서: [`docs/PLAN.md`](docs/PLAN.md)
-- 기술: Next.js 16 · TypeScript · Tailwind 4 · Drizzle(SQLite/libSQL) · Claude API · 네이버 로그인
+- 기술: Next.js 16 · TypeScript · Tailwind 4 · Drizzle + Postgres(Supabase) · Claude API · 네이버 로그인
+- 운영 주소(예정): https://deco.ko372.com — ko372.com 도구함에서 연결
 
 > 네이버는 블로그 스킨을 바꾸는 공개 API 가 없어서, 결과물은 **이미지 + 붙여넣기 코드 + 적용 가이드**로 드립니다.
 
@@ -46,8 +47,9 @@ AI 키가 없으면 **템플릿 모드**(규칙 기반 생성)로 전체 흐름�
 | `SESSION_SECRET` | 세션 서명 키 (32자 이상, 운영 필수) |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 네이버 로그인 |
 | `ANTHROPIC_API_KEY` / `AI_MODEL` | Claude API (비우면 템플릿 모드) |
-| `DATA_DIR` | SQLite 파일과 업로드 이미지 저장 폴더 (기본 `./data`) |
-| `DATABASE_URL` / `DATABASE_AUTH_TOKEN` | (선택) Turso 등 원격 libSQL |
+| `DATABASE_URL` 또는 `POSTGRES_URL` | Postgres 연결 주소 (Supabase 연결 풀러). Vercel 의 Supabase 연동이 자동 입력 |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | 이미지 저장(Supabase Storage, 비공개 버킷 `kblog`). Supabase 연동이 자동 입력 |
+| `DATA_DIR` | 위 값이 없을 때 쓰는 로컬 저장 폴더 (내장 Postgres + 업로드 이미지, 기본 `./data`) |
 | `ALLOW_DEV_LOGIN` | 개발용 로그인 (운영에서는 무조건 꺼짐) |
 | `AI_RATE_LIMIT_PER_HOUR` | 사용자당 시간당 AI 호출 한도 (기본 30) |
 
@@ -60,9 +62,17 @@ npm run lint        # 린트
 npm run build       # 프로덕션 빌드 (.next/standalone 생성)
 ```
 
-## 6. 배포 (단일 서버 + Docker)
+## 6. 배포
 
-DB 와 업로드 이미지가 디스크에 저장되므로 **영구 볼륨이 있는 서버**에 올립니다.
+### Vercel + Supabase (현재 운영 방식)
+
+1. Supabase 프로젝트에 `db/0001_init.sql`, `db/0002_rls_storage.sql` 을 적용합니다 (테이블 + RLS + 비공개 버킷 `kblog`).
+2. Vercel 프로젝트(Root Directory `k-blog-deco`)에서 **Integrations → Supabase** 로 프로젝트를 연결하면 DB·저장소 키가 자동으로 들어갑니다.
+3. 환경 변수에 `APP_URL`, `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `ANTHROPIC_API_KEY` (선택: `SESSION_SECRET`) 를 넣고 다시 배포합니다.
+
+### 단일 서버 + Docker
+
+DB·저장소 값을 비워두면 데이터가 디스크(/data)에 저장되므로 **영구 볼륨이 있는 서버**에 올립니다.
 
 ```bash
 docker build -t k-blog-deco .
@@ -70,7 +80,7 @@ docker run -d -p 3000:3000 -v kblog-data:/data --env-file .env.production k-blog
 ```
 
 HTTPS 리버스 프록시(nginx, Caddy 등) 뒤에 두고 `APP_URL` 을 공개 주소로 맞추세요.
-여러 대로 늘릴 때는 `DATABASE_URL`(Turso) 과 오브젝트 스토리지(S3/R2, `src/lib/storage.ts` 교체)로 옮깁니다.
+여러 대로 늘릴 때는 위의 Supabase 방식으로 옮깁니다.
 
 ## 7. API
 

@@ -1,7 +1,5 @@
 import type { NextRequest } from "next/server";
-import { readFile, isValidKey } from "@/lib/storage";
-
-const TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
+import { readFile, isValidKey, mimeForKey } from "@/lib/storage";
 
 /**
  * 업로드 이미지 공개 주소. 네이버 위젯 코드가 이 주소로 이미지를 불러옵니다.
@@ -14,8 +12,9 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/files/[key]">) 
   if (!bytes) return new Response("Not found", { status: 404 });
   return new Response(new Uint8Array(bytes), {
     headers: {
-      "Content-Type": TYPES[key.split(".").pop()!] ?? "application/octet-stream",
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Content-Type": mimeForKey(key),
+      // 내용이 바뀌지 않는 랜덤 키 → 브라우저·CDN 모두 1년 캐시 (네이버 위젯이 매번 불러도 저장소 부하 없음)
+      "Cache-Control": "public, max-age=31536000, s-maxage=31536000, immutable",
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "default-src 'none'",
       "Access-Control-Allow-Origin": "*",

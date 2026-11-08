@@ -5,8 +5,10 @@ import { env } from "@/lib/env";
 import { randomToken } from "@/lib/ids";
 
 /**
- * 파일 저장소. 기본은 로컬 디스크(DATA_DIR/uploads).
- * 운영에서 여러 서버를 쓰면 S3/R2 등 오브젝트 스토리지 드라이버로 교체하세요 (인터페이스 동일).
+ * 파일 저장소.
+ * - SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY 가 있으면 Supabase Storage(비공개 버킷, 서버만 접근)
+ * - 없으면 로컬 디스크(DATA_DIR/uploads) — 개발용
+ * 이미지는 항상 우리 도메인의 /files/{key} 로 내보내고, CDN 이 오래 캐시합니다.
  */
 export const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/png": "png",
@@ -14,6 +16,8 @@ export const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/webp": "webp",
   "image/gif": "gif",
 };
+
+const MIME_BY_EXT: Record<string, string> = { png: "image/png", jpg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
@@ -25,10 +29,28 @@ export function isValidKey(key: string) {
   return KEY_RE.test(key);
 }
 
+const supabaseStorageEnabled = () => Boolean(env.supabaseUrl && env.supabaseServiceKey);
+
+function sbHeaders(extra: Record<string, string> = {}) {
+  return { Authorization: `Bearer ${env.supabaseServiceKey}`, apikey: env.supabaseServiceKey, ...extra };
+}
+
+const sbObjectUrl = (key: string) => `${env.supabaseUrl}/storage/v1/object/${env.storageBucket}/${key}`;
+
 export async function saveFile(bytes: Uint8Array, mime: string): Promise<string> {
   const ext = ALLOWED_IMAGE_TYPES[mime];
   if (!ext) throw new Error("unsupported mime");
   const key = `${randomToken(18)}.${ext}`;
+  if (supabaseStorageEnabled()) {
+    const res = await fetch(sbObjectUrl(key), {
+      method: "POST",
+      headers: sbHeaders({ "Content-Type": mime, "Cache-Control": "31536000", "x-upsert": "false" }),
+      body: new Blob([new Uint8Array(bytes)], { type: mime }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`storage upload failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    return key;
+  }
   await fs.mkdir(uploadsDir(), { recursive: true });
   await fs.writeFile(path.join(uploadsDir(), key), bytes);
   return key;
@@ -36,6 +58,11 @@ export async function saveFile(bytes: Uint8Array, mime: string): Promise<string>
 
 export async function readFile(key: string): Promise<Buffer | null> {
   if (!isValidKey(key)) return null;
+  if (supabaseStorageEnabled()) {
+    const res = await fetch(sbObjectUrl(key), { headers: sbHeaders(), cache: "no-store" });
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  }
   try {
     return await fs.readFile(path.join(uploadsDir(), key));
   } catch {
@@ -45,8 +72,19 @@ export async function readFile(key: string): Promise<Buffer | null> {
 
 export async function deleteFile(key: string) {
   if (!isValidKey(key)) return;
+  if (supabaseStorageEnabled()) {
+    await fetch(`${env.supabaseUrl}/storage/v1/object/${env.storageBucket}`, {
+      method: "DELETE",
+      headers: sbHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ prefixes: [key] }),
+      cache: "no-store",
+    });
+    return;
+  }
   await fs.rm(path.join(uploadsDir(), key), { force: true });
 }
+
+export const mimeForKey = (key: string) => MIME_BY_EXT[key.split(".").pop() ?? ""] ?? "application/octet-stream";
 
 export const publicFileUrl = (key: string) => `${env.appUrl}/files/${key}`;
 
