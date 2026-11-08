@@ -1,1 +1,109 @@
-/* 사례 화면 「따라하기 사례」 갤러리 전용 스타일. 색은 style.css 의 :root 토큰만 씁니다(다크 모드 자동). */
+/* 사례 화면 「따라하기 사례」 갤러리 전용 스타일. 색은 style.css 의 :root 토큰만 씁니다(다크 모드 자동).
+   마크업은 index.html 의 #case-follow(머리·필터·#followGrid)와 js/showcase.js 의 fillFollowGallery() 가 만드는 .follow-card 입니다. */
+
+/* ── 갤러리 머리 ── */
+.follow { margin-top: 40px; min-width: 0; }
+.follow-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; min-width: 0; }
+.follow-head h2 { font: 900 clamp(24px, 2.8vw, 36px)/1.12 var(--f); letter-spacing: var(--k-ls); max-width: 24ch; }
+.follow-head .rule { width: min(100%, 220px); }
+.follow-head .hint { margin: 0; font-size: 14px; max-width: 60ch; }
+.follow-head[data-reveal] > * { opacity: 0; } /* 스크롤해 들어올 때 떠오르게(.case 와 같은 방식, motion.js revealOnScroll) */
+.follow-head.is-in > * { opacity: 1; }
+.follow-tools { gap: 10px 14px; align-items: center; }
+.follow-filter {
+  display: flex; gap: 6px; align-items: center; flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; scrollbar-width: thin; padding: 2px 2px 4px; /* 좁으면 칩 줄만 가로 스크롤(문서는 넘치지 않음) */
+}
+.follow-tools > .btn { flex: none; margin-left: auto; }
+.chipbtn {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 99px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; white-space: nowrap;
+  font: 700 13px/1 var(--f); letter-spacing: -0.01em;
+  transition: border-color .2s, background .2s, color .2s, transform .25s var(--ease);
+}
+.chipbtn small { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chipbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.chipbtn:disabled { opacity: .45; cursor: not-allowed; }
+.chipbtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chipbtn[aria-pressed="true"] small { color: inherit; opacity: .8; }
+
+/* ── 카드 격자 ── */
+.follow-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 14px; min-width: 0; }
+.follow-card {
+  position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  padding: 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgb(15 18 34 / 3%);
+  transition: transform .3s var(--spring), box-shadow .25s, border-color .2s;
+}
+.follow-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.follow-card .io-label { font-size: 11px; }
+
+/* 넣는 것: 사진 자리 띠(자리 번호 + 라벨) */
+.fc-io, .fc-out, .fc-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fc-body { flex: 1 1 auto; } /* 설명이 짧아도 버튼 줄은 같은 줄 카드끼리 아래에 맞춤 */
+.fc-photos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 6px; } /* 카드 폭 280px 에 6칸(5장 + '+N')이 한 줄로 */
+.fc-photos li { position: relative; min-width: 0; }
+.fc-photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 9px; display: block; background: var(--surface-2); border: 1px solid var(--line); }
+.fc-photos b {
+  position: absolute; top: 4px; left: 4px; padding: 1px 6px; border-radius: 6px;
+  background: rgb(11 13 20 / 70%); color: #fff; font: 800 10px/1.5 var(--f); font-variant-numeric: tabular-nums;
+}
+.fc-photos span { display: block; margin-top: 3px; font: 600 10.5px/1.25 var(--f); color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-photos .more { display: grid; place-items: center; aspect-ratio: 1; border: 1.5px dashed var(--line); border-radius: 9px; color: var(--muted); font: 800 13px/1 var(--f); }
+.fc-count { margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.fc-count b { color: var(--ink); font-weight: 700; }
+
+/* 나오는 것: 비율별 틀 — 9:16 작은 폰, 16:9 모니터, 1:1 정사각. 캔버스는 틀을 가득 채웁니다 */
+.fc-out .phone.sm { transform: none; animation: none; width: min(100%, 176px); margin: 0 auto; padding: 6px; border-radius: 20px; box-shadow: var(--shadow), 0 0 0 1px rgb(255 255 255 / 10%) inset; }
+.fc-out .phone.sm canvas { border-radius: 15px; }
+.fc-out .phone.sm .phone-notch { top: 11px; width: 40px; height: 4px; }
+.monitor { position: relative; width: 100%; padding: 6px; border-radius: 12px; background: var(--monitor); box-shadow: var(--shadow), 0 0 0 1px rgb(255 255 255 / 10%) inset; }
+.monitor[data-aspect="16:9"] { aspect-ratio: 16 / 9; }
+.monitor[data-aspect="1:1"] { aspect-ratio: 1; width: min(100%, 220px); margin: 0 auto; }
+.monitor canvas { width: 100%; height: 100%; border-radius: 8px; display: block; background: #000; }
+/* 준비 전(보이기 전) 캔버스는 단색 뼈대 — 준비되면 data-ready 가 붙고 엔진이 그린 프레임이 보입니다 */
+.follow-card:not([data-ready]) canvas { background: var(--surface-2); }
+
+/* 설명·버튼 */
+.fc-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tag.cat { background: var(--ok-soft); color: var(--ok); }
+.fc-no { margin-left: auto; font: 900 11px/1 var(--f); letter-spacing: .08em; color: var(--accent); white-space: nowrap; }
+.fc-body h3 { font: 800 17px/1.25 var(--f); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.fc-desc { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.fc-style { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.fc-body .row.wrap { gap: 8px; margin-top: auto; padding-top: 2px; }
+.fc-body .row.wrap .btn { flex: 1 1 auto; }
+
+/* 대본 보기(카드 안에서 펼침) */
+.fc-script { margin-top: 2px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12.5px; line-height: 1.45; min-width: 0; }
+.fc-script ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 9px; }
+.fc-script li::marker { font-weight: 800; color: var(--accent); }
+.fc-script li > span { display: block; overflow-wrap: anywhere; }
+.fc-script b { font-size: 11.5px; color: var(--muted); letter-spacing: .01em; }
+.fc-script .kind { display: inline-block; margin-left: 5px; padding: 0 6px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font: 700 10.5px/1.6 var(--f); font-style: normal; vertical-align: 1px; }
+.fc-script .cap { font-weight: 700; color: var(--ink); margin-top: 1px; }
+.fc-script .cap em { font-style: normal; color: var(--accent); font-weight: 800; }
+.fc-script .nar { color: var(--muted); }
+.fc-script .meta { color: var(--muted); font-size: 11.5px; }
+.fc-script .hint { margin: 10px 0 0; font-size: 12px; }
+
+/* ── 좁은 화면 ── */
+@media (max-width: 760px) {
+  /* 위에 붙은 메뉴 줄 아래로 제목이 들어가지 않게(.case 와 같은 값) */
+  .follow { scroll-margin-top: calc(var(--side-h, 105px) + 13px + env(safe-area-inset-top, 0px)); margin-top: 28px; }
+  .follow-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .chipbtn { min-height: 36px; }
+}
+@media (max-width: 440px) {
+  .follow-grid { grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); } /* 400px 에서 2열 */
+  .follow-filter { flex-basis: 100%; }
+  .follow-card { padding: 10px; border-radius: 14px; gap: 10px; }
+  .fc-photos { grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); gap: 5px; }
+  .fc-out .phone.sm { width: 100%; }
+  .fc-body h3 { font-size: 15px; }
+  .fc-body .row.wrap .btn { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .follow-card, .chipbtn { transition: none; }
+  .follow-head[data-reveal] > * { opacity: 1; }
+}

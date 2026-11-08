@@ -7,11 +7,24 @@ import { STYLE_DATA } from './styles-data.js';
 const VISUAL_KEYS = [
   'aspect', 'template', 'captionAnim', 'captionStyle', 'overlay', 'transition', 'motion', 'titleMode',
   'bandColor', 'panelColor', 'textColor', 'inkColor', 'highlightColor', 'font', 'captionSize', 'showProgress',
+  // 광고용 모션 어휘(사양서 1절). 스타일에 없으면 '없음' 값으로 채워, 광고 스타일 뒤에 다른 스타일을 입혀도 로워서드·사진 등장이 남지 않게 합니다
+  'photoIn', 'photoFit', 'deco', 'titleAnim', 'extras', 'fx',
 ];
+const MOTION_DEFAULTS = { photoIn: 'none', photoFit: 'cover', deco: [], titleAnim: 'none', extras: [], fx: 'none' };
 
 function pickVisual(visual = {}) {
   const out = {};
-  for (const k of VISUAL_KEYS) if (visual[k] !== undefined) out[k] = visual[k];
+  for (const k of VISUAL_KEYS) {
+    if (visual[k] !== undefined) out[k] = visual[k];
+    else if (k in MOTION_DEFAULTS) out[k] = MOTION_DEFAULTS[k];
+  }
+  return out;
+}
+
+/** 배열 값(deco·extras)은 복사해서 입힙니다 — 스타일 데이터와 프로젝트가 같은 배열을 가리키면 한쪽을 고칠 때 다른 쪽도 바뀝니다 */
+function copyVisual(visual) {
+  const out = { ...visual };
+  for (const k of Object.keys(out)) if (Array.isArray(out[k])) out[k] = [...out[k]];
   return out;
 }
 
@@ -22,7 +35,7 @@ export function makeStyle(data) {
     ...data,
     visual,
     apply(p) {
-      return Object.assign(p, visual);
+      return Object.assign(p, copyVisual(visual));
     },
   };
 }

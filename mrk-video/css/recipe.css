@@ -1,1 +1,101 @@
 /* 숏폼 화면 「따라하기」 레시피 바·광고용 추천 필터 전용 스타일. 색은 style.css 의 :root 토큰만 씁니다(다크 모드 자동). */
+
+/* ── 레시피 바(#recipeBar) ── */
+.panel.recipe { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); gap: 10px; }
+.recipe-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; }
+.recipe-head h2 { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.recipe-head h2::before { display: none; } /* 배지가 점 구실을 하므로 패널 제목 점은 뺌 */
+.recipe-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.recipe-head #recipeStop { margin-left: auto; }
+.recipe-badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99px;
+  background: var(--accent); color: var(--accent-ink); font: 800 11.5px/1.4 var(--f); letter-spacing: -0.01em; white-space: nowrap;
+}
+.recipe-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .85; }
+.recipe .tag.cat { background: var(--ok-soft); color: var(--ok); }
+
+/* 사진 자리 띠 — 바 안에서만 가로 스크롤(문서 가로 스크롤은 생기지 않음) */
+.recipe-slots {
+  list-style: none; margin: 0; padding: 2px 2px 6px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; scroll-snap-type: x proximity;
+}
+.recipe-slots li { flex: 0 0 92px; min-width: 0; scroll-snap-align: start; transition: transform .3s var(--spring); }
+.recipe-slots li:hover { transform: translateY(-2px); }
+.recipe-slots button {
+  position: relative; display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 4px; border-radius: 11px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font: inherit; cursor: pointer; text-align: left;
+  transition: border-color .2s, box-shadow .25s;
+}
+.recipe-slots button:hover:not(:disabled) { border-color: var(--accent); box-shadow: var(--shadow); }
+.recipe-slots button:disabled { cursor: not-allowed; opacity: .6; }
+.recipe-slots img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; display: block; background: var(--monitor); }
+.recipe-slots b {
+  position: absolute; top: 8px; left: 8px; min-width: 20px; padding: 1px 6px; border-radius: 99px; text-align: center;
+  background: rgb(11 13 20 / 72%); color: #fff; font: 800 11px/1.5 var(--f);
+}
+.recipe-slots li.sample b { background: var(--accent); color: var(--accent-ink); }
+.recipe-slots span { display: block; font-size: 11.5px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 예시 사진이 남은 자리: 사진을 흐리게 덧칠하고 "예시" 글자 */
+.recipe-slots li.sample img { filter: saturate(.55); }
+.recipe-slots li.sample button::after {
+  content: '예시'; position: absolute; left: 4px; right: 4px; top: 4px; aspect-ratio: 4 / 3; border-radius: 8px;
+  display: grid; place-items: center; background: rgb(11 13 20 / 55%); color: #fff; font: 800 12px/1 var(--f); letter-spacing: .04em; pointer-events: none;
+}
+.recipe-slots li.sample span { color: var(--muted); }
+.recipe-slots li.extra span::before { content: '+ '; color: var(--accent); }
+.recipe-hint { margin: 0; }
+.recipe-actions { gap: 8px; }
+.recipe .ls-status { margin: 0; }
+.recipe .ls-status.ok { color: var(--ok); font-weight: 700; }
+.recipe .ls-status.bad { color: var(--bad); font-weight: 700; }
+
+/* 묻는 상태(사용자 장면이 있을 때 "불러올까요?") */
+.recipe-ask { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.recipe-ask p { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink); }
+.recipe.asking .recipe-head h2 { flex-basis: 120px; }
+
+/* ── 장면 목록: 예시 사진 썸네일 덧칠 ── */
+.scene-thumb { position: relative; }
+.scene-thumb.sample::after {
+  content: '예시'; position: absolute; inset: 0; display: grid; place-items: center;
+  background: rgb(11 13 20 / 55%); color: #fff; font: 800 11px/1 var(--f); letter-spacing: .04em; pointer-events: none;
+}
+.scene-meta .scene-stamp { width: 84px; }
+
+/* ── 스타일 패널 「광고용 추천」 필터 칩 ── */
+.style-filter { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding: 0 2px 2px; }
+.style-filter .chipbtn {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 99px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font: 700 12.5px/1.3 var(--f); cursor: pointer; white-space: nowrap;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.style-filter .chipbtn:hover { border-color: var(--accent); color: var(--accent); }
+.style-filter .chipbtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.style-filter .chipbtn span { font-variant-numeric: tabular-nums; opacity: .85; }
+.ad-badge {
+  position: absolute; top: 10px; right: 10px; z-index: 1; padding: 2px 7px; border-radius: 99px;
+  background: var(--mark); color: #0f1222; font: 800 10px/1.5 var(--f); letter-spacing: -0.01em; white-space: nowrap;
+}
+.style-card[aria-pressed="true"] .ad-badge { right: 34px; } /* 고른 표시(✓)와 겹치지 않게 */
+
+/* ── 좁은 화면 ── */
+@media (max-width: 760px) {
+  .recipe-slots li { flex-basis: 84px; }
+  .recipe-actions .btn { min-height: 36px; }
+  .recipe-head #recipeStop { min-height: 36px; }
+}
+@media (max-width: 440px) {
+  .recipe-head h2 { flex-basis: 100%; order: -1; }
+  .recipe-head .recipe-badge { order: -2; }
+  .recipe-actions .btn.accent, .recipe-actions #recipeRefine { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recipe-slots li, .recipe-slots button, .style-filter .chipbtn { transition: none; }
+}
+
+/* 화면 세부 조절의 「추가 장식」 체크칸 묶음(fieldset 기본 테두리 없이 .field 처럼) */
+.extras-field { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.extras-field legend { padding: 0; margin-bottom: 2px; }
+.extras-field legend > span { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.extras-field legend .hint { font-weight: 500; margin-left: 4px; }
+.extras-field .check { min-height: 0; }
+.extras-field .check span { font-size: 13px; }

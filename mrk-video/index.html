@@ -51,17 +51,18 @@
           <h1 class="hero-title" data-kinetic>사진 넣고
 대본 쓰면
 *쇼츠*가 나옵니다.</h1>
-          <p class="lede">잘 나가는 쇼츠 형식 <span data-style-count>30</span>가지를 스타일로 골라, 같은 내용을 <span data-style-count>30</span>가지 영상으로 만들고 바로 올립니다. 사진·소리는 서버로 가지 않고 이 브라우저 안에서 처리됩니다.</p>
+          <p class="lede">잘 나가는 쇼츠 형식 <span data-style-count>30</span>가지를 스타일로 골라, 같은 내용을 <span data-style-count>30</span>가지 영상으로 만들고 바로 올립니다. 사진·소리는 서버로 가지 않고 이 브라우저 안에서 처리됩니다. 광고 사례를 골라 사진만 바꿔 넣으면 그대로 나옵니다.</p>
           <div class="hero-chips" id="heroChips">
             <span class="chip" data-pop><span class="chk">✓</span><span>스타일 <span data-style-count>30</span>가지</span></span>
             <span class="chip" data-pop><span class="chk">✓</span>자막·제목 자동</span>
             <span class="chip" data-pop><span class="chk">✓</span>배경음악·내레이션</span>
             <span class="chip ok" data-pop><span class="chk">✓</span>MP4 바로 저장</span>
             <span class="chip" data-pop><span class="chk">✓</span>AI 대본</span>
+            <span class="chip" data-pop><span class="chk">✓</span><span>따라하기 사례 <span data-case-count>13</span>가지</span></span>
           </div>
           <div class="hero-actions">
             <a class="btn accent" href="#shorts">바로 만들어 보기</a>
-            <a class="btn ghost" href="#case-shorts" id="toCases">사례 3가지 보기</a>
+            <a class="btn ghost" href="#case-follow" id="toCases">따라하기 사례 보기</a>
           </div>
         </div>
         <div class="hero-stage">
@@ -73,10 +74,27 @@
         </div>
       </div>
 
+      <!-- 따라하기 사례 갤러리: 사례(js/cases-data.js) → 살아 있는 미리보기 + 넣을 사진 자리 + 대본. 카드는 js/showcase.js 가 만든다.
+           .case 가 아니므로 아래 점 3개·"사례 n / 3" 셈에는 들어가지 않고, id 가 case- 로 시작해 #case-follow 로 바로 올 수 있다. -->
+      <section class="follow" id="case-follow" aria-labelledby="h-follow">
+        <div class="follow-head" data-reveal>
+          <span class="case-no">따라하기 사례</span>
+          <h2 id="h-follow" data-kinetic-title>사진만 바꿔 넣으면
+*그대로* 나오는 광고 사례</h2>
+          <i class="rule" data-underline></i>
+          <p class="hint" data-rise>사례를 고르면 자막·대본·스타일·음악·엔딩이 그대로 들어오고, 사진 자리만 내 사진으로 바뀝니다.</p>
+          <div class="row wrap follow-tools" data-rise>
+            <div class="follow-filter" role="group" aria-label="용도로 고르기" id="followFilter"></div>
+            <button type="button" class="btn small ghost" id="followPause" aria-pressed="false" aria-label="사례 미리보기 멈춤">❚❚ 미리보기 멈춤</button>
+          </div>
+        </div>
+        <div class="follow-grid" id="followGrid" role="list"></div>
+      </section>
+
       <div class="case-nav">
         <div class="dots" id="caseDots"><i class="dot on"></i><i class="dot"></i><i class="dot"></i></div>
         <span class="case-count">사례 <b id="caseIdx">1</b> / 3</span>
-        <span class="case-label">실제 결과 미리보기</span>
+        <span class="case-label">도구가 하는 일 3가지</span>
       </div>
 
       <article class="case" id="case-shorts" data-reveal data-case="1">
@@ -213,6 +231,39 @@
 
       <div class="studio">
         <div class="studio-controls">
+          <!-- 따라하기(레시피) 바(js/recipe.js): 사례 화면에서 「이대로 따라하기」(#follow=<사례 id>)로 들어오면 보입니다.
+               사례의 장면·자막·스타일·음악·엔딩이 그대로 들어오고, 사진을 넣으면 자리 순서대로 바뀝니다. 평소에는 숨김. -->
+          <section class="panel recipe" id="recipeBar" role="region" aria-labelledby="h-recipe" hidden>
+            <div class="recipe-head">
+              <span class="recipe-badge">따라하기</span>
+              <h2 id="h-recipe" tabindex="-1"></h2>
+              <span class="tag cat" id="recipeCat"></span>
+              <span class="tag" id="recipeAspect"></span>
+              <span class="kchip" id="recipeProgress" role="status" aria-live="polite"></span>
+              <button type="button" class="btn small ghost" id="recipeStop">사례 그만</button>
+            </div>
+            <ol class="recipe-slots" id="recipeSlots" aria-label="사진 자리(순서대로 들어갑니다)"></ol>
+            <p class="hint recipe-hint" id="recipeHint"></p>
+            <div class="row wrap recipe-actions" id="recipeActions">
+              <label class="btn accent" for="recipeFiles">사진 넣기<input type="file" id="recipeFiles" accept="image/*" multiple hidden></label>
+              <button type="button" class="btn" id="recipeRefine" disabled>AI 로 사진에 맞춰 대본 다듬기</button>
+              <button type="button" class="btn small ghost" id="recipeRefineStop" hidden>멈춤</button>
+              <button type="button" class="btn small ghost" id="recipeFill" hidden>남은 자리 채우기</button>
+              <button type="button" class="btn small ghost" id="recipeTrim" hidden>남은 장면 빼기</button>
+              <button type="button" class="btn small ghost" id="recipeRestyle" hidden>사례 스타일로 되돌리기</button>
+            </div>
+            <p class="hint ls-status" id="recipeStatus" role="status" aria-live="polite"></p>
+            <!-- 묻는 상태: 사용자의 사진·글이 있는 장면이 있을 때 확인창 대신 여기서 묻습니다 -->
+            <div class="recipe-ask" id="recipeAsk" hidden>
+              <p id="recipeAskText"></p>
+              <div class="row wrap" role="group" aria-label="사례 불러오기 확인">
+                <button type="button" class="btn accent small" id="recipeAskLoad">불러오기</button>
+                <button type="button" class="btn small" id="recipeAskSave">프로젝트 먼저 저장</button>
+                <button type="button" class="btn small ghost" id="recipeAskCancel">취소</button>
+              </div>
+            </div>
+          </section>
+
           <!-- 매물 사진으로 쇼츠 만들기(js/listing.js): 단계 1~6. 아래 스타일·장면·소리·미리보기와 같은 project 를 씁니다. -->
           <section class="panel listing" id="listingBox" aria-labelledby="h-listing">
             <div class="panel-head">
@@ -426,6 +477,11 @@
               <p class="hint" id="viralHint">유튜브에서 조회수 높은 쇼츠를 찾아 보여 줍니다. 영상을 누르면 그 컨셉으로 AI 대본을 씁니다.</p>
               <div class="viral-grid" id="viralGrid"></div>
             </div>
+            <!-- 보기 범위: 전체 / 광고용 추천(styles-data 의 ad:true). 숨은 카드는 hidden 이고 "전부 만들기"도 보이는 스타일만 만듭니다(shorts.js) -->
+            <div class="style-filter" role="group" aria-label="스타일 보기 범위" id="styleFilter">
+              <button type="button" class="chipbtn" data-filter="all" aria-pressed="true">전체 <span data-style-count>30</span></button>
+              <button type="button" class="chipbtn" data-filter="ad" aria-pressed="false">광고용 추천 <span id="adStyleCount"></span></button>
+            </div>
             <div class="style-strip" id="styleStrip" role="group" aria-label="스타일 고르기"></div>
             <div class="style-desc" id="styleDesc"></div>
           </section>
@@ -491,6 +547,14 @@
               </label>
               <label class="field"><span>로고 이미지 (선택)</span>
                 <input type="file" id="logoFile" accept="image/*">
+              </label>
+              <!-- 상호·연락처(p.brand): 로워서드 자막바·엔딩 연락처 줄이 읽습니다. 매물 상자 ② 사무소 정보를 적으면 저절로 채워지고, 여기서는 이 프로젝트 값만 고칩니다 -->
+              <label class="field"><span>상호 (로워서드·엔딩에 표시)</span>
+                <input type="text" id="brandName" maxlength="60" autocomplete="organization" placeholder="예: 미스터홈즈공인중개사사무소">
+              </label>
+              <label class="field"><span>연락처 (엔딩 버튼 아래)</span>
+                <input type="text" id="brandPhone" maxlength="40" autocomplete="tel" inputmode="tel" placeholder="예: 031-000-0000">
+                <small class="hint">매물 상자 ②의 사무소 정보를 적으면 저절로 들어옵니다.</small>
               </label>
             </div>
           </section>
@@ -567,6 +631,9 @@
                   <option value="vs">비교</option>
                   <option value="counter">숫자 카운트</option>
                   <option value="dots">점 진행</option>
+                  <option value="lower3">로워서드 자막바</option>
+                  <option value="stamp">도장</option>
+                  <option value="ribbon">리본</option>
                 </select>
               </label>
               <label class="field"><span>자막 크기</span>
@@ -586,6 +653,8 @@
                   <option value="slide">옆으로 밀기</option>
                   <option value="zoom">확대되며 등장</option>
                   <option value="wipe">사선 와이프</option>
+                  <option value="flash">흰 플래시 컷</option>
+                  <option value="push">세로 밀기</option>
                   <option value="none">바로 바꾸기</option>
                 </select>
               </label>
@@ -596,6 +665,46 @@
                   <option value="none">표시 안 함</option>
                 </select>
               </label>
+              <!-- 광고용 모션 어휘(docs/STYLE-SPEC.md): 광고 스타일을 고르면 채워지고, 여기서 손으로 바꿀 수 있습니다 -->
+              <label class="field"><span>제목 등장</span>
+                <select id="titleAnim">
+                  <option value="none">바로 보이기</option>
+                  <option value="rise">떠오르며 밑줄</option>
+                  <option value="mask">왼쪽부터 열리기</option>
+                  <option value="stamp">쾅 찍기</option>
+                </select>
+              </label>
+              <label class="field"><span>사진 등장</span>
+                <select id="photoIn">
+                  <option value="none">바로 보이기</option>
+                  <option value="push">색판 뒤에서 밀고 들어오기</option>
+                  <option value="reveal">왼쪽부터 열리기</option>
+                  <option value="pop">톡 튀어나오기</option>
+                  <option value="iris">원형으로 열리기</option>
+                </select>
+              </label>
+              <label class="field"><span>사진 맞춤</span>
+                <select id="photoFit">
+                  <option value="cover">칸에 꽉 채우기</option>
+                  <option value="smart">가로 사진은 흐린 배경 위에 온전히</option>
+                </select>
+              </label>
+              <label class="field"><span>사진 위 장식</span>
+                <select id="deco">
+                  <option value="none">없음</option>
+                  <option value="sweep">빛 스윕</option>
+                  <option value="bars">레터박스 바</option>
+                  <option value="bokeh">보케(빛방울)</option>
+                  <option value="frame">액자 선</option>
+                </select>
+              </label>
+              <fieldset class="field extras-field" id="extrasField">
+                <legend><span>추가 장식 <small class="hint">장식 위에 겹쳐 그림</small></span></legend>
+                <label class="check"><input type="checkbox" id="extras-lower3" data-extra="lower3"><span>로워서드 자막바 (상호·연락처)</span></label>
+                <label class="check"><input type="checkbox" id="extras-stamp" data-extra="stamp"><span>도장 (장면의 도장 글)</span></label>
+                <label class="check"><input type="checkbox" id="extras-ribbon" data-extra="ribbon"><span>리본 (장면의 태그)</span></label>
+              </fieldset>
+              <label class="field check"><input type="checkbox" id="fx"><span>광고형 움직임 (핀·태그·숫자가 살짝 움직임)</span></label>
               <label class="field color"><span>글자색</span><input type="color" id="textColor"></label>
               <label class="field color"><span>강조색</span><input type="color" id="highlightColor"></label>
               <label class="field color"><span>바탕색</span><input type="color" id="bandColor"></label>
@@ -679,6 +788,7 @@
               <label class="field check"><input type="checkbox" id="endingOn"><span>엔딩 화면 넣기</span></label>
               <label class="field"><span>큰 글씨 (줄바꿈 가능)</span><textarea id="endingText" rows="2"></textarea></label>
               <label class="field"><span>작은 글씨</span><input type="text" id="endingSub"></label>
+              <label class="field"><span>버튼 문구 <small class="hint">비우면 버튼 없음</small></span><input type="text" id="endingCta" maxlength="12" placeholder="예: 전화 문의"></label>
               <label class="field"><span>길이 (초)</span><input type="number" id="endingDur" min="1" max="8" step="0.5"></label>
             </div>
           </section>

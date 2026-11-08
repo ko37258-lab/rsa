@@ -61,7 +61,8 @@ export function missingDisclosure(office, facts) {
   return out;
 }
 
-const ASPECT_WORDS = {
+/** 화면 비율 → 프롬프트에 적는 말(매물 대본·따라하기 다듬기 프롬프트가 같이 씀) */
+export const ASPECT_WORDS = {
   '9:16': '세로 쇼츠·릴스(9:16)',
   '16:9': '가로 영상(16:9, 유튜브 일반 영상)',
   '1:1': '정사각형(1:1)',
@@ -87,8 +88,8 @@ function clean(v, max = 120) {
   return String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-/** facts(객체 또는 글) → 프롬프트에 넣을 "항목: 값" 줄들 */
-function factLines(facts) {
+/** facts(객체 또는 글) → 프롬프트에 넣을 "항목: 값" 줄들(따라하기 다듬기 프롬프트도 재사용) */
+export function factLines(facts) {
   if (!facts) return [];
   if (typeof facts === 'string') return clean(facts, 1200) ? [clean(facts, 1200)] : [];
   const known = new Set(FACT_FIELDS.map((f) => f.key));
@@ -105,7 +106,8 @@ function factLines(facts) {
   return lines;
 }
 
-function officeOf(office) {
+/** 중개사무소 칸 값 정리(빈 칸은 '') — 다른 프롬프트도 같이 씁니다 */
+export function officeOf(office) {
   const o = office && typeof office === 'object' ? office : {};
   return {
     name: clean(o.name, 60),

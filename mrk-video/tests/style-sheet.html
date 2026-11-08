@@ -24,22 +24,28 @@
 <pre id="log"></pre>
 <div id="out"></div>
 <script type="module">
-import { drawFrame, buildTimeline, dims, ensureFonts, OVERLAYS, CAPTION_STYLES, CAPTION_ANIMS } from './js/shorts-render.js';
+import { drawFrame, buildTimeline, dims, ensureFonts, OVERLAYS, CAPTION_STYLES, CAPTION_ANIMS, TRANSITIONS, PHOTO_INS, PHOTO_FITS, DECOS, TITLE_ANIMS, FX_MODES, EXTRA_OVERLAYS } from './js/shorts-render.js';
 import { STYLES, styleProject } from './js/styles.js';
 import { sample, SHORTS_CASE } from './js/samples.js';
 
 const log = (m) => { document.getElementById('log').textContent += m + '\n'; };
 
-// 사양서 어휘 전체(자막 모양·등장은 엔진이 내보내는 목록을 그대로 씁니다)
+// 사양서 어휘 전체(자막 모양·등장·전환·광고용 모션 어휘는 엔진이 내보내는 목록을 그대로 씁니다)
 export const VOCAB = {
   template: ['band', 'blur', 'full', 'split', 'card', 'dark'],
   captionAnim: CAPTION_ANIMS,
   captionStyle: CAPTION_STYLES,
   overlay: Object.keys(OVERLAYS),
-  transition: ['fade', 'slide', 'zoom', 'none', 'wipe'],
+  transition: TRANSITIONS,
   titleMode: ['band', 'hook', 'none'],
   motion: ['auto', 'in', 'out', 'none'],
   aspect: ['9:16', '1:1', '16:9'],
+  photoIn: PHOTO_INS,
+  photoFit: PHOTO_FITS,
+  deco: DECOS,
+  titleAnim: TITLE_ANIMS,
+  fx: FX_MODES,
+  extras: EXTRA_OVERLAYS,
 };
 
 const BASE = {
@@ -55,9 +61,9 @@ const BASE = {
 async function richScenes() {
   const [a, b, c, d] = await Promise.all(['s01-land-zoning', 's02-landlocked', 's03-permit-site', 's05-apartment'].map((id) => sample(id)));
   return [
-    { caption: '이거 모르고 땅 사면\n*손해*봅니다', img: a, kind: 'hook', duration: 2.4, tag: '2026', label: '경기 양평' },
-    { caption: '*용도지역*부터 확인하세요', img: b, img2: c, duration: 3, tag: '3.2억', label: '맹지', counter: { from: 0, to: 1200, suffix: '만원' } },
-    { caption: '세 가지만 지켜도\n*토지투자* 실패가 줄어듭니다', img: null, duration: 3.2, tag: '2027', counter: { from: 10, to: 87, suffix: '%' } },
+    { caption: '이거 모르고 땅 사면\n*손해*봅니다', img: a, kind: 'hook', duration: 2.4, tag: '2026', label: '경기 양평', stamp: '급매' },
+    { caption: '*용도지역*부터 확인하세요', img: b, img2: c, duration: 3, tag: '3.2억', label: '맹지', counter: { from: 0, to: 1200, suffix: '만원' }, labelA: '전', labelB: '후' },
+    { caption: '세 가지만 지켜도\n*토지투자* 실패가 줄어듭니다', img: null, duration: 3.2, tag: '2027', counter: { from: 10, to: 87, suffix: '%' }, stamp: '즉시입주' },
     { caption: '정답은 *도로*입니다', img: d, kind: 'answer', duration: 2.6, tag: '정답' },
     { caption: '궁금한 땅은\n*MR.K*에게 물어보세요', img: a, kind: 'cta', duration: 2.6 },
   ];
@@ -249,7 +255,7 @@ async function sweepCaptions() {
   for (const captionStyle of VOCAB.captionStyle) for (const captionAnim of VOCAB.captionAnim) for (const template of VOCAB.template) {
     const overlay = overlays[count % overlays.length];
     const titleMode = VOCAB.titleMode[count % 3];
-    const transition = VOCAB.transition[count % 5];
+    const transition = VOCAB.transition[count % VOCAB.transition.length];
     const p = { ...BASE, scenes, captionStyle, captionAnim, template, overlay, titleMode, transition, bandColor: count % 2 ? '#e9e7e2' : '#0b0d14', highlightColor: count % 3 ? '#ffd43b' : '#2f6cff' };
     const tl = buildTimeline(p);
     for (const t of [0.3, 1.4, 3.2, 4.4, 6.3, 7.4, tl.total - 0.1]) {
@@ -312,7 +318,7 @@ function vocabStyles() {
         captionAnim: V.captionAnim[i % 5],
         captionStyle: V.captionStyle[i % 4],
         overlay: V.overlay[i % V.overlay.length],
-        transition: V.transition[i % 5],
+        transition: V.transition[i % V.transition.length],
         titleMode: V.titleMode[i % 3],
         motion: V.motion[i % 4],
         bandColor: brightBg ? bright[i % 4] : dark[i % 4],
@@ -354,23 +360,38 @@ async function measurePerf(styles, frames = 40) {
   return { avg: Math.round(avg * 100) / 100, max: Math.max(...results.map((r) => r.ms)), results };
 }
 
-/** 모든 어휘 조합을 한 프레임씩 — 예외가 하나라도 나면 errors 에 담습니다(그림은 작게 270×480) */
+/**
+ * 모든 어휘 조합을 한 프레임씩 — 예외가 하나라도 나면 errors 에 담습니다(그림은 작게 270×480).
+ * 광고용 모션 어휘(photoIn·photoFit·deco·titleAnim·fx·extras·brand·ending.cta)는 조합마다 돌아가며 켜서 함께 점검합니다.
+ * 시각은 장면 등장 중(0.6·2.5·3.9·5.3)·엔딩 앞·끝을 고르고, 0.1·8.1 은 전환·사진 등장 한가운데입니다.
+ */
 async function sweepAll() {
   const scenes = await richScenes();
   const errors = [];
   let count = 0;
   const c = document.createElement('canvas');
+  const brand = { name: '미스터홈즈공인중개사사무소', phone: '031-000-0000' };
   for (const template of VOCAB.template) for (const overlay of VOCAB.overlay) for (const captionAnim of VOCAB.captionAnim) for (const transition of VOCAB.transition) {
     const titleMode = VOCAB.titleMode[count % 3];
     const captionStyle = VOCAB.captionStyle[count % VOCAB.captionStyle.length];
-    const p = { ...BASE, scenes, template, overlay, captionAnim, transition, titleMode, captionStyle, bandColor: count % 2 ? '#e9e7e2' : '#0b0d14' };
+    const motionVocab = count % 4 === 0 ? {} : {
+      photoIn: VOCAB.photoIn[count % VOCAB.photoIn.length],
+      photoFit: VOCAB.photoFit[count % 2],
+      deco: count % 3 === 0 ? ['bokeh', VOCAB.deco[count % 4]] : [VOCAB.deco[count % 4]],
+      titleAnim: VOCAB.titleAnim[count % 4],
+      fx: VOCAB.fx[count % 2],
+      extras: count % 2 ? [VOCAB.extras[count % 3]] : [...VOCAB.extras],
+      brand: count % 2 ? brand : undefined,
+      ending: { ...BASE.ending, cta: count % 2 ? '문의하기' : '' },
+    };
+    const p = { ...BASE, scenes, template, overlay, captionAnim, transition, titleMode, captionStyle, bandColor: count % 2 ? '#e9e7e2' : '#0b0d14', ...motionVocab };
     const tl = buildTimeline(p);
     const { W, H } = { W: 270, H: 480 };
     c.width = W; c.height = H;
     const ctx = c.getContext('2d');
-    for (const t of [0.6, 2.5, 3.9, 5.3, 8.0, tl.total - 0.1]) {
+    for (const t of [0.1, 0.6, 2.5, 3.9, 5.3, 8.0, 8.1, tl.total - 2.1, tl.total - 0.1]) {
       try { drawFrame(ctx, p, W, H, t, tl); }
-      catch (e) { errors.push({ template, overlay, captionAnim, transition, titleMode, captionStyle, t, message: String(e && e.stack || e) }); }
+      catch (e) { errors.push({ template, overlay, captionAnim, transition, titleMode, captionStyle, ...motionVocab, t, message: String(e && e.stack || e) }); }
     }
     count++;
   }

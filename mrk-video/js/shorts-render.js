@@ -269,6 +269,34 @@ const easeOutBounce = (x) => {
   return n1 * (x -= 2.625 / d1) * x + 0.984375;
 };
 
+// ── 광고용 모션 어휘(photoIn·photoFit·deco·titleAnim·extras·fx·brand·ending.cta) 공통 ──
+// 새 필드는 RENDER_DEFAULTS 에 넣지 않습니다. 없거나 'none'/''/빈 배열이면 "꺼짐"으로 보고 기존 코드 경로를 그대로 탑니다
+// (옛 프로젝트·기존 스타일이 한 픽셀도 바뀌지 않게). 켜졌을 때만 아래 함수들이 그립니다.
+const on = (v) => !!v && v !== 'none';
+const hasDeco = (p, id) => Array.isArray(p.deco) && p.deco.includes(id);
+/** 장식 id 가 주 장식(overlay)이나 2차 장식(extras)에 들어 있는지 */
+const hasExtra = (p, id) => p.overlay === id || (Array.isArray(p.extras) && p.extras.includes(id));
+/** 상호·연락처(p.brand). 없으면 channel 만 씁니다 */
+const brandOf = (p) => ({
+  name: String(p.brand?.name || p.channel || '').trim(),
+  phone: String(p.brand?.phone || '').trim(),
+  sub: String(p.brand?.sub || '').trim(),
+});
+/** 살짝 넘쳤다가(최대 ≈1.05) 자리 잡는 이징 — 엔딩 CTA 버튼 등장 */
+const easeOutBack = (x) => { x = clamp(x, 0, 1); const c = 1.2; const y = x - 1; return 1 + (c + 1) * y * y * y + c * y * y; };
+/** photoFit:'smart' 가 발동하는 사진·칸 비율 어긋남(배) */
+const SMART_FIT_RATIO = 1.35;
+/** 효과용 캔버스 캐시(보케·비네트). patternCache(64개 넘으면 전부 비움)와 분리해 패널·도트 패턴이 함께 날아가지 않게. 키에 시간·알파는 넣지 않습니다 */
+const fxCache = new Map();
+function cachedFx(key, make) {
+  let v = fxCache.get(key);
+  if (!v) {
+    if (fxCache.size > 32) fxCache.clear();
+    fxCache.set(key, (v = make()));
+  }
+  return v;
+}
+
 function motionFor(p, index, prog) {
   let mode = p.motion;
   if (mode === 'none') return { zoom: 1, ox: 0, oy: 0 };
@@ -378,12 +406,80 @@ function tapePattern(ctx, u) {
   });
 }
 
+/**
+ * 보케(deco: bokeh) 배경 한 장: 강조색 빛방울 18개(반지름 40~140u, 가운데 알파 0.10~0.22 → 가장자리 0). 화면 크기·색별 캐시.
+ * 점 자리는 고정 시드 난수(Park–Miller)라 언제 그려도 같습니다(난수·현재 시각을 쓰면 픽셀 기준선이 흔들립니다).
+ */
+function bokehCanvas(W, H, color, u) {
+  return cachedFx(`bokeh:${W}x${H}:${color}`, () => {
+    const c = makeCanvas(W, H);
+    const g = c.getContext('2d');
+    let s = 20261108;
+    const rnd = () => (s = (s * 48271) % 2147483647) / 2147483647;
+    for (let i = 0; i < 18; i++) {
+      const rad = (40 + rnd() * 100) * u;
+      const x = rnd() * W;
+      const y = rnd() * H;
+      const a = 0.10 + rnd() * 0.12;
+      // 가로로 이어 붙여 흐르게 하므로, 양 끝에 걸친 방울은 반대쪽에도 한 번 더 그려 이음새가 안 보이게
+      for (const xx of [x, x - W, x + W]) {
+        if (xx + rad < 0 || xx - rad > W) continue;
+        const grad = g.createRadialGradient(xx, y, rad * 0.15, xx, y, rad);
+        grad.addColorStop(0, rgba(color, a));
+        grad.addColorStop(1, rgba(color, 0));
+        g.fillStyle = grad;
+        g.beginPath();
+        g.arc(xx, y, rad, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    return c;
+  });
+}
+/** 보케를 배경(bandColor 구역) 위·장면 아래에 천천히 흐르게(초당 14u) 두 장 이어 그립니다 */
+function drawBokeh(ctx, p, L, W, H, t) {
+  const c = bokehCanvas(W, H, p.highlightColor, L.u);
+  const off = (t * 14 * L.u) % W;
+  ctx.drawImage(c, -off, 0);
+  ctx.drawImage(c, W - off, 0);
+}
+/** 비네트(deco: vignette): 가운데는 투명, 가장자리로 갈수록 검정 45% 인 방사 그라데이션 캔버스(칸 크기별 캐시)를 칸에 한 번 그립니다 */
+function drawVignette(ctx, r) {
+  const w = Math.max(1, Math.round(r.w));
+  const h = Math.max(1, Math.round(r.h));
+  const c = cachedFx(`vig:${w}x${h}`, () => {
+    const cv = makeCanvas(w, h);
+    const g = cv.getContext('2d');
+    const R = Math.hypot(w, h) / 2;
+    const grad = g.createRadialGradient(w / 2, h / 2, R * 0.45, w / 2, h / 2, R);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.45)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
+    return cv;
+  });
+  ctx.drawImage(c, r.x, r.y, r.w, r.h);
+}
+
 // ── 자막 어휘 ─────────────────────────────────────────
 /** 자막 모양(captionStyle) 전체. 모르는 값은 outline 으로 봅니다. 뜻은 docs/STYLE-SPEC.md 1절. */
 export const CAPTION_STYLES = ['outline', 'box', 'plain', 'pill', 'neon', 'shadow3d', 'marker', 'glass', 'tag', 'underline', 'gradient', 'bubble'];
 /** 자막 등장(captionAnim) 전체. 모르는 값은 none 으로 봅니다. */
 export const CAPTION_ANIMS = ['none', 'words', 'karaoke', 'type', 'pop', 'bounce', 'scale', 'slide', 'wave', 'flash'];
 const CAPTION_STYLE_SET = new Set(CAPTION_STYLES);
+// 광고용 모션 어휘 목록(화면 select·점검 시트가 이 목록을 씁니다). 뜻은 docs/STYLE-SPEC.md 1절.
+/** 사진 등장 */
+export const PHOTO_INS = ['none', 'push', 'reveal', 'pop', 'iris', 'plate'];
+/** 사진 맞춤 */
+export const PHOTO_FITS = ['cover', 'smart'];
+/** 사진 위·배경 장식(배열로 여러 개) */
+export const DECOS = ['sweep', 'bars', 'bokeh', 'frame', 'vignette'];
+/** 제목 등장(titleMode=band) */
+export const TITLE_ANIMS = ['none', 'rise', 'mask', 'stamp'];
+/** 장면 전환 */
+export const TRANSITIONS = ['fade', 'slide', 'zoom', 'none', 'wipe', 'flash', 'push'];
+/** 기존 장식 미세 움직임 묶음 */
+export const FX_MODES = ['none', 'ad'];
 /** 줄 간격 배율(모양별). 칩·알약처럼 줄 뒤에 배경이 붙는 모양은 줄 사이가 붙지 않게 넓힙니다. */
 const LINE_HEIGHT = { pill: 1.42, tag: 1.5, marker: 1.36, glass: 1.3, bubble: 1.3 };
 /** 띄어쓰기 폭 배율(모양별). 단어 칩(tag)은 칩 사이에 틈이 보이게 공백을 넓힙니다. */
@@ -977,12 +1073,34 @@ function chip(ctx, text, x, y, o) {
   let x0 = x;
   if (o.align === 'right') x0 = x - w;
   else if (o.align === 'center') x0 = x - w / 2;
+  // fx:'ad' 의 칩 팝(scale 1.4→1): 칩 가운데를 중심으로 키웁니다. 옵션이 없으면 아무 변환도 없음
+  if (o.scale && o.scale !== 1) {
+    const cx = x0 + w / 2;
+    ctx.translate(cx, y);
+    ctx.scale(o.scale, o.scale);
+    ctx.translate(-cx, -y);
+  }
   if (o.bg) {
     ctx.fillStyle = o.bg;
     roundRectPath(ctx, x0, y - h / 2, w, h, o.radius ?? h / 2);
     ctx.fill();
     // 배경과 칩 색이 비슷할 때(훅 장면) 윤곽이 사라지지 않게 테두리
     if (o.border) { ctx.strokeStyle = o.border; ctx.lineWidth = 3 * (o.u || 1); ctx.stroke(); }
+    // fx:'ad' 의 빛 스윕 1회(o.sweep 0→1): 칩 안을 흰 띠가 왼→오로 지나감
+    if (o.sweep > 0 && o.sweep < 1) {
+      ctx.save();
+      roundRectPath(ctx, x0, y - h / 2, w, h, o.radius ?? h / 2);
+      ctx.clip();
+      const bw = h * 1.2;
+      const sx = x0 - bw + easeInOut(o.sweep) * (w + bw * 2);
+      const g = ctx.createLinearGradient(sx, 0, sx + bw, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(sx, y - h / 2, bw, h);
+      ctx.restore();
+    }
   }
   ctx.fillStyle = o.color || '#fff';
   ctx.fillText(text, x0 + padX, y + size * 0.04);
@@ -991,7 +1109,8 @@ function chip(ctx, text, x, y, o) {
 }
 
 // ── 장면 그리기 ───────────────────────────────────────
-function drawEnding(ctx, p, L, W, H, logo, textAlpha = 1) {
+/** 엔딩 화면. textAlpha=글이 나타나는 알파(전환 중), local=엔딩 시작 뒤 초(CTA 버튼 등장·맥동용, 옛 호출은 0) */
+function drawEnding(ctx, p, L, W, H, logo, textAlpha = 1, local = 0) {
   const { u } = L;
   ctx.save();
   ctx.fillStyle = p.bandColor;
@@ -1023,8 +1142,73 @@ function drawEnding(ctx, p, L, W, H, logo, textAlpha = 1) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(plainText(p.ending?.sub), W / 2, y + H * E.h + 40 * u);
+  const cta = String(p.ending?.cta || '').trim();
+  if (cta) drawEndingCta(ctx, p, L, W, color, cta, y + H * E.h + 40 * u, local);
   ctx.restore();
   ctx.restore();
+}
+
+/**
+ * 엔딩 CTA(ending.cta 가 있을 때만): 부제 아래 강조색 알약 버튼이 0.4초 동안 1.15→1 로 자리 잡고 그 뒤 1.2초 주기로 살짝 맥동,
+ * 0.6~1.1초에 빛 스윕 1회. 버튼 아래엔 연락처 줄(brand.phone — 부제에 같은 번호가 이미 있으면 생략). subY=부제 줄의 y.
+ */
+function drawEndingCta(ctx, p, L, W, color, cta, subY, local) {
+  const { u } = L;
+  const e = easeOutBack((local - 0.3) / 0.4);
+  if (e <= 0) return;
+  const bh = 112 * u;
+  const cy = subY + 110 * u;
+  const pulse = local > 0.9 ? 1 + 0.03 * Math.sin(((local - 0.9) / 1.2) * Math.PI * 2) : 1;
+  const s = (0.6 + 0.4 * e) * pulse;
+  ctx.save();
+  ctx.globalAlpha *= Math.min(1, e);
+  let size = 48 * u;
+  ctx.font = fontCss(p.font, size);
+  let tw = ctx.measureText(cta).width; // 글 폭은 캐시하지 않습니다(글꼴을 받기 전 폭이 남지 않게)
+  const maxW = W - L.pad * 2;
+  while (tw + 112 * u > maxW && size > 28 * u) { size *= 0.9; ctx.font = fontCss(p.font, size); tw = ctx.measureText(cta).width; }
+  const bw = clamp(tw + 112 * u, 360 * u, maxW);
+  const x0 = W / 2 - bw / 2;
+  ctx.translate(W / 2, cy);
+  ctx.scale(s, s);
+  ctx.translate(-W / 2, -cy);
+  // 흐림 그림자 대신 살짝 내려 깐 어두운 알약(눌림 느낌)
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  roundRectPath(ctx, x0, cy - bh / 2 + 6 * u, bw, bh, bh / 2);
+  ctx.fill();
+  ctx.fillStyle = p.highlightColor;
+  roundRectPath(ctx, x0, cy - bh / 2, bw, bh, bh / 2);
+  ctx.fill();
+  const sw = (local - 0.8) / 0.5;
+  if (sw > 0 && sw < 1) {
+    ctx.save();
+    roundRectPath(ctx, x0, cy - bh / 2, bw, bh, bh / 2);
+    ctx.clip();
+    const sx = x0 - 90 * u + easeInOut(sw) * (bw + 180 * u);
+    const g = ctx.createLinearGradient(sx, 0, sx + 90 * u, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(sx, cy - bh / 2, 90 * u, bh);
+    ctx.restore();
+  }
+  ctx.fillStyle = onHl(p);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(cta, W / 2, cy + 3 * u);
+  ctx.restore();
+  const phone = brandOf(p).phone;
+  if (phone && !plainText(p.ending?.sub).includes(phone)) {
+    ctx.save();
+    ctx.globalAlpha *= Math.min(1, e);
+    ctx.font = uiFont(34 * u, 700);
+    ctx.fillStyle = rgba(color, 0.85);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(phone, W / 2, cy + 100 * u);
+    ctx.restore();
+  }
 }
 
 /**
@@ -1033,9 +1217,9 @@ function drawEnding(ctx, p, L, W, H, logo, textAlpha = 1) {
  */
 const hasHookBg = (p, scene) => scene?.kind === 'hook' && (p.template === 'full' || p.template === 'blur');
 
-/** 훅 장면 배경: 선명한 사진 위에 highlight→band 그라데이션 틴트. 자막이 놓이는 화면 가운데 아래는 bandColor */
-function drawHookBackground(ctx, p, W, H, scene) {
-  if (scene.img) drawImageFit(ctx, scene.img, 0, 0, W, H, 'cover', 1.08);
+/** 훅 장면 배경: 선명한 사진 위에 highlight→band 그라데이션 틴트. 자막이 놓이는 화면 가운데 아래는 bandColor. zoomIn=photoIn 이 켜졌을 때의 줌 정착(1.06→1, 옛 호출은 1) */
+function drawHookBackground(ctx, p, W, H, scene, zoomIn = 1) {
+  if (scene.img) drawImageFit(ctx, scene.img, 0, 0, W, H, 'cover', 1.08 * zoomIn);
   else { ctx.fillStyle = p.bandColor; ctx.fillRect(0, 0, W, H); }
   const g = ctx.createLinearGradient(0, 0, W * 0.35, H);
   g.addColorStop(0, p.highlightColor);
@@ -1095,8 +1279,8 @@ function drawStaticBackground(ctx, p, L, W, H) {
   }
 }
 
-function drawSplitImages(ctx, scene, rect, zoom, m) {
-  // vs 장식: 사진 두 장 좌우 비교
+/** vs 장식: 사진 두 장 좌우 비교. wipe(fx:'ad', 0→1)가 1 미만이면 둘째 사진이 오른쪽 가장자리에서 가운데로 와이프되며 열립니다(끝 모양은 같음) */
+function drawSplitImages(ctx, scene, rect, zoom, m, wipe = 1) {
   const gap = Math.max(4, rect.w * 0.006);
   const half = (rect.w - gap) / 2;
   ctx.save();
@@ -1104,11 +1288,195 @@ function drawSplitImages(ctx, scene, rect, zoom, m) {
   drawImageFit(ctx, scene.img, rect.x, rect.y, half, rect.h, 'cover', zoom, m.ox, m.oy);
   ctx.restore();
   ctx.save();
-  ctx.beginPath(); ctx.rect(rect.x + half + gap, rect.y, half, rect.h); ctx.clip();
-  drawImageFit(ctx, scene.img2, rect.x + half + gap, rect.y, half, rect.h, 'cover', zoom, -m.ox, m.oy);
+  const open = wipe >= 1 ? 1 : wipe <= 0 ? 0 : easeInOut(wipe);
+  const x2 = rect.x + half + gap;
+  ctx.beginPath(); ctx.rect(x2 + half * (1 - open), rect.y, half * open, rect.h); ctx.clip();
+  drawImageFit(ctx, scene.img2, x2, rect.y, half, rect.h, 'cover', zoom, -m.ox, m.oy);
   ctx.restore();
+  if (open < 1) {
+    // 열리는 가장자리의 흰 선
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x2 + half * (1 - open), rect.y, Math.max(2, rect.w * 0.006), rect.h);
+  }
   ctx.fillStyle = '#fff';
   ctx.fillRect(rect.x + half, rect.y, gap, rect.h);
+}
+
+// ── 사진 등장(photoIn)·사진 맞춤(photoFit)·사진 위 장식(deco) ──────────
+const PHOTO_IN = 0.5;
+const PHOTO_IN_SET = new Set(PHOTO_INS);
+/**
+ * 사진 등장 상태. 꺼져 있거나(none·모르는 값·사진 없음·훅 배경) 등장(0.5초, 짧은 장면은 길이의 절반)이 끝났으면 null → 기존 코드 경로 그대로.
+ * 시계는 장면이 보이기 시작한 때부터: 플래시 컷은 컷 시각(fx.cut)부터, 색판 push 는 밀기·와이프 전환(fx.delay=전환 길이)이 끝난 뒤부터
+ * ("두 번 밀리는" 느낌을 피함. reveal·pop·iris·plate 는 전환과 겹쳐도 어색하지 않아 바로 시작).
+ * 돌려주는 값: { mode, e(0→1 easeOut), e2(plate 색판이 빠지는 진행, easeInOut), a(알파 0→1, 0.15초), dir(짝수 장면 1=오른쪽에서, 홀수 -1=왼쪽에서) }
+ */
+function photoInOf(p, seg, t, fx) {
+  const mode = p.photoIn;
+  if (!on(mode) || !PHOTO_IN_SET.has(mode) || seg.kind !== 'scene' || !seg.scene.img || hasHookBg(p, seg.scene)) return null;
+  const dur = Math.min(PHOTO_IN, (seg.end - seg.start) * 0.5);
+  const delay = (fx.cut || 0) + (mode === 'push' ? fx.delay || 0 : 0);
+  const local = t - seg.start - delay;
+  if (local >= dur) return null;
+  const x = Math.max(0, local);
+  return { mode, e: easeOut(x / dur), e2: easeInOut(x / Math.min(0.45, dur * 0.9)), a: Math.min(1, x / 0.15), dir: seg.index % 2 ? -1 : 1 };
+}
+/** 사진 칸 clip 이 잡힌 뒤, 사진을 그리기 직전에 부릅니다(색판·이동·열림·확대). r=사진 칸 */
+function applyPhotoIn(ctx, p, pin, r, u) {
+  const { mode, e } = pin;
+  if (mode === 'plate') {
+    // 색판이 덮고 있다가 빠지는 동안 사진은 1.04→1 로 살짝 눌러 앉음(색판 자체는 photoInEdge 가 사진 위에 그림)
+    const s = 1 + 0.04 * (1 - e);
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    ctx.translate(cx, cy);
+    ctx.scale(s, s);
+    ctx.translate(-cx, -cy);
+  } else if (mode === 'push') {
+    // 강조색 색판이 먼저 깔리고 사진이 옆에서 밀고 들어옴. cover 사진은 칸보다 넓어 그냥 옮기면 색판이 안 보이므로,
+    // 사진을 칸 크기 판처럼 옮긴 자리로 잘라(clip) 아직 안 들어온 자리엔 색판이 남게 합니다
+    ctx.fillStyle = p.highlightColor;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    const sh = pin.dir * (1 - e) * r.w;
+    ctx.beginPath();
+    ctx.rect(r.x + sh, r.y, r.w, r.h);
+    ctx.clip();
+    ctx.translate(sh, 0);
+  } else if (mode === 'reveal') {
+    // 왼→오로 열림(열린 폭 + 앞선 선 10u 만 보이게). 선은 photoInEdge 가 사진 위에 그림
+    ctx.beginPath();
+    ctx.rect(r.x, r.y, e * r.w + 10 * u, r.h);
+    ctx.clip();
+  } else if (mode === 'iris') {
+    // 원형 아이리스: 칸 가운데에서 대각선 절반까지 열림(끝엔 칸을 다 덮음)
+    ctx.beginPath();
+    ctx.arc(r.x + r.w / 2, r.y + r.h / 2, Math.max(0.5, e * Math.hypot(r.w, r.h) / 2), 0, Math.PI * 2);
+    ctx.clip();
+  } else if (mode === 'pop') {
+    // 0.85→1 로 톡 커지며 알파 0→1
+    const s = 0.85 + 0.15 * e;
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    ctx.globalAlpha *= pin.a;
+    ctx.translate(cx, cy);
+    ctx.scale(s, s);
+    ctx.translate(-cx, -cy);
+  }
+}
+/** 사진을 그린 뒤: plate 의 색판(왼→오로 빠짐), reveal 의 앞선 강조색 선, iris 의 가장자리 고리 */
+function photoInEdge(ctx, p, pin, r, u) {
+  if (pin.mode === 'plate') {
+    if (pin.e2 < 1) {
+      ctx.fillStyle = p.highlightColor;
+      ctx.fillRect(r.x + r.w * pin.e2, r.y, r.w * (1 - pin.e2), r.h);
+    }
+  } else if (pin.mode === 'reveal') {
+    ctx.fillStyle = p.highlightColor;
+    ctx.fillRect(r.x + pin.e * r.w, r.y, 10 * u, r.h);
+  } else if (pin.mode === 'iris' && pin.e < 1) {
+    ctx.strokeStyle = p.highlightColor;
+    ctx.lineWidth = 8 * u;
+    ctx.beginPath();
+    ctx.arc(r.x + r.w / 2, r.y + r.h / 2, Math.max(0.5, pin.e * Math.hypot(r.w, r.h) / 2), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+/**
+ * 사진 한 장을 칸에 그립니다. 기본(cover)은 예전 호출과 인자까지 같습니다.
+ * photoFit:'smart' 이고 사진 비율이 칸 비율과 1.35배 이상 어긋나면(예: 3:2 가로 사진을 세로 칸에) 흐린 사진 배경 + 25% 어둡게 위에
+ * contain 으로 온전히 보이고, 사진 둘레에 얇은 그림자. contain 사진의 켄번스는 blur 템플릿처럼 약하게(0.35배).
+ */
+function drawPhoto(ctx, p, img, r, zoom, m, u) {
+  if (p.photoFit === 'smart') {
+    const iw = img.naturalWidth || img.width || 1;
+    const ih = img.naturalHeight || img.height || 1;
+    const ir = iw / ih;
+    const rr = r.w / Math.max(1, r.h);
+    if (Math.max(ir / rr, rr / ir) >= SMART_FIT_RATIO) {
+      ctx.save();
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(blurredOf(img, Math.round(r.w), Math.round(r.h)), r.x, r.y, r.w, r.h);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      const z = 1 + (zoom - 1) * 0.35;
+      const s = Math.min(r.w / iw, r.h / ih) * z;
+      const dw = iw * s;
+      const dh = ih * s;
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(r.x + (r.w - dw) / 2 + 6 * u, r.y + (r.h - dh) / 2 + 10 * u, dw, dh);
+      drawImageFit(ctx, img, r.x, r.y, r.w, r.h, 'contain', z, 0, 0);
+      ctx.restore();
+      return;
+    }
+  }
+  drawImageFit(ctx, img, r.x, r.y, r.w, r.h, 'cover', zoom, m.ox, m.oy);
+}
+
+/**
+ * 사진 위 장식(deco). 사진 칸 clip 안에서 사진을 그린 뒤·자막 전에 부릅니다. bokeh 는 배경층이라 여기 없음(drawBokeh).
+ *  sweep   : 흰 반투명 빛 띠(폭 220u, 가운데 알파 0.5, 아래가 왼쪽으로 칸 높이의 0.45 기울어짐)가 장면 0.4~1.0초에 왼→오로 한 번
+ *  frame   : 안쪽 28u 흰 액자 선(3u)이 0.6초 동안 위→오른쪽→아래→왼쪽 순서로 그려짐
+ *  vignette: 가장자리를 검정 45% 로 어둡게(정지, 캐시 캔버스 1장). blur 템플릿은 흐린 배경 쪽에서 따로 그림
+ *  bars    : 위아래 70u 레터박스 띠(bandColor) + 안쪽 가장자리 3u 강조색 선(정지)
+ * photo=false(사진 없는 글자 장면)면 bars 만, hookBg=true(훅 배경)면 bars·vignette 만 그립니다.
+ */
+function drawDeco(ctx, p, r, local, u, photo = true, hookBg = false) {
+  const d = p.deco;
+  if (!Array.isArray(d) || !d.length) return;
+  if (photo && d.includes('sweep')) {
+    const k = (local - 0.4) / 0.6;
+    if (k > 0 && k < 1) {
+      const bw = 220 * u;
+      const skew = r.h * 0.45;
+      const x = r.x - bw + easeInOut(k) * (r.w + bw + skew);
+      ctx.save();
+      // 기울임 변환 뒤 세로 띠를 그려 그라데이션도 띠와 같이 기울어지게 (x' = x - 0.45·(y - r.y))
+      ctx.transform(1, 0, -0.45, 1, 0.45 * r.y, 0);
+      const g = ctx.createLinearGradient(x, 0, x + bw, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.5)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x, r.y, bw, r.h);
+      ctx.restore();
+    }
+  }
+  if (photo && d.includes('frame')) {
+    const e = easeOut(local / 0.6);
+    const inset = 28 * u;
+    const fx = r.x + inset;
+    const fy = r.y + inset;
+    const fw = r.w - inset * 2;
+    const fh = r.h - inset * 2;
+    if (e > 0 && fw > 0 && fh > 0) {
+      let left = e * 2 * (fw + fh); // 아직 그릴 길이
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 3 * u;
+      ctx.lineCap = 'square';
+      ctx.beginPath();
+      // 네 변: 시작점 → 끝점 (위 → 오른쪽 → 아래 → 왼쪽)
+      for (const [x0, y0, x1, y1] of [[fx, fy, fx + fw, fy], [fx + fw, fy, fx + fw, fy + fh], [fx + fw, fy + fh, fx, fy + fh], [fx, fy + fh, fx, fy]]) {
+        if (left <= 0) break;
+        const len = Math.hypot(x1 - x0, y1 - y0);
+        const k = Math.min(1, left / len);
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k);
+        left -= len;
+      }
+      ctx.stroke();
+    }
+  }
+  if ((photo || hookBg) && p.template !== 'blur' && d.includes('vignette')) drawVignette(ctx, r);
+  if (d.includes('bars')) {
+    const bh = 70 * u;
+    ctx.fillStyle = p.bandColor;
+    ctx.fillRect(r.x, r.y, r.w, bh);
+    ctx.fillRect(r.x, r.y + r.h - bh, r.w, bh);
+    ctx.fillStyle = p.highlightColor;
+    ctx.fillRect(r.x, r.y + bh - 3 * u, r.w, 3 * u);
+    ctx.fillRect(r.x, r.y + r.h - bh, r.w, 3 * u);
+  }
 }
 
 function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
@@ -1119,12 +1487,18 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
   const m = motionFor(p, seg.index, prog);
   const zoom = m.zoom * (fx.zoom || 1);
   const tpl = p.template;
+  // 광고용 모션 어휘: 장면 시각·사진 등장 상태·vs 와이프 진행(모두 꺼져 있으면 null/0 이라 아래 분기가 비어 지나감)
+  const local = t - seg.start;
+  const pin = photoInOf(p, seg, t, fx);
+  const vsWipe = p.fx === 'ad' ? (local - (fx.cut || 0) - (fx.delay || 0)) / 0.7 : 1; // 둘째 사진 와이프는 장면이 보이기 시작한 때부터 0.7초
   ctx.save();
   ctx.globalAlpha *= fx.alpha;
-  ctx.translate(fx.dx, 0);
+  ctx.translate(fx.dx, fx.dy || 0);
 
   if (hasHookBg(p, scene)) {
-    drawHookBackground(ctx, p, W, H, scene);
+    // photoIn 이 켜져 있으면 훅 배경 사진도 1.06→1 로 살짝 정착(광고 첫 1초에 움직임이 있게). 꺼져 있으면 1.08×1 로 옛 값 그대로
+    drawHookBackground(ctx, p, W, H, scene, on(p.photoIn) ? 1 + 0.06 * (1 - easeOut((local - (fx.cut || 0)) / 0.5)) : 1);
+    if (hasDeco(p, 'bars') || hasDeco(p, 'vignette')) drawDeco(ctx, p, { x: 0, y: 0, w: W, h: H }, local, u, false, true);
     ctx.restore();
     return;
   }
@@ -1134,6 +1508,7 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
     ctx.drawImage(blurredOf(scene.img, W, H), 0, 0, W, H);
     ctx.fillStyle = 'rgba(0,0,0,0.38)';
     ctx.fillRect(0, 0, W, H);
+    if (hasDeco(p, 'vignette')) drawVignette(ctx, { x: 0, y: 0, w: W, h: H }); // blur 는 화면 전체(흐린 배경)에
   }
 
   if (tpl === 'card') {
@@ -1141,6 +1516,12 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
     const cx = card.x + card.w / 2;
     const cy = card.y + card.h / 2;
     ctx.translate(cx, cy);
+    // photoIn:'pop' 은 카드 전체(테두리·그림자 포함)가 카드 가운데를 중심으로 톡 자리 잡음
+    if (pin?.mode === 'pop') {
+      const s = 1 + 0.12 * (1 - pin.e);
+      ctx.scale(s, s);
+      ctx.globalAlpha *= pin.a;
+    }
     ctx.rotate((-2 * Math.PI) / 180);
     ctx.translate(-cx, -cy);
     // 흐림 대신 겹친 반투명 사각형으로 가벼운 그림자
@@ -1154,9 +1535,12 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
     ctx.fill();
     roundRectPath(ctx, r.x, r.y, r.w, r.h, 8 * u);
     ctx.clip();
+    if (pin && pin.mode !== 'pop') applyPhotoIn(ctx, p, pin, r, u);
     if (!scene.img) drawTextPanel(ctx, p, L, r);
-    else if (p.overlay === 'vs' && scene.img2) drawSplitImages(ctx, scene, r, zoom, m);
-    else drawImageFit(ctx, scene.img, r.x, r.y, r.w, r.h, 'cover', zoom, m.ox, m.oy);
+    else if (p.overlay === 'vs' && scene.img2) drawSplitImages(ctx, scene, r, zoom, m, vsWipe);
+    else drawPhoto(ctx, p, scene.img, r, zoom, m, u);
+    if (pin) photoInEdge(ctx, p, pin, r, u);
+    drawDeco(ctx, p, r, local, u, !!scene.img);
     ctx.restore();
     return;
   }
@@ -1166,8 +1550,11 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
       const r = L.thumb;
       roundRectPath(ctx, r.x, r.y, r.w, r.h, 28 * u);
       ctx.clip();
-      if (p.overlay === 'vs' && scene.img2) drawSplitImages(ctx, scene, r, zoom, m);
-      else drawImageFit(ctx, scene.img, r.x, r.y, r.w, r.h, 'cover', zoom, m.ox, m.oy);
+      if (pin) applyPhotoIn(ctx, p, pin, r, u);
+      if (p.overlay === 'vs' && scene.img2) drawSplitImages(ctx, scene, r, zoom, m, vsWipe);
+      else drawPhoto(ctx, p, scene.img, r, zoom, m, u);
+      if (pin) photoInEdge(ctx, p, pin, r, u);
+      drawDeco(ctx, p, r, local, u, true);
     }
     ctx.restore();
     return;
@@ -1186,10 +1573,11 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
   ctx.clip();
+  if (pin) applyPhotoIn(ctx, p, pin, rect, u);
   if (!scene.img) {
     drawTextPanel(ctx, p, L, rect);
   } else if (p.overlay === 'vs' && scene.img2) {
-    drawSplitImages(ctx, scene, rect, zoom, m);
+    drawSplitImages(ctx, scene, rect, zoom, m, vsWipe);
   } else if (tpl === 'blur') {
     const inset = 24 * u;
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -1204,8 +1592,10 @@ function drawSceneVisual(ctx, p, L, W, H, seg, t, fx) {
     } else ctx.fillRect(rect.x + inset + 6 * u, rect.y + inset + 10 * u, rect.w - inset * 2, rect.h - inset * 2);
     drawImageFit(ctx, scene.img, rect.x + inset, rect.y + inset, rect.w - inset * 2, rect.h - inset * 2, 'contain', 1 + (zoom - 1) * 0.35, 0, 0);
   } else {
-    drawImageFit(ctx, scene.img, rect.x, rect.y, rect.w, rect.h, 'cover', zoom, m.ox, m.oy);
+    drawPhoto(ctx, p, scene.img, rect, zoom, m, u);
   }
+  if (pin) photoInEdge(ctx, p, pin, rect, u);
+  drawDeco(ctx, p, rect, local, u, !!scene.img);
   ctx.restore();
 }
 
@@ -1296,11 +1686,15 @@ function drawCaption(ctx, p, L, seg, alpha, t, adj) {
     if (adj.box) box = adj.box;
     if (adj.sizeMul) o.size *= adj.sizeMul;
     for (const k of ['color', 'hl', 'style', 'shadow', 'align', 'valign', 'maxLines']) if (adj[k] !== undefined) o[k] = adj[k];
+    // 2차 장식(extras)·로워서드의 상자 축소: 위(minTop)·아래(maxBottom) 한계만 받고, 상자가 그 한계와 겹칠 때만 자릅니다(최소 높이 60u)
+    if (adj.maxBottom != null && box.y < adj.maxBottom && box.y + box.h > adj.maxBottom) box = { ...box, h: Math.max(60 * u, adj.maxBottom - box.y) };
+    if (adj.minTop != null && box.y < adj.minTop && box.y + box.h > adj.minTop) box = { ...box, y: adj.minTop, h: Math.max(60 * u, box.y + box.h - adj.minTop) };
   }
   drawRichText(ctx, scene.caption, box, { ...o, weight: p.font, alpha, u, anim });
 }
 
-function drawChrome(ctx, p, L, W, H, logo, alpha) {
+/** 제목 띠·채널 이름·로고. t=영상 전체 시각(titleAnim 제목 등장용, 옛 호출은 Infinity=정착 모양) */
+function drawChrome(ctx, p, L, W, H, logo, alpha, t = Infinity) {
   const { u, pad } = L;
   const overPhoto = p.template === 'full' || p.template === 'blur';
   ctx.save();
@@ -1337,12 +1731,41 @@ function drawChrome(ctx, p, L, W, H, logo, alpha) {
     ctx.drawImage(logo, W - pad - lw, chY - lh / 2, lw, lh);
   }
   if (p.titleMode === 'band') {
+    // titleAnim(제목 등장): 영상 시작 0.9초 동안만. rise=아래 40u 에서 떠오르며 강조색 밑줄이 왼→오로 그려짐(0.9초에 사라짐),
+    // mask=왼→오로 열림, stamp=1.3→1 로 쾅. 0.9초 뒤엔 변환이 없어 정착 모양은 지금 제목과 같습니다
+    const ta = p.titleAnim;
+    const live = on(ta) && t < 0.9;
+    if (live) {
+      ctx.save();
+      const e = easeOut(t / 0.5);
+      if (ta === 'rise') { ctx.translate(0, (1 - e) * 40 * u); ctx.globalAlpha *= e; }
+      else if (ta === 'mask') { ctx.beginPath(); ctx.rect(L.title.x - 20 * u, L.title.y - 20 * u, (L.title.w + 40 * u) * easeOut(t / 0.6), L.title.h + 40 * u); ctx.clip(); }
+      else if (ta === 'stamp') {
+        const s = 1.3 - 0.3 * easeOut(t / 0.35);
+        const cx = L.title.x + L.title.w / 2;
+        const cy = L.title.y + L.title.h / 2;
+        ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+        ctx.globalAlpha *= Math.min(1, t / 0.15);
+      }
+    }
     // 가로 화면은 제목 띠가 얇고 넓으므로 세로용 줄바꿈을 이어 한 줄로 씁니다(길면 자동으로 두 줄)
-    drawRichText(ctx, L.wide ? String(p.title || '').replace(/\s*\n\s*/g, ' ') : p.title, L.title, {
-      size: p.captionSize * 1.08 * u, weight: p.font, color: p.titleColor || ink, hl: p.highlightColor,
-      style: overPhoto ? 'outline' : 'plain', shadow: overPhoto,
-      valign: 'center', maxLines: L.wide ? 2 : 3, u,
+    const titleText = L.wide ? String(p.title || '').replace(/\s*\n\s*/g, ' ') : p.title;
+    const titleOpt = { size: p.captionSize * 1.08 * u, weight: p.font, style: overPhoto ? 'outline' : 'plain', maxLines: L.wide ? 2 : 3 };
+    drawRichText(ctx, titleText, L.title, {
+      ...titleOpt, color: p.titleColor || ink, hl: p.highlightColor, shadow: overPhoto, valign: 'center', u,
     });
+    if (live) {
+      if (ta === 'rise' && t > 0.5 && plainText(titleText).trim()) {
+        // 밑줄: 글 블록(세로 가운데) 바로 아래, 가장 긴 줄의 왼쪽 끝에서 그 줄 폭만큼 왼→오로. 줄나눔은 layoutText 캐시라 비용 없음
+        const TLt = layoutText(ctx, titleText, L.title, titleOpt, titleOpt.style);
+        const lw = Math.max(...TLt.lines.map((ln) => ln.w), 0);
+        const bottom = L.title.y + (L.title.h + TLt.lines.length * TLt.lh) / 2 - (TLt.lh - TLt.size) / 2;
+        ctx.globalAlpha *= 1 - clamp((t - 0.75) / 0.15, 0, 1); // 0.75~0.9초에 밑줄을 지움
+        ctx.fillStyle = p.highlightColor;
+        ctx.fillRect(L.title.x + (L.title.w - lw) / 2, bottom + 8 * u, lw * easeOut((t - 0.5) / 0.4), 6 * u);
+      }
+      ctx.restore();
+    }
   }
   ctx.restore();
 }
@@ -1450,15 +1873,21 @@ function newsBandWide(e) {
 }
 
 function ovNews(ctx, e) {
-  const { p, L, W, u, pad, top, scene } = e;
+  const { p, L, W, u, pad, top, scene, local, t } = e;
   const img = L.img;
   const cap = L.cap;
+  const ad = p.fx === 'ad';
   // 세로·정사각: 자막 칸 자리에 띠(최대 340u), 가로: 템플릿마다 정한 자리(newsBandWide)
   const band = L.wide ? newsBandWide(e) : { x: 0, y: cap.y - 10 * u, w: W, h: Math.min(cap.h + 20 * u, 340 * u) };
+  // fx:'ad': 첫 장면에서 띠가 아래에서 0.35초 올라옴(자막 상자도 함께)
+  if (ad && e.index === 0) band.y += (1 - easeOut(local / 0.35)) * band.h;
   const chipOpt = { size: 34 * u, weight: '900', bg: p.highlightColor, color: onHl(p), h: 58 * u, padX: 22 * u, radius: 8 * u, border: hookChipBorder(p, scene), u };
-  // '속보' 칩: 사진 왼쪽 위. 가로 화면의 사진 없는 장면은 빈 화면에 떠 있지 않게 띠 왼쪽 위에 붙입니다
+  // '속보' 칩: 사진 왼쪽 위. 가로 화면의 사진 없는 장면은 빈 화면에 떠 있지 않게 띠 왼쪽 위에 붙입니다. fx:'ad' 면 0.5초 주기로 깜빡(알파 1↔0.7)
+  ctx.save();
+  if (ad) ctx.globalAlpha *= Math.floor(t / 0.5) % 2 ? 0.7 : 1;
   if (L.wide && !scene.img) chip(ctx, '속보', band.x + pad * 0.6, Math.max(top + pad * 0.5, band.y - 40 * u), chipOpt);
   else chip(ctx, '속보', img.x + pad * 0.5, top + pad * 0.5 + 26 * u, chipOpt);
+  ctx.restore();
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(band.x, band.y, band.w, band.h);
   ctx.fillStyle = p.highlightColor;
@@ -1469,6 +1898,15 @@ function ovNews(ctx, e) {
     ctx.textAlign = 'left';
     ctx.fillStyle = p.highlightColor;
     ctx.fillText(p.channel, band.x + pad * 0.6, band.y + 38 * u);
+  }
+  // fx:'ad': 띠 오른쪽 위(채널 이름 줄)에 연락처(brand.phone) — 띠가 로워서드 구실을 하므로 lower3 없이도 전화번호가 보이게
+  const phone = ad ? brandOf(p).phone : '';
+  if (phone) {
+    ctx.font = uiFont(26 * u, 700);
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = rgba(p.inkColor, 0.8);
+    ctx.fillText(phone, band.x + band.w - pad * 0.6, band.y + 38 * u);
   }
   return { box: { x: band.x + pad * 0.6, y: band.y + 62 * u, w: band.w - pad * 1.2, h: band.h - 76 * u }, color: p.inkColor, hl: p.highlightColor, style: 'plain', shadow: false, align: 'left', valign: 'top', maxLines: 3 };
 }
@@ -1493,8 +1931,9 @@ function ovSteps(ctx, e) {
   const y = top + pad * 0.5 + 24 * u;
   const w = chip(ctx, `STEP ${n} / ${total}`, img.x + pad * 0.5, y, { size: 28 * u, weight: '800', bg: p.highlightColor, color: onHl(p), h: 50 * u, padX: 18 * u, radius: 10 * u });
   let x = img.x + pad * 0.5 + w + 22 * u;
+  const ad = p.fx === 'ad'; // fx:'ad': 진행 점이 왼쪽부터 0.1초 간격으로 차례로 채워짐
   for (let i = 0; i < Math.min(itemCount, 12); i++) {
-    ctx.fillStyle = i <= itemIndex ? p.highlightColor : 'rgba(255,255,255,0.45)';
+    ctx.fillStyle = i <= itemIndex && (!ad || e.fxLocal >= i * 0.1) ? p.highlightColor : 'rgba(255,255,255,0.45)';
     ctx.beginPath();
     ctx.arc(x, y, 7 * u, 0, Math.PI * 2);
     ctx.fill();
@@ -1580,18 +2019,26 @@ function ovPin(ctx, e) {
     const y1 = y + 80 * u;
     adj = { box: { x: box.x, y: y1, w: box.w, h: Math.max(60 * u, box.y + box.h - y1) } };
   }
+  // fx:'ad': 핀이 80u 위에서 떨어져 바닥에서 한 번 튀고(0.45초), 라벨 칩은 0.15초 뒤 0.2초 동안 나타남
+  const ad = p.fx === 'ad';
+  const dy = ad ? -(1 - easeOutBounce(e.fxLocal / 0.45)) * 80 * u : 0;
   ctx.fillStyle = p.highlightColor;
   ctx.beginPath();
-  ctx.arc(x, y - 52 * u, 32 * u, Math.PI * 0.85, Math.PI * 2.15);
-  ctx.lineTo(x, y);
+  ctx.arc(x, y + dy - 52 * u, 32 * u, Math.PI * 0.85, Math.PI * 2.15);
+  ctx.lineTo(x, y + dy);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.arc(x, y - 52 * u, 13 * u, 0, Math.PI * 2);
+  ctx.arc(x, y + dy - 52 * u, 13 * u, 0, Math.PI * 2);
   ctx.fill();
   const label = scene.label || firstWord(scene.caption);
-  if (label) chip(ctx, label, x, y + 36 * u, { size: 30 * u, weight: '800', bg: '#ffffff', color: p.inkColor, h: 54 * u, padX: 20 * u, align: 'center', radius: 12 * u });
+  if (label) {
+    ctx.save();
+    if (ad) ctx.globalAlpha *= clamp((e.fxLocal - 0.15) / 0.2, 0, 1);
+    chip(ctx, label, x, y + 36 * u, { size: 30 * u, weight: '800', bg: '#ffffff', color: p.inkColor, h: 54 * u, padX: 20 * u, align: 'center', radius: 12 * u });
+    ctx.restore();
+  }
   return adj;
 }
 
@@ -1600,6 +2047,8 @@ function ovPrice(ctx, e) {
   if (!scene.tag) return;
   const img = L.img;
   const common = { weight: '900', bg: p.highlightColor, color: onHl(p), border: hookChipBorder(p, scene), u };
+  // fx:'ad': 태그가 0.25초 동안 1.4→1 로 팝 + 0.3~0.7초 빛 스윕 1회
+  if (p.fx === 'ad') Object.assign(common, { scale: 1.4 - 0.4 * easeOut(e.fxLocal / 0.25), sweep: (e.fxLocal - 0.3) / 0.4 });
   if (hasHookBg(p, scene)) {
     // 매물형 훅: 가격이 먼저 보이게 화면 위 가운데에 크게
     chip(ctx, String(scene.tag), W / 2, L.hook.y + 120 * u, { ...common, size: 72 * u, h: 120 * u, padX: 40 * u, align: 'center', radius: 24 * u });
@@ -1644,6 +2093,14 @@ function ovQuote(ctx, e) {
   ctx.globalAlpha *= 0.9;
   // 가로의 낮은 자막 칸(사진 장면)은 따옴표가 첫 글자에 겹치지 않게 글 앞(왼쪽)에 매달고, 가운데 장면은 글 묶음 바로 위에
   const qx = wideQuote ? box.x - (centered ? 8 : 72) * u : cap.x - 8 * u;
+  if (p.fx === 'ad') {
+    // fx:'ad': 따옴표가 0.3초 동안 1.6→1 로 팝
+    const s = 1.6 - 0.6 * easeOut(e.fxLocal / 0.3);
+    const cx = qx + 40 * u;
+    const cy = qy + 60 * u;
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+    ctx.globalAlpha *= Math.min(1, e.fxLocal / 0.12);
+  }
   ctx.fillText('“', qx, qy);
   ctx.restore();
   if (p.channel) {
@@ -1799,6 +2256,22 @@ function ovVs(ctx, e) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = p.inkColor;
   ctx.fillText(scene.vsLabel || 'VS', cx, cy + 3 * u);
+  if (p.fx === 'ad') {
+    // fx:'ad': 좌우 라벨 칩(scene.labelA/labelB, 예 '전'/'후') — 각 사진 칸 왼쪽 아래. 오른쪽 칩은 둘째 사진 와이프가 끝날 때(0.5초) 나타남
+    const gap = Math.max(4, img.w * 0.006);
+    const half = (img.w - gap) / 2;
+    const opt = { size: 30 * u, weight: '800', bg: 'rgba(0,0,0,0.62)', color: '#ffffff', h: 54 * u, padX: 20 * u, radius: 12 * u };
+    const ly = img.y + img.h - 48 * u;
+    const a = String(scene.labelA || '').trim();
+    const b = String(scene.labelB || '').trim();
+    if (a) chip(ctx, a, img.x + 20 * u, ly, opt);
+    if (b) {
+      ctx.save();
+      ctx.globalAlpha *= clamp((e.fxLocal - 0.5) / 0.2, 0, 1);
+      chip(ctx, b, img.x + half + gap + 20 * u, ly, opt);
+      ctx.restore();
+    }
+  }
 }
 
 function ovCounter(ctx, e) {
@@ -1832,11 +2305,23 @@ function ovCounter(ctx, e) {
   ctx.lineJoin = 'round';
   let size = 170 * u;
   while (ctx.measureText(text).width > box.w - 40 * u && size > 50 * u) { size *= 0.9; ctx.font = fontCss('900', size); }
+  const ad = p.fx === 'ad';
+  const tEnd = Math.max(0.3, dur * 0.8); // 끝값에 닿는 시각
+  if (ad && local >= tEnd) {
+    // fx:'ad': 끝값에 닿은 뒤 0.2초 동안 1.12→1 로 자리 잡음(settle)
+    const s = 1 + 0.12 * (1 - easeOut((local - tEnd) / 0.2));
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+  }
   ctx.strokeStyle = 'rgba(0,0,0,0.6)';
   ctx.lineWidth = size * 0.1;
   ctx.strokeText(text, cx, cy);
   ctx.fillStyle = p.highlightColor;
   ctx.fillText(text, cx, cy);
+  if (ad && local > tEnd) {
+    // fx:'ad': 숫자 아래 강조색 밑줄이 0.3초 동안 가운데에서 양쪽으로 그려져 남습니다
+    const lw = ctx.measureText(text).width * easeOut((local - tEnd) / 0.3);
+    ctx.fillRect(cx - lw / 2, cy + size * 0.52, lw, Math.max(3, size * 0.05));
+  }
   ctx.restore();
   if (hookBg) return { box: { x: L.hook.x, y: cy + size * 0.6, w: L.hook.w, h: L.hook.h - (cy + size * 0.6 - L.hook.y) }, sizeMul: 0.6, valign: 'top' };
   if (darkImg) return { box: { x: L.cap.x, y: L.cap.y + 220 * u, w: L.cap.w, h: L.cap.h - 220 * u }, sizeMul: 0.85, valign: 'top' };
@@ -1866,10 +2351,12 @@ function ovDots(ctx, e) {
   const bg = p.template === 'split' ? p.panelColor : p.bandColor;
   const overPhoto = p.template === 'full';
   const dim = overPhoto ? 'rgba(255,255,255,0.4)' : rgba(onColor(bg, p), 0.3);
+  // fx:'ad': 현재 점이 0.3초 동안 1.5→1 배로 커지며 자리 잡음
+  const cur = p.fx === 'ad' ? 10 * u * (1 + 0.5 * (1 - easeOut(e.fxLocal / 0.3))) : 10 * u;
   for (let i = 0; i < n; i++) {
     ctx.fillStyle = i <= index ? p.highlightColor : dim;
     ctx.beginPath();
-    ctx.arc(x, y, i === index ? 10 * u : 7 * u, 0, Math.PI * 2);
+    ctx.arc(x, y, i === index ? cur : 7 * u, 0, Math.PI * 2);
     ctx.fill();
     x += gap;
   }
@@ -1881,36 +2368,274 @@ function ovDots(ctx, e) {
   if (cap.y + cap.h > y - 24 * u) return { box: { x: cap.x, y: cap.y, w: cap.w, h: Math.max(60 * u, y - 30 * u - cap.y) } };
 }
 
+// ── 광고용 장식(lower3·stamp·ribbon): 주 장식(overlay)으로도, 2차 장식(extras)으로도 씁니다 ──
+
+/**
+ * 로워서드 바가 놓이는 자리. 돌려주는 값: { x, y, w, h, onPhoto(사진 위라 검은 바), bg(바가 놓인 면의 색), adj(자막 상자 아래 한계를 돌려줄지) }
+ *  A 사진 위 왼쪽 아래: band·blur·split 의 사진 장면(자막 칸과 겹치지 않아 adj 없음)
+ *  C 가로 card 사진 장면: 오른쪽 자막 칸 아래, 카드 아래선에 맞춤
+ *  B 화면 왼쪽 아래: 그 밖(full·card·dark·사진 없는 장면·훅 배경). 진행 막대·티커·경고 테이프·점 진행 위로 올립니다
+ */
+function lower3Rect(e, bw, bh) {
+  const { p, L, H, u, pad, scene } = e;
+  const tpl = p.template;
+  const hookBg = hasHookBg(p, scene);
+  // 자리는 템플릿으로만 정해 항상 보이는 바가 장면(사진·글자) 사이에서 순간 이동하지 않게 합니다
+  if (tpl === 'band' || tpl === 'blur' || tpl === 'split' || tpl === 'card') {
+    // 사진 칸 왼쪽 아래(글자 장면도 같은 칸 — band·blur 는 도면 패널, split 은 패널색, card 는 카드 안 패널. 1:1 card 훅은 overlayEnv 가 바꿔 준 imgHook)
+    const r = L.img;
+    const bright = tpl === 'split' && !scene.img && isBright(p.panelColor); // split 글자 장면만 밝은 패널 위
+    return { x: r.x + pad * 0.5, y: r.y + r.h - 24 * u - bh, w: bw, h: bh, dark: !bright, adj: !scene.img || hookBg, rotateCard: tpl === 'card' };
+  }
+  // full·dark: 화면 왼쪽 아래(진행 막대·티커·경고 테이프·점 진행 위로 올림). 자막 상자 아래 한계를 돌려줍니다
+  const inset = (p.showProgress ? 9 : 0) * u + (p.overlay === 'ticker' ? 64 : p.overlay === 'warning' || p.overlay === 'dots' ? 30 : 0) * u;
+  const onPhoto = tpl === 'full' && (!!scene.img || hookBg);
+  return { x: pad * 0.5, y: H - 60 * u - inset - bh, w: bw, h: bh, dark: onPhoto || !isBright(p.bandColor), adj: true, rotateCard: false };
+}
+
+/**
+ * lower3 — 로워서드(방송 자막바): 강조색 세로 막대 12u + 둥근 바. 1줄 상호(brand.name, 없으면 channel) 36u/800, 2줄 연락처(brand.phone, 없으면 brand.sub) 28u/600.
+ * 폭 = 글 폭 + 64u(240u~0.6W, 넘치면 글자를 0.75배까지 줄이고 그래도 넘치면 뒤를 …). 사진·패널·어두운 면 위는 검정 72% 바 + 흰 글, 밝은 면은 흰 94% 바 + inkColor 글.
+ * 영상 시작 0.35초 동안 왼쪽에서 밀려 들어온 뒤 고정(PERSISTENT). 글자 장면·훅 배경·full·dark 에선 자막 상자 아래 한계(maxBottom)를 바 위 16u 로 돌려줍니다.
+ * 글 폭은 캐시하지 않습니다(글꼴을 받기 전 폭이 남지 않게, 프레임당 measureText 몇 번은 수 µs).
+ */
+function ovLower3(ctx, e) {
+  const { p, u, t, W } = e;
+  const b = brandOf(p);
+  const l1 = b.name || b.phone || b.sub;
+  let l2 = b.name ? b.phone || b.sub : b.phone ? b.sub : '';
+  if (!l1) return;
+  const bh = (l2 ? 110 : 72) * u;
+  const maxW = W * 0.6 - 64 * u;
+  let k = 1;
+  let tw;
+  const measure = () => {
+    ctx.font = uiFont(36 * u * k, 800);
+    tw = ctx.measureText(l1).width;
+    ctx.font = uiFont(28 * u * k, 600);
+    if (l2) tw = Math.max(tw, ctx.measureText(l2).width);
+  };
+  for (measure(); tw > maxW && k > 0.75; measure()) k *= 0.9;
+  if (tw > maxW && l2) { while (l2.length > 4 && ctx.measureText(l2 + '…').width > maxW) l2 = l2.slice(0, -1); l2 += '…'; tw = Math.min(tw, maxW); }
+  const bw = clamp(tw + 64 * u, 240 * u, W * 0.6);
+  const r = lower3Rect(e, bw, bh);
+  const dx = t < 0.35 ? -(1 - easeOut(t / 0.35)) * (r.x + r.w + 20 * u) : 0;
+  ctx.save();
+  if (r.rotateCard && e.L.card) {
+    // 카드 안에 있으므로 카드처럼 −2° 기울임
+    const cx = e.L.card.x + e.L.card.w / 2;
+    const cy = e.L.card.y + e.L.card.h / 2;
+    ctx.translate(cx, cy); ctx.rotate((-2 * Math.PI) / 180); ctx.translate(-cx, -cy);
+  }
+  ctx.translate(dx, 0);
+  ctx.fillStyle = r.dark ? 'rgba(0,0,0,0.72)' : 'rgba(255,255,255,0.94)';
+  roundRectPath(ctx, r.x, r.y, r.w, r.h, 8 * u);
+  ctx.fill();
+  ctx.fillStyle = p.highlightColor;
+  ctx.fillRect(r.x, r.y, 12 * u, r.h);
+  ctx.fillStyle = r.dark ? '#ffffff' : p.inkColor;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = uiFont(36 * u * k, 800);
+  ctx.fillText(l1, r.x + 38 * u, l2 ? r.y + 36 * u : r.y + r.h / 2);
+  if (l2) {
+    ctx.font = uiFont(28 * u * k, 600);
+    ctx.globalAlpha *= 0.85;
+    ctx.fillText(l2, r.x + 38 * u, r.y + 78 * u);
+  }
+  ctx.restore();
+  return r.adj ? { maxBottom: r.y - 16 * u } : undefined;
+}
+
+/**
+ * stamp — 도장 배지(scene.stamp 가 있을 때만, 8자까지): 강조색 글(900, 52u) + 둥근 사각 이중 테두리(바깥 6u·안 2u), −10° 기울임.
+ * 시계는 전환이 끝난 뒤(e.fxLocal) 0.05초 뒤부터 0.22초 동안 1.6→1 로 "찍힘"(ease-in — 크게 떠 있다가 쾅), 알파는 0.08초.
+ * 자리: 사진 칸(훅 배경은 화면) 오른쪽 위 — 가격 태그·날짜 칩·리본이 오른쪽을 쓰면 왼쪽 위, 글자 장면은 글 상자 오른쪽 위. 폭이 칸의 45% 를 넘으면 글자를 줄임.
+ * 뒷판: 사진·훅 배경 위는 검정 35%, 그 밖은 강조색이 어두울 때만 흰 88%(밝은 강조색은 글자 장면 패널 위에서 그대로 읽힘).
+ */
+function ovStamp(ctx, e) {
+  const { p, L, u, pad, scene, fxLocal, top } = e;
+  const text = String(scene.stamp || '').trim().slice(0, 8);
+  if (!text) return;
+  const x = (fxLocal - 0.05) / 0.22;
+  if (x <= 0) return;
+  const k = clamp(x, 0, 1);
+  const hookBg = hasHookBg(p, scene);
+  const area = scene.img || hookBg ? L.img : noImgBox(p, L);
+  const left = p.overlay === 'price' || p.overlay === 'ticker' || hasExtra(p, 'ribbon');
+  let size = 52 * u;
+  ctx.save();
+  ctx.font = fontCss('900', size);
+  let tw = ctx.measureText(text).width;
+  while (tw + 48 * u > area.w * 0.45 && size > 26 * u) { size *= 0.9; ctx.font = fontCss('900', size); tw = ctx.measureText(text).width; }
+  const w = tw + 48 * u;
+  const h = size * 1.2 + 28 * u;
+  const cx = left ? area.x + pad * 0.5 + w / 2 : area.x + area.w - pad * 0.5 - w / 2;
+  const cy = top + pad * 0.5 + 60 * u;
+  const s = 1.6 - 0.6 * k * k * k;
+  ctx.globalAlpha *= Math.min(1, (fxLocal - 0.05) / 0.08);
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.1745);
+  ctx.scale(s, s);
+  if (scene.img || hookBg) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; roundRectPath(ctx, -w / 2, -h / 2, w, h, 12 * u); ctx.fill(); }
+  else if (!isBright(p.highlightColor)) { ctx.fillStyle = 'rgba(255,255,255,0.88)'; roundRectPath(ctx, -w / 2, -h / 2, w, h, 12 * u); ctx.fill(); }
+  ctx.strokeStyle = p.highlightColor;
+  ctx.lineWidth = 6 * u;
+  roundRectPath(ctx, -w / 2, -h / 2, w, h, 12 * u);
+  ctx.stroke();
+  ctx.lineWidth = 2 * u;
+  roundRectPath(ctx, -w / 2 + 9 * u, -h / 2 + 9 * u, w - 18 * u, h - 18 * u, 8 * u);
+  ctx.stroke();
+  ctx.fillStyle = p.highlightColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, 3 * u);
+  ctx.restore();
+}
+
+/**
+ * ribbon — 대각선 리본(scene.tag 가 있을 때만): 사진 칸 오른쪽 위 모서리를 45° 로 가로지르는 강조색 띠(폭 60u, 모서리에서 110u)에 글.
+ * 장면이 바뀌어도 자리는 그대로(PERSISTENT), 글만 바뀜. 사진 없는 장면은 글자 패널(dark 는 화면) 모서리, 훅 배경은 화면 모서리.
+ * card 는 카드와 같이 −2° 기울여 사진 가장자리에 맞춥니다.
+ */
+function ovRibbon(ctx, e) {
+  const { p, L, W, H, u, scene } = e;
+  const text = String(scene.tag || '').trim();
+  if (!text) return;
+  const hookBg = hasHookBg(p, scene);
+  const screen = { x: 0, y: 0, w: W, h: H };
+  const r = hookBg || (!scene.img && p.template === 'dark') ? screen : L.img;
+  const D = 110 * u;
+  const bw = 60 * u;
+  ctx.save();
+  if (p.template === 'card' && L.card) {
+    const cx = L.card.x + L.card.w / 2;
+    const cy = L.card.y + L.card.h / 2;
+    ctx.translate(cx, cy); ctx.rotate((-2 * Math.PI) / 180); ctx.translate(-cx, -cy);
+  }
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
+  ctx.translate(r.x + r.w - D / Math.SQRT2, r.y + D / Math.SQRT2);
+  ctx.rotate(Math.PI / 4);
+  const len = 2 * D + bw * 2;
+  ctx.fillStyle = p.highlightColor;
+  ctx.fillRect(-len / 2, -bw / 2, len, bw);
+  ctx.fillStyle = isBright(p.highlightColor) ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.4)';
+  ctx.fillRect(-len / 2, -bw / 2 + 6 * u, len, 2 * u);
+  ctx.fillRect(-len / 2, bw / 2 - 8 * u, len, 2 * u);
+  let size = 26 * u;
+  ctx.font = fontCss('800', size);
+  let label = text;
+  let tw = ctx.measureText(label).width;
+  const maxW = 2 * D - 24 * u;
+  while (tw > maxW && size > 18 * u) { size *= 0.9; ctx.font = fontCss('800', size); tw = ctx.measureText(label).width; }
+  while (tw > maxW && label.length > 2) { label = label.slice(0, -2) + '…'; tw = ctx.measureText(label).width; }
+  ctx.fillStyle = onHl(p);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, 0, 2 * u);
+  ctx.restore();
+}
+
 export const OVERLAYS = {
   none: null, news: ovNews, warning: ovWarning, steps: ovSteps, number: ovNumber, check: ovCheck, pin: ovPin,
   price: ovPrice, quote: ovQuote, quiz: ovQuiz, ticker: ovTicker, date: ovDate, comment: ovComment, vs: ovVs,
   counter: ovCounter, dots: ovDots,
+  lower3: ovLower3, stamp: ovStamp, ribbon: ovRibbon,
 };
+/** 2차 장식(extras)으로 넣을 수 있는 광고용 장식 id */
+export const EXTRA_OVERLAYS = ['lower3', 'stamp', 'ribbon'];
 // 장면이 바뀌어도 항상 보이는 장식(전환 중 흐려지지 않음)
-const PERSISTENT_OVERLAYS = new Set(['warning', 'steps', 'ticker', 'dots', 'news', 'check']);
+const PERSISTENT_OVERLAYS = new Set(['warning', 'steps', 'ticker', 'dots', 'news', 'check', 'lower3', 'ribbon']);
 
-/** hidden=true 면 그리지 않고(알파 0) 자막 상자·색 조정값만 받아 옵니다(전환 중 사라지는 앞 장면 자막용) */
-function drawOverlay(ctx, p, L, W, H, seg, t, tl, alpha, hidden = false) {
-  const fn = OVERLAYS[p.overlay];
-  if (!fn || seg.kind !== 'scene') return undefined;
+/**
+ * 장식 함수에 넘기는 환경 e(drawOverlay·drawExtras 공용). trDur=이 장면으로 들어오는 전환 길이(초, 첫 장면은 0).
+ * fxLocal: 광고용 움직임(fx:'ad'·도장 등장)의 시계 — 전환 앞 절반은 장식 알파가 0 이라, 전환이 끝난 뒤(local − trDur)부터 셉니다
+ */
+function overlayEnv(p, L, W, H, seg, t, tl, alpha, trDur = 0) {
   const count = tl.segs.reduce((n, s) => n + (s.kind === 'scene' ? 1 : 0), 0);
   // 항목 번호: 훅·CTA 를 뺀 순번(STEP 칩·번호 배지가 '1단계'와 어긋나지 않게). 훅·CTA 면 -1
   const items = tl.segs.filter((s) => s.kind === 'scene' && s.scene.kind !== 'hook' && s.scene.kind !== 'cta');
   // 가로 card 의 사진 없는 장면은 카드가 가운데로 옮겨지므로(cardRects) 장식도 가운데 카드 기준으로 놓습니다
   if (!seg.scene.img && wideCardText(p, L)) L = { ...L, card: L.cardText, img: L.imgText };
   else if (p.template === 'card' && squareCardHook(L, seg.scene)) L = { ...L, card: L.cardHook, img: L.imgHook, cap: L.capHook };
-  const e = {
+  return {
     p, L, W, H, u: L.u, pad: L.pad, seg, scene: seg.scene, index: seg.index, count, t, tl,
     itemIndex: items.findIndex((s) => s.index === seg.index), itemCount: items.length,
     local: t - seg.start, dur: seg.end - seg.start, alpha,
     top: Math.max(L.img.y, L.titleH), // 배지가 채널 이름·제목과 겹치지 않는 위쪽 기준선
+    fxLocal: Math.max(0, t - seg.start - trDur), // 전환이 끝나(자막·장식 알파가 1이 된 뒤)부터 센 시각
   };
+}
+
+/** hidden=true 면 그리지 않고(알파 0) 자막 상자·색 조정값만 받아 옵니다(전환 중 사라지는 앞 장면 자막용). trDur 은 overlayEnv 의 fxLocal 용 */
+function drawOverlay(ctx, p, L, W, H, seg, t, tl, alpha, hidden = false, trDur = 0) {
+  const fn = OVERLAYS[p.overlay];
+  if (!fn || seg.kind !== 'scene') return undefined;
+  const e = overlayEnv(p, L, W, H, seg, t, tl, alpha, trDur);
   ctx.save();
   if (hidden) ctx.globalAlpha = 0;
   else if (!PERSISTENT_OVERLAYS.has(p.overlay)) ctx.globalAlpha *= alpha;
   let adj;
   try { adj = fn(ctx, e); } finally { ctx.restore(); }
   return adj;
+}
+
+/**
+ * 2차 장식(p.extras): 주 장식 위에 겹쳐 그리는 장식들(주 장식과 같은 id 는 건너뜀). 자막 조정은 상자를 위·아래로 줄이는 것만 받습니다 —
+ * 새 장식은 maxBottom/minTop 을, 기존 장식 id 를 넣었으면 그 장식의 box 위·아래를 한계로 씁니다(색·모양·정렬은 주 장식만).
+ * prevPass=true(전환 중 사라지는 앞 장면)면 항상 보이는 장식은 그리지 않고 조정값만 받습니다(drawOverlay 의 hidden 과 같은 규칙).
+ * extras 가 비어 있으면 adj 를 그대로 돌려줍니다(기존 경로 불변).
+ */
+function drawExtras(ctx, p, L, W, H, seg, t, tl, alpha, adj, prevPass = false, trDur = 0) {
+  const list = p.extras;
+  if (!Array.isArray(list) || !list.length || seg.kind !== 'scene') return adj;
+  let e = null;
+  let out = adj;
+  for (const id of list) {
+    const fn = OVERLAYS[id];
+    if (!fn || id === p.overlay) continue;
+    if (!e) e = overlayEnv(p, L, W, H, seg, t, tl, alpha, trDur);
+    const persistent = PERSISTENT_OVERLAYS.has(id);
+    ctx.save();
+    if (prevPass && persistent) ctx.globalAlpha = 0;
+    else if (!persistent) ctx.globalAlpha *= alpha;
+    let a;
+    try { a = fn(ctx, e); } finally { ctx.restore(); }
+    if (!a) continue;
+    const top = a.minTop ?? (a.box ? a.box.y : undefined);
+    const bottom = a.maxBottom ?? (a.box ? a.box.y + a.box.h : undefined);
+    if (top == null && bottom == null) continue;
+    out = { ...(out || {}) };
+    if (top != null) out.minTop = Math.max(out.minTop ?? -Infinity, top);
+    if (bottom != null) out.maxBottom = Math.min(out.maxBottom ?? Infinity, bottom);
+  }
+  return out;
+}
+
+/** 플래시 컷 전환 길이(초)와 컷 뒤 줌 길이(초). 컷 직후 1.06배에서 1 로 */
+const FLASH_DUR = 0.24;
+const FLASH_ZOOM = 0.35;
+const flashZoom = (sinceCut) => 1 + 0.06 * (1 - easeOut(sinceCut / FLASH_ZOOM));
+
+/**
+ * 세로 밀기(push) 전환이 움직이는 창: full·blur·엔딩은 화면 전체(제목·채널은 chromeAlpha 로 사라짐), band·split 은 사진 칸, dark 는 썸네일,
+ * card 는 앞·뒤 장면 카드의 합집합을 40u 넓힌 상자(−2° 모서리 포함). 제목 띠·패널·자막 칸 위로 사진이 지나가지 않게 합니다. null=창 없음
+ */
+function pushWindow(p, L, prev, seg) {
+  const tpl = p.template;
+  if (seg.kind === 'ending' || prev.kind === 'ending' || tpl === 'full' || tpl === 'blur') return null;
+  if (tpl === 'dark') return L.thumb;
+  if (tpl === 'card') {
+    const a = cardRects(p, L, prev.scene).card;
+    const b = cardRects(p, L, seg.scene).card;
+    const m = 40 * L.u;
+    const x = Math.min(a.x, b.x) - m;
+    const y = Math.min(a.y, b.y) - m;
+    return { x, y, w: Math.max(a.x + a.w, b.x + b.w) + m - x, h: Math.max(a.y + a.h, b.y + b.h) + m - y };
+  }
+  return L.img;
 }
 
 /** t초 시점의 화면 한 장을 그립니다. */
@@ -1933,13 +2658,22 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
   const i = segmentAt(tl, t);
   const seg = tl.segs[i];
   const prev = i > 0 ? tl.segs[i - 1] : null;
-  const trMax = p.transition === 'wipe' ? 0.55 : 0.5;
+  const trMax = p.transition === 'wipe' ? 0.55 : p.transition === 'flash' ? FLASH_DUR : 0.5;
   const trDur = p.transition === 'none' || !prev ? 0 : Math.min(trMax, (seg.end - seg.start) * 0.4, (prev.end - prev.start) * 0.4);
   const inTr = trDur > 0 && t - seg.start < trDur;
   const raw = inTr ? (t - seg.start) / trDur : 1;
   const k = inTr ? easeInOut(raw) : 1;
+  // 사진 등장(photoIn): 장면이 옆·위로 움직이는 전환(slide·push·wipe)에선 색판 push 를 전환이 끝난 뒤 시작시키고(delay),
+  // 사라지는 전환(fade·zoom)에선 새 장면을 흐리게 겹치지 않고 바로 보여 등장 효과가 가려지지 않게 합니다(앞 장면 위에서 색판·리빌·팝·아이리스가 곧 전환)
+  const delay = p.transition === 'slide' || p.transition === 'push' || p.transition === 'wipe' ? trDur : 0;
+  const entering = inTr && on(p.photoIn) && photoInOf(p, seg, t, {}) !== null;
+  // 제목 등장(titleAnim)의 시계: 제목이 처음 보이는 장면(훅 배경이 아닌 첫 장면)의 시작부터. full/blur 훅 스타일은 둘째 장면에 제목이 처음 나옵니다
+  const tTitle = on(p.titleAnim) ? t - (tl.segs.find((s) => s.kind === 'scene' && !hasHookBg(p, s.scene)) || tl.segs[0]).start : t;
+  // 보케는 full·blur 에선 사진에 덮여 보이지 않으므로 그리지 않습니다(비용만 듦)
+  const bokeh = hasDeco(p, 'bokeh') && p.template !== 'full' && p.template !== 'blur';
 
   drawStaticBackground(ctx, p, L, W, H);
+  if (bokeh) drawBokeh(ctx, p, L, W, H, t);
 
   // 자막은 겹치면 읽기 어려워서, 앞 자막이 먼저 사라진 뒤(전환 후반부) 새 자막이 나타납니다. 엔딩 문구도 같은 규칙.
   const capAlpha = inTr ? clamp(k * 2 - 1, 0, 1) : 1;
@@ -1947,8 +2681,9 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
     if (s.kind === 'ending') {
       ctx.save();
       ctx.globalAlpha = fx.alpha;
-      ctx.translate(fx.dx, 0);
-      drawEnding(ctx, p, L, W, H, logo, inTr && p.transition !== 'slide' ? capAlpha : 1);
+      ctx.translate(fx.dx, fx.dy || 0);
+      // 밀기 전환(slide·push)은 엔딩이 통째로 밀려 들어오므로 글도 바로 보입니다
+      drawEnding(ctx, p, L, W, H, logo, inTr && p.transition !== 'slide' && p.transition !== 'push' ? capAlpha : 1, t - s.start);
       ctx.restore();
     } else {
       drawSceneVisual(ctx, p, L, W, H, s, t, fx);
@@ -1957,14 +2692,14 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
 
   if (inTr) {
     if (p.transition === 'slide') {
-      draw(prev, { alpha: 1, dx: -k * W, zoom: 1 });
-      draw(seg, { alpha: 1, dx: (1 - k) * W, zoom: 1 });
+      draw(prev, { alpha: 1, dx: -k * W, zoom: 1, delay });
+      draw(seg, { alpha: 1, dx: (1 - k) * W, zoom: 1, delay });
     } else if (p.transition === 'zoom') {
       draw(prev, { alpha: 1, dx: 0, zoom: 1 });
-      draw(seg, { alpha: k, dx: 0, zoom: 1 + 0.18 * (1 - k) });
+      draw(seg, { alpha: entering ? 1 : k, dx: 0, zoom: 1 + 0.18 * (1 - k) });
     } else if (p.transition === 'wipe') {
       // 사선 띠가 왼쪽 위→오른쪽 아래로 쓸고 지나가며 그 뒤로 새 장면
-      draw(prev, { alpha: 1, dx: 0, zoom: 1 });
+      draw(prev, { alpha: 1, dx: 0, zoom: 1, delay });
       const bw = 260 * L.u;
       const span = W + H;
       const c = -bw + easeOut(raw) * (span + bw * 2);
@@ -1978,7 +2713,8 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
         ctx.fillStyle = p.bandColor;
         ctx.fillRect(0, 0, W, H);
         drawStaticBackground(ctx, p, L, W, H);
-        draw(seg, { alpha: 1, dx: 0, zoom: 1 });
+        if (bokeh) drawBokeh(ctx, p, L, W, H, t);
+        draw(seg, { alpha: 1, dx: 0, zoom: 1, delay });
         ctx.restore();
       }
       ctx.fillStyle = p.highlightColor;
@@ -1989,10 +2725,27 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
       ctx.beginPath();
       ctx.moveTo(c + bw, 0); ctx.lineTo(c + bw + 14 * L.u, 0); ctx.lineTo(0, c + bw + 14 * L.u); ctx.lineTo(0, c + bw); ctx.closePath();
       ctx.fill();
+    } else if (p.transition === 'flash') {
+      // 플래시 컷: 정점(raw 0.5)까지 앞 장면, 그 뒤 새 장면(하드 컷) + 1.06→1 줌(flashZoom). 흰빛 덧칠은 맨 뒤(진행 막대 뒤)에서
+      if (raw < 0.5) draw(prev, { alpha: 1, dx: 0, zoom: 1 });
+      else draw(seg, { alpha: 1, dx: 0, zoom: flashZoom(t - seg.start - trDur / 2), cut: trDur / 2 });
+    } else if (p.transition === 'push') {
+      // 세로 밀기: 앞 장면은 위로, 새 장면은 아래에서. 사진 칸 창(pushWindow) 안에서만 밀려 제목 띠·패널·자막 칸을 덮지 않게(full·blur·엔딩은 화면 전체)
+      ctx.save();
+      const win = pushWindow(p, L, prev, seg);
+      if (win) { ctx.beginPath(); ctx.rect(win.x, win.y, win.w, win.h); ctx.clip(); }
+      draw(prev, { alpha: 1, dx: 0, dy: -k * H, zoom: 1, delay });
+      draw(seg, { alpha: 1, dx: 0, dy: (1 - k) * H, zoom: 1, delay });
+      ctx.restore();
     } else {
       draw(prev, { alpha: 1, dx: 0, zoom: 1 });
-      draw(seg, { alpha: k, dx: 0, zoom: 1 });
+      draw(seg, { alpha: entering ? 1 : k, dx: 0, zoom: 1 });
     }
+  } else if (p.transition === 'flash' && trDur > 0 && t - seg.start < trDur / 2 + Math.max(FLASH_ZOOM, PHOTO_IN)) {
+    // 플래시 컷 뒤 줌·사진 등장 마무리(전환이 끝난 뒤에도 컷 시각 기준으로 이어짐)
+    draw(seg, { alpha: 1, dx: 0, zoom: flashZoom(t - seg.start - trDur / 2), cut: trDur / 2 });
+  } else if (delay) {
+    draw(seg, { alpha: 1, dx: 0, zoom: 1, delay });
   } else {
     draw(seg, { alpha: 1, dx: 0, zoom: 1 });
   }
@@ -2000,18 +2753,20 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
   // 제목·채널: 엔딩으로 넘어갈 때만 함께 사라집니다. 훅 배경(full/blur 훅) 위에는 채널만.
   const chromeAlpha = seg.kind === 'ending' ? (inTr && prev?.kind === 'scene' ? 1 - k : 0) : 1;
   if (chromeAlpha > 0) {
-    if (seg.kind === 'scene' && hasHookBg(p, seg.scene)) drawChrome(ctx, { ...p, titleMode: 'none' }, L, W, H, logo, chromeAlpha);
-    else drawChrome(ctx, p, L, W, H, logo, chromeAlpha);
+    if (seg.kind === 'scene' && hasHookBg(p, seg.scene)) drawChrome(ctx, { ...p, titleMode: 'none' }, L, W, H, logo, chromeAlpha, tTitle);
+    else drawChrome(ctx, p, L, W, H, logo, chromeAlpha, tTitle);
   }
 
-  // 장식 → 자막. 사라지는 앞 장면 자막도 그 장면의 장식(말풍선·숫자 등)과 함께 흐려지고, 상자·색 조정을 그대로 받아 자리가 튀지 않게 합니다.
+  // 장식 → 2차 장식(extras) → 자막. 사라지는 앞 장면 자막도 그 장면의 장식(말풍선·숫자 등)과 함께 흐려지고, 상자·색 조정을 그대로 받아 자리가 튀지 않게 합니다.
   // 항상 보이는 장식(STEP 칩·티커 등)은 앞 장면 것을 그리지 않고 조정값만 받습니다(같은 자리에 두 번 찍히지 않게).
   if (inTr && prev.kind === 'scene' && k < 0.5) {
     const prevAlpha = clamp(1 - k * 2, 0, 1);
-    const adjPrev = drawOverlay(ctx, p, L, W, H, prev, t, tl, prevAlpha, PERSISTENT_OVERLAYS.has(p.overlay));
+    let adjPrev = drawOverlay(ctx, p, L, W, H, prev, t, tl, prevAlpha, PERSISTENT_OVERLAYS.has(p.overlay));
+    adjPrev = drawExtras(ctx, p, L, W, H, prev, t, tl, prevAlpha, adjPrev, true);
     drawCaption(ctx, p, L, prev, prevAlpha, t, adjPrev);
   }
-  const adj = drawOverlay(ctx, p, L, W, H, seg, t, tl, capAlpha);
+  let adj = drawOverlay(ctx, p, L, W, H, seg, t, tl, capAlpha, false, trDur);
+  adj = drawExtras(ctx, p, L, W, H, seg, t, tl, capAlpha, adj, false, trDur);
   drawCaption(ctx, p, L, seg, capAlpha, t, adj);
 
   if (p.showProgress) {
@@ -2022,6 +2777,14 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
     ctx.fillRect(0, H - bh, (W * t) / tl.total, bh);
   }
 
+  // 플래시 컷의 흰빛(강조색 25% 섞음): 제목·장식·자막까지 함께 하얘지게 맨 위에, 알파는 sin 곡선(0→0.92→0)
+  if (inTr && p.transition === 'flash') {
+    const { r, g, b } = rgbOf(p.highlightColor);
+    const mix = (c) => Math.round(255 - (255 - c) * 0.25);
+    ctx.fillStyle = `rgba(${mix(r)},${mix(g)},${mix(b)},${(Math.sin(raw * Math.PI) * 0.92).toFixed(3)})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+
   if (p.titleMode === 'hook') drawHookTitle(ctx, p, L, W, H, t, logo);
   ctx.restore();
 }
@@ -2029,7 +2792,8 @@ export function drawFrame(ctx, p0, W, H, t, tl = buildTimeline(p0), logo = p0.lo
 /** 화면에 들어가는 글꼴을 미리 받아 둡니다(받기 전에 그리면 기본 글꼴로 나옵니다). */
 export async function ensureFonts(p) {
   if (!document.fonts?.load) return;
-  const text = plainText([p.title, p.channel, p.ending?.text, p.ending?.sub, ...(p.scenes || []).map((s) => s.caption)].join(' ')) || '가나다';
+  const b = brandOf(p);
+  const text = plainText([p.title, p.channel, p.ending?.text, p.ending?.sub, p.ending?.cta, b.name, b.phone, b.sub, ...(p.scenes || []).map((s) => `${s.caption} ${s.stamp || ''} ${s.labelA || ''} ${s.labelB || ''}`)].join(' ')) || '가나다';
   const jobs = ['700', '800', '900'].map((w) => document.fonts.load(`${w} 48px "Pretendard Variable"`, text));
   await Promise.all(jobs.map((j) => j.catch(() => null)));
   textLayoutCache.clear();
