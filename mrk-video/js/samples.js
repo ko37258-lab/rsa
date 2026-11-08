@@ -18,6 +18,20 @@ export const SAMPLES = {
   'c04-listing-sub': { fallback: 'city', caption: '건물 외관' },
   'h01-hero-land': { fallback: 'land', caption: '개발 예정 토지' },
   'h02-hero-studio': { fallback: 'product', caption: '쇼츠 촬영 책상' },
+  // 광고 사례용(2026-11): 아파트 매물 세트·상가·토지·중개사무소·세미나·계약·리모델링 전후
+  'a01-apt-exterior': { fallback: 'city', caption: '신축 아파트 외관' },
+  'a02-apt-living': { fallback: 'product', caption: '아파트 거실' },
+  'a03-apt-kitchen': { fallback: 'product', caption: '아파트 주방' },
+  'a04-apt-bedroom': { fallback: 'product', caption: '안방 침실' },
+  'a05-apt-bath': { fallback: 'product', caption: '욕실' },
+  'b01-shop-front': { fallback: 'city', caption: '1층 코너 상가 전면' },
+  'b02-shop-inside': { fallback: 'product', caption: '상가 내부 공실' },
+  'l01-land-road': { fallback: 'road', caption: '도로 접한 대지' },
+  'o01-office-front': { fallback: 'product', caption: '중개사무소 상담 공간' },
+  'e01-seminar': { fallback: 'city', caption: '부동산 세미나 강의' },
+  'r01-contract': { fallback: 'product', caption: '계약서 서명' },
+  'v01-villa-before': { fallback: 'product', caption: '리모델링 전 거실' },
+  'v02-villa-after': { fallback: 'product', caption: '리모델링 후 거실' },
 };
 
 const cache = new Map();

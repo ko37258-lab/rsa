@@ -1,5 +1,5 @@
 {
-  "generatedWith": "Higgsfield gpt_image_2_5",
+  "generatedWith": "Higgsfield gpt_image_2_5 (처음 12장) · gpt_image_2_6 (광고 사례용 13장, 2026-11-08)",
   "license": "MR.K 자체 생성 이미지",
   "items": [
     {
@@ -97,6 +97,123 @@
       "ok": true,
       "caption": "삼각대 스마트폰으로 세로 영상 찍는 작업실",
       "use": "hero"
+    },
+    {
+      "id": "a01-apt-exterior",
+      "file": "a01-apt-exterior.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "맑은 날 신축 아파트 단지 외관과 조경 입구",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "a02-apt-living",
+      "file": "a02-apt-living.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "남향 창으로 햇살 드는 밝은 아파트 거실",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "a03-apt-kitchen",
+      "file": "a03-apt-kitchen.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "흰 아일랜드 조리대의 아파트 주방",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "a04-apt-bedroom",
+      "file": "a04-apt-bedroom.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "붙박이장 있는 차분한 안방 침실",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "a05-apt-bath",
+      "file": "a05-apt-bath.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "유리 파티션과 큰 거울의 깨끗한 욕실",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "b01-shop-front",
+      "file": "b01-shop-front.jpg",
+      "aspect": "3:2",
+      "ok": true,
+      "caption": "신축 상가 1층 코너 공실, 통유리 전면과 보행자",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "b02-shop-inside",
+      "file": "b02-shop-inside.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "임대 대기 중인 1층 상가 내부 공실",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "l01-land-road",
+      "file": "l01-land-road.jpg",
+      "aspect": "3:2",
+      "ok": true,
+      "caption": "2차선 도로에 접한 평탄한 대지와 측량 말뚝",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "o01-office-front",
+      "file": "o01-office-front.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "상담 책상과 지도가 있는 중개사무소 내부",
+      "use": "brand",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "e01-seminar",
+      "file": "e01-seminar.jpg",
+      "aspect": "3:2",
+      "ok": true,
+      "caption": "토지 지도를 띄운 부동산 투자 세미나 강의 장면",
+      "use": "lecture",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "r01-contract",
+      "file": "r01-contract.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "계약서에 서명하는 손과 집 열쇠",
+      "use": "review",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "v01-villa-before",
+      "file": "v01-villa-before.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "리모델링 전 낡은 빌라 거실",
+      "use": "listing",
+      "model": "gpt_image_2_6"
+    },
+    {
+      "id": "v02-villa-after",
+      "file": "v02-villa-after.jpg",
+      "aspect": "1:1",
+      "ok": true,
+      "caption": "리모델링 후 같은 자리의 밝은 빌라 거실",
+      "use": "listing",
+      "model": "gpt_image_2_6"
     }
   ]
 }
