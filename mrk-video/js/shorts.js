@@ -276,7 +276,7 @@ function renderScenes() {
     stamp.className = 'scene-stamp';
     stamp.maxLength = 10;
     stamp.value = s.stamp || '';
-    stamp.placeholder = '도장(급매)';
+    stamp.placeholder = '도장(남향)';
     stamp.setAttribute('aria-label', `${i + 1}번 장면 도장 글`);
     stamp.addEventListener('input', () => { s.stamp = stamp.value; changed(false); });
     meta.append(dur, document.createTextNode('초'), kind, tag, stamp);
