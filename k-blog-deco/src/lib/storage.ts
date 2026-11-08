@@ -51,6 +51,7 @@ export async function saveFile(bytes: Uint8Array, mime: string): Promise<string>
     if (!res.ok) throw new Error(`storage upload failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
     return key;
   }
+  if (process.env.VERCEL) throw new Error("이미지 저장소(Supabase Storage)가 설정되지 않았습니다.");
   await fs.mkdir(uploadsDir(), { recursive: true });
   await fs.writeFile(path.join(uploadsDir(), key), bytes);
   return key;

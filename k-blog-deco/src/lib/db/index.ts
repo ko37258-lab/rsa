@@ -4,6 +4,7 @@ import path from "node:path";
 import postgres from "postgres";
 import { drizzle as drizzlePg, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { env } from "@/lib/env";
+import { ApiError } from "@/lib/api/http";
 import * as schema from "./schema";
 
 /**
@@ -42,6 +43,10 @@ async function connectLocal(): Promise<Db> {
 }
 
 export function getDb(): Promise<Db> {
+  if (!env.databaseUrl && process.env.VERCEL) {
+    // Vercel 은 디스크에 저장할 수 없으므로 로컬 DB 로 대체하지 않고 설정 안내를 돌려줍니다.
+    throw new ApiError(503, "db_not_configured", "DB 연결이 아직 설정되지 않았습니다. Vercel 프로젝트에 Supabase 연동을 켜 주세요.");
+  }
   if (!globalForDb.__kbdDb) {
     globalForDb.__kbdDb = env.databaseUrl ? Promise.resolve(connectRemote(env.databaseUrl)) : connectLocal();
   }

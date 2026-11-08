@@ -11,6 +11,14 @@ export async function GET() {
       devLogin: env.allowDevLogin,
       ai: aiConfigured() ? { mode: "claude", model: env.aiModel } : { mode: "template", model: null },
       naverSpec: NAVER_SPEC,
+      // 운영 설정 점검용 (값은 노출하지 않고 설정 여부만)
+      setup: {
+        database: Boolean(env.databaseUrl) || !process.env.VERCEL,
+        storage: Boolean(env.supabaseUrl && env.supabaseServiceKey) || !process.env.VERCEL,
+        naverLogin: naverLoginConfigured(),
+        ai: aiConfigured(),
+        appUrl: env.appUrl,
+      },
     },
     { headers: { "Cache-Control": "no-store" } },
   );
