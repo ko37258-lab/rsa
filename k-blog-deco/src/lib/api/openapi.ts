@@ -100,7 +100,7 @@ export function buildOpenApi(serverUrl: string) {
   return {
     openapi: "3.1.0",
     info: {
-      title: "K 블로그 꾸미기 API",
+      title: "MR.K-홈형 블로그 만들기 API",
       version: "1.0.0",
       description:
         "웹 화면이 쓰는 것과 같은 API 입니다. 웹에서는 세션 쿠키로, 외부 연동은 개인 API 토큰(Authorization: Bearer kbd_...)으로 인증합니다.",

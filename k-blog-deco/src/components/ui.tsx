@@ -94,8 +94,8 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "error" | 
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cx("inline-flex items-center gap-2 font-extrabold tracking-tight", className)}>
-      <span className="grid size-7 place-items-center rounded-md bg-accent text-[15px] font-black text-white">K</span>
-      <span>블로그 꾸미기</span>
+      <span className="rounded-md bg-ink px-1.5 py-0.5 text-[12px] font-black tracking-normal text-white">MR.K</span>
+      <span>홈형 블로그 만들기</span>
     </span>
   );
 }

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session";
 import { resolveToken } from "@/lib/auth/tokens";
-import { findUser } from "@/lib/auth/users";
+import { findUser, onboardingNeeds } from "@/lib/auth/users";
 
 export class ApiError extends Error {
   constructor(
@@ -64,8 +64,9 @@ const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 /**
  * 인증: (1) Authorization: Bearer kbd_... 개인 API 토큰, (2) 세션 쿠키.
  * 쿠키 인증 + 상태 변경 요청은 Origin 검사로 CSRF 를 막습니다.
+ * 약관 미동의(403 terms_required)·회원 코드 미확인(403 member_required) 사용자는 막습니다 (첫 이용 화면용 요청은 allowUnagreed 로 예외).
  */
-export async function requireUser(req: NextRequest) {
+export async function requireUser(req: NextRequest, opts: { allowUnagreed?: boolean } = {}) {
   const auth = req.headers.get("authorization");
   let userId: string | null = null;
   if (auth?.toLowerCase().startsWith("bearer ")) {
@@ -81,6 +82,11 @@ export async function requireUser(req: NextRequest) {
   if (!userId) throw new ApiError(401, "unauthorized", "로그인이 필요합니다.");
   const user = await findUser(userId);
   if (!user) throw new ApiError(401, "unauthorized", "사용자 정보를 찾을 수 없습니다. 다시 로그인해 주세요.");
+  if (!opts.allowUnagreed) {
+    const needs = onboardingNeeds(user);
+    if (needs.terms) throw new ApiError(403, "terms_required", "서비스를 이용하려면 이용약관과 개인정보처리방침에 동의해야 합니다.");
+    if (needs.member) throw new ApiError(403, "member_required", "회원 코드를 확인한 회원만 이용할 수 있습니다.");
+  }
   return user;
 }
 

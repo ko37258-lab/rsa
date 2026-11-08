@@ -37,8 +37,13 @@ async function connectLocal(): Promise<Db> {
   const dir = path.resolve(env.dataDir, "pglite");
   fs.mkdirSync(dir, { recursive: true });
   const client = new PGlite(dir);
-  const sql = fs.readFileSync(path.join(process.cwd(), "db", "0001_init.sql"), "utf8");
-  await client.exec(sql);
+  // db/*.sql 을 순서대로 적용 (supabase-only 표시가 있는 파일은 건너뜀)
+  const dbDir = path.join(process.cwd(), "db");
+  for (const f of fs.readdirSync(dbDir).filter((n) => /^\d+_.*\.sql$/.test(n)).sort()) {
+    const sql = fs.readFileSync(path.join(dbDir, f), "utf8");
+    if (sql.startsWith("-- supabase-only")) continue;
+    await client.exec(sql);
+  }
   return drizzle(client, { schema }) as unknown as Db;
 }
 

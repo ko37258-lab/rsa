@@ -24,6 +24,8 @@ export const env = {
   allowDevLogin:
     process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_LOGIN === "true",
   aiRateLimitPerHour: Number(process.env.AI_RATE_LIMIT_PER_HOUR || 30),
+  /** 회원 코드. 설정하면 첫 로그인 때 이 코드를 입력한 사람만 서비스를 쓸 수 있습니다. */
+  memberAccessCode: (process.env.MEMBER_ACCESS_CODE || "").trim(),
 };
 
 export const naverLoginConfigured = () =>

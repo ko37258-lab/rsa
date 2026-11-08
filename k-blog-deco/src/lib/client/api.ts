@@ -18,10 +18,13 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = (data as { error?: { code?: string; message?: string } }).error;
-    if (res.status === 401 && typeof window !== "undefined") {
-      // 세션 만료: 앱 어디서든 로그인 화면으로 전체 이동 (라우터 밖 유틸리티라 하드 이동)
+    if (typeof window !== "undefined") {
+      const back = encodeURIComponent(window.location.pathname);
+      // 세션 만료 → 로그인 화면, 약관 미동의·회원 코드 미확인 → 첫 이용 화면 (라우터 밖 유틸리티라 하드 이동)
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign(`/?next=${encodeURIComponent(window.location.pathname)}`);
+      if (res.status === 401) window.location.assign(`/?next=${back}`);
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      else if (res.status === 403 && (err?.code === "terms_required" || err?.code === "member_required")) window.location.assign(`/welcome?next=${back}`);
     }
     throw new ApiClientError(res.status, err?.code ?? "error", err?.message ?? `요청 실패 (${res.status})`);
   }

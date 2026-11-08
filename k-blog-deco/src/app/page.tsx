@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { LoginActions } from "@/components/login-actions";
 import { Logo } from "@/components/ui";
+import { SiteFooter } from "@/components/site-footer";
 
 const STEPS = [
   {
@@ -63,8 +64,8 @@ export default function Home() {
     <main className="flex-1">
       <header className="mx-auto flex h-16 max-w-6xl items-center px-5">
         <Logo className="text-base" />
-        <a href="#how" className="ml-auto text-[13px] font-semibold text-ink-3 hover:text-ink">
-          사용 방법
+        <a href="/guide" className="ml-auto text-[13px] font-semibold text-ink-3 hover:text-ink">
+          따라하기 가이드
         </a>
       </header>
 
@@ -72,7 +73,7 @@ export default function Home() {
         <div>
           <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-line-2 bg-card px-3 py-1 text-xs font-semibold text-ink-2">
             <span className="size-1.5 rounded-full bg-accent" />
-            네이버 홈페이지형 블로그 전용
+            MR.K 회원 전용 · 네이버 홈페이지형 블로그
           </p>
           <h1 className="text-[40px] font-extrabold leading-[1.15] tracking-[-0.03em] sm:text-[52px]">
             레퍼런스만 보여주세요.
@@ -89,6 +90,10 @@ export default function Home() {
             <Suspense fallback={<div className="h-13" />}>
               <LoginActions />
             </Suspense>
+            <p className="mt-4 text-xs leading-relaxed text-ink-3">
+              처음 로그인하면 <a href="/terms" className="underline">이용약관</a>·<a href="/privacy" className="underline">개인정보처리방침</a> 동의와 회원 코드 확인을 한 번 거칩니다.
+              처음이라면 <a href="/guide" className="font-semibold text-accent-ink underline">따라하기 가이드</a>를 먼저 보세요.
+            </p>
           </div>
         </div>
         <MockBlog />
@@ -122,7 +127,7 @@ export default function Home() {
         </p>
       </section>
 
-      <footer className="border-t border-line py-8 text-center text-xs text-ink-3">© K 블로그 꾸미기</footer>
+      <SiteFooter />
     </main>
   );
 }

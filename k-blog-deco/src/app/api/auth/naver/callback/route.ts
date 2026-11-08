@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCodeForProfile } from "@/lib/auth/naver";
-import { upsertUser } from "@/lib/auth/users";
+import { onboardingNeeds, upsertUser } from "@/lib/auth/users";
+
+const isReady = (u: Parameters<typeof onboardingNeeds>[0]) => {
+  const n = onboardingNeeds(u);
+  return !n.terms && !n.member;
+};
 import { createSessionToken, OAUTH_STATE_COOKIE, SESSION_COOKIE, sessionCookieOptions } from "@/lib/auth/session";
 import { safeNextPath } from "@/lib/auth/next-path";
 import { appUrl } from "@/lib/env";
@@ -34,7 +39,10 @@ export async function GET(req: NextRequest) {
       email: profile.email ?? null,
       profileImage: profile.profile_image ?? null,
     });
-    const res = NextResponse.redirect(appUrl(safeNextPath(saved.next)));
+    const next = safeNextPath(saved.next);
+    // 첫 로그인(또는 약관 개정 후)이면 동의 화면을 먼저 보여 줍니다.
+    const dest = isReady(user) ? next : `/welcome?next=${encodeURIComponent(next)}`;
+    const res = NextResponse.redirect(appUrl(dest));
     res.cookies.set(SESSION_COOKIE, await createSessionToken(user.id), sessionCookieOptions());
     res.cookies.delete(OAUTH_STATE_COOKIE);
     return res;

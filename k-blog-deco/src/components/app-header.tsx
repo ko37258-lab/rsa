@@ -24,12 +24,14 @@ function HeaderInner({ right }: { right?: React.ReactNode }) {
   }, []);
   const nav = [
     { href: "/dashboard", label: "내 디자인" },
+    { href: "/guide", label: "따라하기" },
     { href: "/developers", label: "API 연동" },
+    { href: "/account", label: "계정" },
   ];
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-paper/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-        <Link href="/dashboard" aria-label="K 블로그 꾸미기 홈">
+        <Link href="/dashboard" aria-label="MR.K-홈형 블로그 만들기 홈">
           <Logo className="text-[15px]" />
         </Link>
         <nav className="hidden items-center gap-1 sm:flex">

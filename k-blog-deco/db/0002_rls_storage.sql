@@ -1,3 +1,4 @@
+-- supabase-only: Supabase 프로젝트에서만 실행 (로컬 내장 DB 는 건너뜀)
 -- Supabase 전용: 공개 API 차단(RLS) + 이미지 저장 버킷(비공개, 서버만 접근)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
