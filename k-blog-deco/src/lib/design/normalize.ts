@@ -10,10 +10,19 @@ import type {
   StrokeT,
 } from "./schema";
 
-const clamp = (n: unknown, min: number, max: number, fallback: number) => {
-  const v = typeof n === "number" && Number.isFinite(n) ? n : fallback;
-  return Math.min(max, Math.max(min, v));
+// AI 출력은 형식이 강제되지 않으므로 숫자 대신 "24px" 같은 문자열, 배열 대신 객체 등이 올 수 있습니다.
+const toNum = (n: unknown): number | null => {
+  if (typeof n === "number" && Number.isFinite(n)) return n;
+  if (typeof n === "string" && n.trim()) {
+    const v = parseFloat(n);
+    return Number.isFinite(v) ? v : null;
+  }
+  return null;
 };
+const clamp = (n: unknown, min: number, max: number, fallback: number) => Math.min(max, Math.max(min, toNum(n) ?? fallback));
+const str = (x: unknown): string => (typeof x === "string" ? x : typeof x === "number" ? String(x) : "");
+const arr = <T = unknown>(x: unknown): T[] => (Array.isArray(x) ? (x as T[]) : []);
+const obj = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
 const round = (n: number) => Math.round(n * 100) / 100;
 
 const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
@@ -31,10 +40,12 @@ export function normColor(c: unknown, fallback: string): string {
 const normFont = (f: unknown, fallback: FontKey): FontKey =>
   FONT_KEYS.includes(f as FontKey) ? (f as FontKey) : fallback;
 
-export function normFill(f: FillT | null | undefined, fallback: string): FillT {
-  if (!f) return { type: "solid", color: fallback };
+export function normFill(f: FillT | string | null | undefined, fallback: string): FillT {
+  if (typeof f === "string") return { type: "solid", color: normColor(f, fallback) };
+  if (!obj(f)) return { type: "solid", color: fallback };
   if (f.type === "linear") {
-    const stops = (f.stops || [])
+    const stops = arr<{ at?: unknown; color?: unknown }>(f.stops)
+      .filter(obj)
       .slice(0, 6)
       .map((s) => ({ at: round(clamp(s.at, 0, 1, 0)), color: normColor(s.color, fallback) }))
       .sort((a, b) => a.at - b.at);
@@ -45,10 +56,10 @@ export function normFill(f: FillT | null | undefined, fallback: string): FillT {
 }
 
 const normShadow = (s: ShadowT | null | undefined): ShadowT | null =>
-  s ? { color: normColor(s.color, "#00000033"), blur: clamp(s.blur, 0, 120, 12), x: clamp(s.x, -80, 80, 0), y: clamp(s.y, -80, 80, 4) } : null;
+  obj(s) ? { color: normColor(s.color, "#00000033"), blur: clamp(s.blur, 0, 120, 12), x: clamp(s.x, -80, 80, 0), y: clamp(s.y, -80, 80, 4) } : null;
 
 const normStroke = (s: StrokeT | null | undefined): StrokeT | null =>
-  s && s.width > 0 ? { color: normColor(s.color, "#000000"), width: clamp(s.width, 0.5, 40, 1) } : null;
+  obj(s) && (toNum(s.width) ?? 0) > 0 ? { color: normColor(s.color, "#000000"), width: clamp(s.width, 0.5, 40, 1) } : null;
 
 /** http(s) 링크만 허용. 도메인만 적은 경우 https:// 를 붙입니다. */
 export function sanitizeLink(url: unknown): string {
@@ -89,7 +100,7 @@ function normAsset(id: unknown, ctx: Ctx): string | null {
 function normLayer(l: LayerT, ctx: Ctx, maxW: number, maxH: number): LayerT | null {
   const common = {
     id: uniqueId(l.id, "L", ctx),
-    name: (l.name || "").slice(0, 40) || l.type,
+    name: str(l.name).slice(0, 40) || l.type,
     x: round(clamp(l.x, -1600, maxW + 1600, 0)),
     y: round(clamp(l.y, -600, maxH + 600, 0)),
     w: round(clamp(l.w, 1, 4000, 100)),
@@ -107,7 +118,7 @@ function normLayer(l: LayerT, ctx: Ctx, maxW: number, maxH: number): LayerT | nu
         ...common,
         type: "image",
         assetId: normAsset(l.assetId, ctx),
-        placeholder: (l.placeholder || "사진").slice(0, 30),
+        placeholder: (str(l.placeholder) || "사진").slice(0, 30),
         fit: l.fit === "contain" ? "contain" : "cover",
         shape: (["rect", "circle", "arch"] as const).includes(l.shape) ? l.shape : "rect",
         radius: clamp(l.radius, 0, 2000, 0),
@@ -116,7 +127,7 @@ function normLayer(l: LayerT, ctx: Ctx, maxW: number, maxH: number): LayerT | nu
       };
     case "text": {
       const font = normFont(l.font, ctx.fonts.body);
-      const text = (l.text || "").slice(0, 400);
+      const text = str(l.text).slice(0, 400);
       if (!text.trim()) return null;
       return {
         ...common,
@@ -150,7 +161,8 @@ function normArtboard(a: ArtboardT, w: number, h: number, ctx: Ctx, fallbackBg: 
             overlay: a.backgroundImage.overlay ? normFill(a.backgroundImage.overlay, "#00000066") : null,
           }
         : null,
-    layers: (a?.layers || [])
+    layers: arr<LayerT>(a?.layers)
+      .filter(obj)
       .slice(0, 60)
       .map((l) => normLayer(l, ctx, w, h))
       .filter((l): l is LayerT => l !== null),
@@ -175,11 +187,11 @@ function normMenu(m: MenuT, ctx: Ctx): MenuT {
       weight: nearestWeight(font, clamp(st?.weight, 100, 900, 700)),
       layout: (["label", "label-sub", "emoji-label", "emoji-top"] as const).includes(st?.layout) ? st.layout : "label",
     },
-    items: (m?.items || []).slice(0, 10).map((it) => ({
+    items: arr<MenuT["items"][number]>(m?.items).filter(obj).slice(0, 10).map((it) => ({
       id: uniqueId(it.id, "M", ctx),
-      label: (it.label || "메뉴").slice(0, 20),
-      sublabel: (it.sublabel || "").slice(0, 30),
-      emoji: Array.from(it.emoji || "").slice(0, 2).join(""),
+      label: (str(it.label) || "메뉴").slice(0, 20),
+      sublabel: str(it.sublabel).slice(0, 30),
+      emoji: Array.from(str(it.emoji)).slice(0, 2).join(""),
       link: sanitizeLink(it.link),
       fill: it.fill ? normFill(it.fill, ctx.palette.primary) : null,
       textColor: it.textColor ? normColor(it.textColor, "#FFFFFF") : null,
@@ -213,8 +225,8 @@ export function normalizeDesign(d: BlogDesignT, opts: { allowedAssetIds?: Set<st
 
   return {
     version: 1,
-    name: (d.name || "새 블로그 디자인").slice(0, 60),
-    summary: (d.summary || "").slice(0, 600),
+    name: (str(d.name) || "새 블로그 디자인").slice(0, 60),
+    summary: str(d.summary).slice(0, 600),
     palette,
     fonts,
     pageBackground: normColor(d.pageBackground, palette.background),

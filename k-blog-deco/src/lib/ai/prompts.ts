@@ -58,11 +58,13 @@ export const GENERATE_SYSTEM = `${DOMAIN}
 ## 지금 할 일
 사용자의 요구사항·레퍼런스·사진을 보고 새 BlogDesign 을 만드세요.
 referenceAnalysis 에는 레퍼런스에서 읽어낸 스타일 특징(색, 레이아웃, 타이포, 버튼, 분위기)을 한국어 3~6줄로 정리하세요. 레퍼런스가 없으면 요구사항을 어떻게 해석했는지 적습니다.
-design.summary 에는 콘셉트를 한국어 2~3문장으로 설명하세요. design.version 은 1 입니다.`;
+design.summary 에는 콘셉트를 한국어 2~3문장으로 설명하세요. design.version 은 1 입니다.
+결과는 submit_design 도구를 한 번 호출해 제출하세요. 도구 스키마의 모든 필수 항목(팔레트, 폰트, layout, hero, menu, mobile)을 빠짐없이 채웁니다.`;
 
 export const REVISE_SYSTEM = `${DOMAIN}
 
 ## 지금 할 일
 사용자가 이미 만든 BlogDesign 과 수정 요청을 줍니다. 요청한 부분만 바꾸고 나머지(레이어 id, 위치, 문구, 색)는 최대한 그대로 유지한 '수정된 전체 BlogDesign' 을 반환하세요.
 요청이 모호하면 가장 자연스러운 해석을 택합니다. 레퍼런스 이미지가 함께 오면 그 스타일을 참고합니다.
-changeSummary 에는 실제로 바꾼 내용을 한국어 1~3문장으로 적으세요.`;
+changeSummary 에는 실제로 바꾼 내용을 한국어 1~3문장으로 적으세요.
+결과는 submit_revision 도구를 한 번 호출해, 바꾸지 않은 부분까지 포함한 전체 BlogDesign 으로 제출하세요.`;

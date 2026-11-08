@@ -14,7 +14,7 @@ import { deriveMobile, templateDesign, templateRevise } from "@/lib/design/templ
 import { briefAssetIds, userAssetIdSet } from "@/lib/services/projects";
 import type { AssetRow, ProjectRow, UserRow } from "@/lib/db/schema";
 import { GENERATE_SYSTEM, REVISE_SYSTEM } from "./prompts";
-import { structuredDesignCall, type AiUsage } from "./claude";
+import { designToolCall, type AiUsage, type Check, type DesignTool } from "./claude";
 
 const GenerateOutput = z.object({
   referenceAnalysis: z.string().describe("레퍼런스에서 읽어낸 스타일 특징 (한국어 3~6줄)"),
@@ -25,6 +25,59 @@ const ReviseOutput = z.object({
   changeSummary: z.string().describe("바꾼 내용 요약 (한국어 1~3문장)"),
   design: BlogDesign,
 });
+
+/** zod 스키마 → 도구 입력 스키마(JSON Schema). strict 가 아니므로 문법 크기 제한이 없습니다. */
+function toInputSchema(s: z.ZodType): Anthropic.Beta.BetaTool.InputSchema {
+  const js = z.toJSONSchema(s, { unrepresentable: "any" }) as Record<string, unknown>;
+  delete js.$schema;
+  return js as Anthropic.Beta.BetaTool.InputSchema;
+}
+
+const GENERATE_TOOL: DesignTool = {
+  name: "submit_design",
+  description: "완성한 BlogDesign 과 레퍼런스 분석을 제출합니다. 결과는 반드시 이 도구를 한 번 호출해 제출하세요.",
+  inputSchema: toInputSchema(GenerateOutput),
+};
+
+const REVISE_TOOL: DesignTool = {
+  name: "submit_revision",
+  description: "수정한 전체 BlogDesign 과 바꾼 내용 요약을 제출합니다. 결과는 반드시 이 도구를 한 번 호출해 제출하세요.",
+  inputSchema: toInputSchema(ReviseOutput),
+};
+
+const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object" && x !== null && !Array.isArray(x);
+
+/** 도구 입력의 뼈대만 확인합니다. 세부 값(범위·색·글꼴 등)은 normalizeDesign 이 보정합니다. */
+function readDesign(raw: unknown): Check<BlogDesignT> {
+  let d = raw;
+  if (typeof d === "string") {
+    try {
+      d = JSON.parse(d); // 가끔 design 을 문자열로 감싸 보내는 경우
+    } catch {
+      return { ok: false, reason: "design 이 올바른 JSON 객체가 아님" };
+    }
+  }
+  if (!isObj(d)) return { ok: false, reason: "design 객체가 없음" };
+  if (!isObj(d.hero) || !Array.isArray(d.hero.layers) || d.hero.layers.length === 0) {
+    return { ok: false, reason: "design.hero.layers 가 비어 있음" };
+  }
+  if (!isObj(d.menu) || !Array.isArray(d.menu.items)) return { ok: false, reason: "design.menu.items 가 없음" };
+  return { ok: true, data: d as unknown as BlogDesignT };
+}
+
+function validateGenerate(input: unknown): Check<{ referenceAnalysis: string; design: BlogDesignT }> {
+  if (!isObj(input)) return { ok: false, reason: "도구 입력이 객체가 아님" };
+  const d = readDesign(input.design);
+  if (!d.ok) return d;
+  return { ok: true, data: { referenceAnalysis: typeof input.referenceAnalysis === "string" ? input.referenceAnalysis : "", design: d.data } };
+}
+
+function validateRevise(input: unknown): Check<{ changeSummary: string; design: BlogDesignT }> {
+  if (!isObj(input)) return { ok: false, reason: "도구 입력이 객체가 아님" };
+  const d = readDesign(input.design);
+  if (!d.ok) return d;
+  return { ok: true, data: { changeSummary: typeof input.changeSummary === "string" ? input.changeSummary : "요청한 내용을 반영했습니다.", design: d.data } };
+}
 
 const MAX_IMAGE_BYTES = 4_500_000;
 
@@ -111,7 +164,7 @@ async function buildGenerateContent(user: UserRow, brief: BriefT) {
   } else {
     content.push({ type: "text", text: "# 사용자 사진: 없음 — image 레이어를 쓰려면 assetId=null 로 두세요." });
   }
-  content.push({ type: "text", text: "위 내용으로 BlogDesign 을 만들어 주세요." });
+  content.push({ type: "text", text: "위 내용으로 BlogDesign 을 만들어 submit_design 도구로 제출해 주세요." });
   return content;
 }
 
@@ -168,7 +221,7 @@ export async function generateDesign(user: UserRow, project: ProjectRow, brief: 
   const started = Date.now();
   try {
     const content = await buildGenerateContent(user, brief);
-    const { data, usage } = await structuredDesignCall({ system: GENERATE_SYSTEM, content, schema: GenerateOutput, effort: "high" });
+    const { data, usage } = await designToolCall({ system: GENERATE_SYSTEM, content, tool: GENERATE_TOOL, validate: validateGenerate, effort: "high" });
     const allowed = await userAssetIdSet(user.id);
     let design = normalizeDesign(data.design, { allowedAssetIds: allowed });
     if (!design.mobile.layers.length) design = { ...design, mobile: deriveMobile(design) };
@@ -207,9 +260,10 @@ export async function reviseDesign(
       const block = await imageBlock(assets.get(id));
       if (block) content.push({ type: "text", text: "# 수정 참고 이미지" }, block);
     }
-    content.push({ type: "text", text: `# 수정 요청\n${instruction}` });
-    const { data, usage } = await structuredDesignCall({ system: REVISE_SYSTEM, content, schema: ReviseOutput, effort: "medium" });
-    const design = normalizeDesign(data.design, { allowedAssetIds: photoIds });
+    content.push({ type: "text", text: `# 수정 요청\n${instruction}\n\n수정한 전체 BlogDesign 을 submit_revision 도구로 제출해 주세요.` });
+    const { data, usage } = await designToolCall({ system: REVISE_SYSTEM, content, tool: REVISE_TOOL, validate: validateRevise, effort: "medium" });
+    let design = normalizeDesign(data.design, { allowedAssetIds: photoIds });
+    if (!design.mobile.layers.length) design = { ...design, mobile: deriveMobile(design) };
     await logRun({ userId: user.id, projectId: project.id, kind: "revise", status: "ok", usage, ms: Date.now() - started });
     return { design, note: data.changeSummary, source: "ai-revise", mode: "ai" };
   } catch (err) {
