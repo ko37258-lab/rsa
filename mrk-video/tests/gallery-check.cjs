@@ -277,10 +277,11 @@ async function prepareAll(page) {
     const pk = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     watch(pk, 'K');
     await openShowcase(pk, '#case-follow');
-    await pk.waitForTimeout(1500);
-    const k1 = await pk.evaluate(() => ({ view: !document.getElementById('view-showcase').hidden, top: Math.round(document.getElementById('case-follow').getBoundingClientRect().top), scrollY: Math.round(window.scrollY), hash: location.hash }));
+    // 히어로 제목 움직임(키네틱)이 끝나며 위쪽 높이가 바뀌어도 갤러리 머리가 화면 맨 위에 맞춰져 있어야 한다(showcase.js scrollToFollowIfAsked)
+    await pk.waitForTimeout(3200);
+    const k1 = await pk.evaluate(() => ({ view: !document.getElementById('view-showcase').hidden, top: Math.round(document.getElementById('case-follow').getBoundingClientRect().top), scrollY: Math.round(window.scrollY), hash: location.hash, anims: document.getAnimations().filter((a) => a.playState === 'running' && Number.isFinite(a.effect?.getTiming?.().iterations)).length }));
     report.detail.k1 = k1;
-    check('K 주소 #case-follow 로 바로 열기 → 사례 화면 + 갤러리로 스크롤', k1.view && k1.scrollY > 200 && k1.top >= -2 && k1.top <= 80, k1);
+    check('K 주소 #case-follow 로 바로 열기 → 사례 화면 + 갤러리로 스크롤(제목 움직임이 끝난 뒤에도 맨 위)', k1.view && k1.scrollY > 200 && k1.top >= -2 && k1.top <= 2, k1);
     await shot(pk, 'gallery-1280-anchor-direct.png');
     // 히어로 버튼(hashchange)
     await pk.goto(`${BASE}/#showcase`, { waitUntil: 'load' });
@@ -297,7 +298,7 @@ async function prepareAll(page) {
     const pm = await browser.newPage({ viewport: { width: 400, height: 800 }, deviceScaleFactor: 2 });
     watch(pm, 'M');
     await openShowcase(pm, '#case-follow');
-    await pm.waitForTimeout(1800);
+    await pm.waitForTimeout(3200);
     const m1 = await pm.evaluate(() => {
       const side = document.querySelector('.side').getBoundingClientRect();
       const sec = document.getElementById('case-follow').getBoundingClientRect();
@@ -314,7 +315,7 @@ async function prepareAll(page) {
     const wideM = await pm.evaluate(() => [...document.querySelectorAll('#followGrid .follow-card.wide .monitor')].map((m) => m.dataset.aspect).sort());
     const wantM = await pm.evaluate(() => import('./js/cases-data.js').then((m) => m.CASE_DATA.filter((c) => c.aspect !== '9:16').map((c) => c.aspect).sort()));
     check('M 400px 2열: 16:9·1:1 카드가 한 줄(.wide)', JSON.stringify(wideM) === JSON.stringify(wantM), { wideM, wantM });
-    check('K 모바일 #case-follow 가 위 메뉴 줄 아래로', m1.secTop >= m1.sideBottom - 1 && m1.secTop <= m1.sideBottom + 80, { secTop: m1.secTop, sideBottom: m1.sideBottom });
+    check('K 모바일 #case-follow 가 위 메뉴 줄 아래로', m1.secTop >= m1.sideBottom - 1 && m1.secTop <= m1.sideBottom + 40, { secTop: m1.secTop, sideBottom: m1.sideBottom });
     const preparedM = await prepareAll(pm);
     check('M 400px 카드가 모두 그려짐', preparedM.every((p) => p.ready && !p.blank), preparedM.filter((p) => !p.ready || p.blank).map((p) => p.id).join(',') || '전부');
     const m2 = await pm.evaluate(() => ({ scrollW: document.documentElement.scrollWidth, vw: document.documentElement.clientWidth }));

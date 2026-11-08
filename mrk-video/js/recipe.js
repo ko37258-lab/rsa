@@ -460,7 +460,7 @@ export function renderBar() {
   $('#recipeFill').hidden = !!job || !(p.filled > 0 && p.open.length > 0);
   const filledIds = new Set(recipe.slots.filter((sl) => sl.filled).flatMap((sl) => sl.targets.map((t) => t.sceneId)));
   const emptyScene = scenesNow().some((s) => s.sample && !filledIds.has(s.id) && s.kind !== 'cta');
-  $('#recipeTrim').hidden = !!job || !(p.open.length > 0 && emptyScene);
+  $('#recipeTrim').hidden = !!job || !(p.filled > 0 && p.open.length > 0 && emptyScene); // 사진을 하나라도 넣은 뒤에만(처음부터 장면을 빼는 길로 이끌지 않게)
   $('#recipeRestyle').hidden = api.project.style === recipe.styleId && api.project.aspect === recipe.aspect;
   $('#recipeFiles').disabled = !!job;
 }

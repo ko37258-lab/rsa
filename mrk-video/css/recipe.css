@@ -5,7 +5,7 @@
 .recipe-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; }
 .recipe-head h2 { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
 .recipe-head h2::before { display: none; } /* 배지가 점 구실을 하므로 패널 제목 점은 뺌 */
-.recipe-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.recipe-head h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; padding-inline: 4px; margin-inline: -4px; }
 .recipe-head #recipeStop { margin-left: auto; }
 .recipe-badge {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99px;

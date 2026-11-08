@@ -267,9 +267,11 @@ function buildCard(c, index) {
   return { el: card, canvas, ctx: canvas.getContext('2d'), data: c, index, project: null, tl: null, ready: false, preparing: false, broken: false, ratio: 0, active: false };
 }
 
+/** 그리다 예외가 나면 그 카드만 미리보기를 포기하고(카드·버튼은 그대로) 경고만 남깁니다 — 엔진이 바뀌는 중이어도 갤러리는 남게 */
 function markBroken(card, e) {
   card.broken = true;
   card.active = false;
+  card.el.dataset.broken = '1';
   console.warn('사례 미리보기', card.data.id, e);
 }
 
@@ -369,8 +371,11 @@ function renderFilter() {
  *  1열인데 span 2 를 주면 격자가 옆으로 넘치므로 실제 열 수를 보고 붙입니다. */
 function fitWideCards(grid) {
   if (!grid.clientWidth) return; // 화면이 숨겨져 있으면 열 수를 알 수 없음(보이면 ResizeObserver 가 다시 부름)
-  const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
-  const wide = (c) => (c.data.aspect === '16:9' ? cols >= 2 : c.data.aspect === '1:1' ? cols === 2 : false);
+  const tracks = getComputedStyle(grid).gridTemplateColumns.split(' ');
+  const cols = tracks.length;
+  const colW = parseFloat(tracks[0]) || 0;
+  // 1:1 은 2열(폰)이거나 열이 좁아(260px 미만) 정사각 틀이 폰 높이(313px)에 못 미칠 때 두 칸
+  const wide = (c) => (c.data.aspect === '16:9' ? cols >= 2 : c.data.aspect === '1:1' ? cols === 2 || (cols >= 3 && colW < 260) : false);
   for (const c of follow.cards) c.el.classList.toggle('wide', wide(c));
 }
 
@@ -407,10 +412,23 @@ function fillFollowGallery() {
   }
 }
 
-/** 주소가 #case-follow 로 바로 열렸을 때(hashchange 가 없어 main.js 가 스크롤하지 않음) 갤러리로 내려갑니다. 사용자가 이미 스크롤했으면 그대로 둡니다. */
+/** 주소가 #case-follow 로 바로 열렸을 때(hashchange 가 없어 main.js 가 스크롤하지 않음) 갤러리로 내려갑니다.
+ *  히어로 제목의 키네틱(글자 간격이 넓은 동안 줄이 하나 더 생김)·패널 떠오르기가 끝날 때까지 위쪽 높이가 바뀌므로 2.6초 동안 자리를 다시 맞춥니다.
+ *  그새 사용자가 휠·터치·키로 움직이면 바로 그만둡니다. */
 function scrollToFollowIfAsked() {
-  if (location.hash !== '#case-follow' || window.scrollY > 40) return;
-  document.getElementById('case-follow')?.scrollIntoView({ behavior: 'auto', block: 'start' });
+  const sec = document.getElementById('case-follow');
+  if (location.hash !== '#case-follow' || !sec) return;
+  let userMoved = false;
+  const stop = () => { userMoved = true; };
+  for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown']) window.addEventListener(ev, stop, { once: true, passive: true });
+  const until = performance.now() + 2600;
+  const tick = () => {
+    if (userMoved || location.hash !== '#case-follow' || performance.now() > until) return;
+    const want = parseFloat(getComputedStyle(sec).scrollMarginTop) || 0; // 좁은 화면은 위 메뉴 줄 아래
+    if (Math.abs(sec.getBoundingClientRect().top - want) > 0.5) sec.scrollIntoView({ behavior: 'auto', block: 'start' });
+    requestAnimationFrame(tick);
+  };
+  tick();
 }
 
 async function fillStyleWall() {

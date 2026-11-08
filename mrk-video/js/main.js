@@ -37,7 +37,7 @@ function enterMotion(name) {
   if (!view) return;
   const title = view.querySelector('.view-head h1[data-kinetic], .hero-title[data-kinetic]');
   if (title) kinetic(title, { delay: 80 });
-  const panels = view.querySelectorAll('.studio-controls > .panel, .studio-preview > *, .prose > .panel, .view > .panel, .grid4 > .panel, .runbar, .hero, .view > .follow, .recipe');
+  const panels = view.querySelectorAll('.studio-controls > .panel, .studio-preview > *, .prose > .panel, .view > .panel, .grid4 > .panel, .runbar, .hero, .recipe');
   rise(panels, { delay: 120, stagger: 45 });
 }
 
