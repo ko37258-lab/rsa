@@ -292,7 +292,7 @@ function makeJpeg(file, color) {
       const sc = await sceneState();
       check('E: 매물 상자 ① 사진 1장 → 같은 자리 규칙(장면 추가 없음, 자리 1 = 장면 1·6)', sc.length === cA.scenes.length && sc[0].src.startsWith('blob:') && sc[5].src === sc[0].src && sc[1].sample, { n: sc.length });
       const ct0 = await controls();
-      check('E: ① 로 넣으면 사례(예시) 제목은 매물 제목(*매물* 소개)으로(② 정보가 없을 때의 기본), 엔딩 문구는 사례 그대로', ct0.title === '*매물* 소개' && ct0.endingText === cA.ending.text, { title: ct0.title, endingText: ct0.endingText });
+      check('E: ① 로 넣어도 따라하기 중에는 사례 제목(훅 문구)·엔딩 문구 그대로', ct0.title === cA.title && ct0.endingText === cA.ending.text, { title: ct0.title, endingText: ct0.endingText });
       await page.click('#lsInfo > summary');
       await page.fill('#lsOfName', OFFICE.name);
       await page.fill('#lsOfPhone', OFFICE.phone);

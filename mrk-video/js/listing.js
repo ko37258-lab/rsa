@@ -423,6 +423,8 @@ function syncAutoTitle(fromSample = false) {
   const t = api.project.title;
   const mine = ls.autoTitle && t === ls.autoTitle;
   if (!mine && !(fromSample && api.isSampleTitle(t))) return;
+  // 따라하기(사례) 중에는 사례가 정한 제목(훅 문구)을 지킵니다 — "매물 소개" 같은 기본 제목으로 덮지 않음(AI 다듬기가 바꿈)
+  if (!mine && api.recipeMode) return;
   const next = autoTitle();
   ls.autoTitle = next;
   if (next !== t) api.setTitle(next);
