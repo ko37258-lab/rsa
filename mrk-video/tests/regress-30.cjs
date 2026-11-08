@@ -153,7 +153,7 @@ const savePng = (dataUrl, file) => fs.writeFileSync(file, Buffer.from(dataUrl.sp
       transitionOpts: [...document.querySelectorAll('#transition option')].map((o) => o.value),
     }));
     report.styles = { count: S.length, cards: cards.length, counts, perStyle: [] };
-    if (S.length !== 30) problem(`STYLES 가 ${S.length}개 (30개여야 함)`);
+    if (S.length < 30) problem(`STYLES 가 ${S.length}개 (30개 이상이어야 함)`);
     if (cards.length !== S.length) problem(`스타일 카드 ${cards.length}개 ≠ STYLES ${S.length}개`);
     if (counts.styleCount !== `${S.length}가지`) problem(`#styleCount 가 "${counts.styleCount}"`);
     if (counts.batchBtn !== `${S.length}가지 전부 만들기`) problem(`전부 만들기 버튼이 "${counts.batchBtn}"`);
@@ -486,14 +486,15 @@ const savePng = (dataUrl, file) => fs.writeFileSync(file, Buffer.from(dataUrl.sp
     // 사용 안내
     await p2.evaluate(() => { location.hash = '#guide'; });
     await p2.waitForTimeout(1200);
-    const guide = await p2.evaluate(() => {
+    // 안내 문구의 숫자는 data-style-count 자리표시로 채워지므로 실제 스타일 수(N)로 확인합니다
+    const guide = await p2.evaluate((N) => {
       const v = document.getElementById('view-guide') || document.querySelector('.view[data-view="guide"]');
       const txt = v ? v.innerText : '';
-      return { hidden: v?.hidden, has30: (txt.match(/30가지/g) || []).length, has30x: /30배/.test(txt), stale: (txt.match(/\b20\s*가지|20배/g) || []), sample: txt.split('\n').filter((l) => /가지/.test(l)).slice(0, 6) };
-    });
+      return { hidden: v?.hidden, has30: (txt.match(new RegExp(`${N}가지`, 'g')) || []).length, has30x: new RegExp(`${N}배`).test(txt), stale: (txt.match(/\b20\s*가지|20배/g) || []), sample: txt.split('\n').filter((l) => /가지/.test(l)).slice(0, 6) };
+    }, S.length);
     report.showcase.guide = guide;
     if (guide.hidden) problem('사용 안내 화면이 열리지 않음');
-    if (guide.has30 < 3 || !guide.has30x) problem(`사용 안내 문구에 30가지/30배가 ${guide.has30}/${guide.has30x}`);
+    if (guide.has30 < 3 || !guide.has30x) problem(`사용 안내 문구에 ${S.length}가지/${S.length}배가 ${guide.has30}/${guide.has30x}`);
     if (guide.stale.length) problem(`사용 안내에 남은 옛 숫자: ${guide.stale.join(', ')}`);
     await p2.screenshot({ path: path.join(OUT, 'regress-guide.png'), fullPage: true });
     await p2.close();
