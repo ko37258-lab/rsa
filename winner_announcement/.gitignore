@@ -1,0 +1,6 @@
+node_modules/
+public/fonts/
+work/
+out/
+*.mp4
+*.wav
